@@ -4,6 +4,6 @@ gunicorn==22.0.0
 holehe
 ghunt
 sherlock-project
-maigret
 ignorant
 requests==2.32.3
+
