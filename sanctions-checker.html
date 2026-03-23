@@ -130,7 +130,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
   <div class="seo-block">
     <div class="seo-block-label">What This Tool Does</div>
-    <p>Sanctions screening is a legal requirement in finance, trade, and professional services — and a critical step in any serious due diligence process. This free <strong>sanctions list checker</strong> searches four major government watchlists simultaneously: the <strong>OFAC Specially Designated Nationals (SDN) list</strong> maintained by the US Treasury, the <strong>UN Security Council Consolidated Sanctions List</strong>, the <strong>EU Consolidated Sanctions List</strong>, and the <strong>UK OFSI Consolidated List</strong> maintained by HM Treasury. Enter any individual name, entity, vessel, or organization and this tool will scan all four lists in real time, returning any matches with their designation type, listed nationality, sanctioning program, and listing date. Used by <strong>compliance officers</strong>, <strong>investigative journalists</strong>, <strong>legal professionals conducting due diligence</strong>, <strong>financial institutions</strong>, and <strong>OSINT researchers</strong> who need a fast, free, cross-jurisdictional sanctions screen without a paid API subscription. Lists are fetched live from official government sources and cached for six hours.</p>
+    <p>Sanctions screening is a legal requirement in finance, trade, and professional services — and a critical step in any serious due diligence process. This free <strong>sanctions list checker</strong> searches four major government watchlists simultaneously: the <strong>OFAC Specially Designated Nationals (SDN) list</strong> maintained by the US Treasury, the <strong>UN Security Council Consolidated Sanctions List</strong>, the <strong>EU Consolidated Sanctions List</strong>, and the <strong>UK Sanctions List (FCDO)</strong> maintained by HM Treasury. Enter any individual name, entity, vessel, or organization and this tool will scan all four lists in real time, returning any matches with their designation type, listed nationality, sanctioning program, and listing date. Used by <strong>compliance officers</strong>, <strong>investigative journalists</strong>, <strong>legal professionals conducting due diligence</strong>, <strong>financial institutions</strong>, and <strong>OSINT researchers</strong> who need a fast, free, cross-jurisdictional sanctions screen without a paid API subscription. Lists are fetched live from official government sources and cached for six hours.</p>
     <div class="seo-tags">
       <span class="seo-tag">OFAC SDN Search</span><span class="seo-tag">Sanctions Screening</span>
       <span class="seo-tag">UN Sanctions List</span><span class="seo-tag">EU Sanctions</span>
@@ -143,7 +143,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
     <div class="list-status-cell"><div class="list-status-dot" id="dot-ofac"></div><div class="list-status-info"><div class="list-status-name">OFAC SDN</div><div class="list-status-label" id="lbl-ofac">Not loaded</div></div></div>
     <div class="list-status-cell"><div class="list-status-dot" id="dot-un"></div><div class="list-status-info"><div class="list-status-name">UN Security Council</div><div class="list-status-label" id="lbl-un">Not loaded</div></div></div>
     <div class="list-status-cell"><div class="list-status-dot" id="dot-eu"></div><div class="list-status-info"><div class="list-status-name">EU Consolidated</div><div class="list-status-label" id="lbl-eu">Not loaded</div></div></div>
-    <div class="list-status-cell"><div class="list-status-dot" id="dot-uk"></div><div class="list-status-info"><div class="list-status-name">UK OFSI</div><div class="list-status-label" id="lbl-uk">Not loaded</div></div></div>
+    <div class="list-status-cell"><div class="list-status-dot" id="dot-uk"></div><div class="list-status-info"><div class="list-status-name">UK Sanctions List</div><div class="list-status-label" id="lbl-uk">Not loaded</div></div></div>
   </div>
 
   <section class="search-section">
@@ -157,7 +157,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
       <button class="list-toggle active" data-list="ofac" onclick="toggleList(this)">OFAC SDN</button>
       <button class="list-toggle active" data-list="un"   onclick="toggleList(this)">UN</button>
       <button class="list-toggle active" data-list="eu"   onclick="toggleList(this)">EU</button>
-      <button class="list-toggle active" data-list="uk"   onclick="toggleList(this)">UK OFSI</button>
+      <button class="list-toggle active" data-list="uk"   onclick="toggleList(this)">UK FCDO</button>
     </div>
   </section>
 
