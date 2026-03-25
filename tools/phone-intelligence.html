@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phone Number Intelligence — Carrier, Platform & OSINT Analysis | The Intel Desk</title>
+<meta name="description" content="Free phone number intelligence tool. Analyze carrier, line type, country and region using libphonenumber. Check platform registration via Ignorant. Results stream live. No API key required.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/libphonenumber-js/1.10.51/libphonenumber-js.min.js"></script>
+<style>
+:root{--bg:#050505;--bg2:#0a0a0a;--bg3:#111111;--border:rgba(255,255,255,0.07);--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);--green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 48px;max-width:1200px;margin:0 auto;}
+.hero{padding:80px 0 60px;border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(38px,5vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-meta{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.40)!important;margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.hero-badge{border:1px solid rgba(200,169,110,0.25);padding:4px 12px;color:#c8a96e!important;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;}
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:800px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;font-weight:500;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+.input-section{padding:48px 0 0;animation:fadeUp 0.6s 0.1s ease both;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.search-row{display:flex;gap:0;}
+.country-select{background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:0 14px;outline:none;cursor:pointer;}
+.country-select option{background:#0a0a0a;}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:14px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.search-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.search-input:focus{border-color:rgba(200,169,110,0.35);}
+.btn-analyze{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 28px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-analyze:hover{background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-scan{background:rgba(126,184,228,0.08);border:1px solid rgba(126,184,228,0.25);color:#7eb8e4!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 22px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-scan:hover:not(:disabled){background:rgba(126,184,228,0.15);color:#a8d4f0!important;}
+.btn-scan:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-stop{background:rgba(192,57,43,0.12);border:1px solid rgba(192,57,43,0.3);color:#c0392b!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;padding:16px 20px;cursor:pointer;display:none;white-space:nowrap;}
+.btn-stop.visible{display:block;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+/* Summary cards */
+.summary-grid{display:none;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--border);margin-top:48px;}
+.summary-grid.visible{display:grid;}
+.summary-card{background:var(--bg2);padding:22px 24px;display:flex;flex-direction:column;gap:7px;}
+.summary-card-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.40)!important;}
+.summary-card-value{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;line-height:1.4;}
+.summary-card-value.accent{color:#e8d5a3!important;}
+.summary-card-value.green{color:#4ec994!important;}
+.summary-card-value.warn{color:#e87b4a!important;}
+.summary-card-value.dim{color:rgba(240,236,228,0.35)!important;}
+/* Platform scan results */
+.platform-header{display:none;background:var(--bg2);border:1px solid var(--border);border-top:none;padding:14px 24px;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#4ec994!important;display:none;align-items:center;gap:10px;margin-top:2px;}
+.platform-header.visible{display:flex;}
+.platform-header::after{content:'';flex:1;height:1px;background:rgba(78,201,148,0.2);}
+.platform-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:1px;background:var(--border);}
+.platform-card{background:var(--bg2);padding:14px 18px;display:flex;align-items:center;gap:10px;}
+.platform-dot{width:7px;height:7px;border-radius:50%;background:#4ec994;box-shadow:0 0 6px #4ec994;flex-shrink:0;}
+.platform-name{font-family:var(--mono);font-size:12px;font-weight:500;color:#e8d5a3!important;}
+/* Terminal */
+.terminal-wrap{border:1px solid var(--border);margin-top:2px;}
+.terminal-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.terminal-dots{display:flex;gap:7px;}
+.dot{width:11px;height:11px;border-radius:50%;}
+.dot-red{background:#5a2020;}.dot-yellow{background:#5a4a20;}.dot-green{background:#1e4a2e;}
+.terminal-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;flex:1;}
+.terminal-status{font-family:var(--mono);font-size:10px;padding:3px 10px;border:1px solid;transition:all 0.3s;}
+.terminal-status.running{color:#e87b4a!important;border-color:rgba(232,123,74,0.3);}
+.terminal-status.done{color:#4ec994!important;border-color:rgba(78,201,148,0.3);}
+.terminal-status.idle{color:rgba(240,236,228,0.25)!important;border-color:rgba(255,255,255,0.07);}
+.terminal-body{background:#050505!important;padding:24px 28px;font-family:var(--mono);font-size:12px;line-height:1.8;height:360px;overflow-y:auto;}
+.terminal-body::-webkit-scrollbar{width:4px;}
+.terminal-body::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.15);border-radius:2px;}
+.t-cmd{color:#c8a96e!important;}.t-found{color:#4ec994!important;}.t-notfound{color:rgba(240,236,228,0.22)!important;}
+.t-error{color:#c0392b!important;}.t-info{color:rgba(240,236,228,0.55)!important;}.t-dim{color:rgba(240,236,228,0.28)!important;}
+.t-warn{color:#e87b4a!important;}.t-key{color:#e8d5a3!important;}
+.t-cursor{display:inline-block;width:7px;height:13px;background:#c8a96e;vertical-align:middle;animation:blink 1.1s step-end infinite;}
+.footer{margin-top:80px;padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+@media(max-width:768px){.page-wrap{padding:0 20px;}.search-row{flex-wrap:wrap;}.footer{flex-direction:column;gap:12px;}.footer-right{text-align:left;}}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Identity Intelligence</span></div>
+    <h1>Phone Number <em>Intelligence</em></h1>
+    <div class="hero-meta">
+      <span class="hero-badge">libphonenumber</span>
+      <span class="hero-badge">Ignorant</span>
+      <span>Carrier · Type · Platform scan · Live streaming</span>
+    </div>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>This tool provides two layers of phone number intelligence. The first layer uses <strong>Google's libphonenumber</strong> — the same library used by Android and WhatsApp — to instantly extract <strong>carrier</strong>, <strong>line type</strong> (mobile, landline, VoIP, toll-free), <strong>country and region</strong>, <strong>timezone</strong>, and all standard formatting variants (E.164, national, international). The second layer runs <strong>Ignorant</strong>, an open-source tool that checks whether a phone number is registered on platforms including <strong>Instagram</strong> and <strong>Snapchat</strong> using their account-recovery flows — without alerting the number's owner and without requiring any login. Results from the platform scan stream live into the terminal. This combination gives investigators a complete initial profile of any phone number: what it is technically, where it's from, and where it has a digital presence. Used by <strong>fraud investigators</strong>, <strong>journalists</strong>, <strong>due diligence analysts</strong>, and <strong>OSINT researchers</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Phone OSINT</span><span class="seo-tag">Carrier Lookup</span>
+        <span class="seo-tag">VoIP Detection</span><span class="seo-tag">Platform Scan</span>
+        <span class="seo-tag">Ignorant</span><span class="seo-tag">OSINT</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="input-section">
+    <div class="section-label">Enter Phone Number</div>
+    <div class="search-row">
+      <select class="country-select" id="countryCode">
+        <option value="US">🇺🇸 +1</option>
+        <option value="GB">🇬🇧 +44</option>
+        <option value="AU">🇦🇺 +61</option>
+        <option value="CA">🇨🇦 +1</option>
+        <option value="DE">🇩🇪 +49</option>
+        <option value="FR">🇫🇷 +33</option>
+        <option value="IN">🇮🇳 +91</option>
+        <option value="JP">🇯🇵 +81</option>
+        <option value="BR">🇧🇷 +55</option>
+        <option value="NG">🇳🇬 +234</option>
+        <option value="OTHER">🌐 Other</option>
+      </select>
+      <input type="text" class="search-input" id="phoneInput"
+        placeholder="e.g. (202) 456-1111  or  +1 202 456 1111"
+        autocomplete="off" spellcheck="false">
+      <button class="btn-analyze" onclick="analyze()">Analyze →</button>
+      <button class="btn-scan" id="btnScan" onclick="scan()" disabled>Platform Scan →</button>
+      <button class="btn-stop" id="btnStop" onclick="stop()">■ Stop</button>
+    </div>
+    <div class="input-hint">Click Analyze for instant number intelligence · Then Platform Scan to check Instagram, Snapchat, and more</div>
+  </section>
+
+  <!-- Summary cards (instant analysis) -->
+  <div class="summary-grid" id="summaryGrid"></div>
+
+  <!-- Platform scan results -->
+  <div class="platform-header" id="platformHeader">Platforms Found</div>
+  <div class="platform-grid" id="platformGrid" style="display:none;border:1px solid var(--border);border-top:none;"></div>
+
+  <!-- Terminal -->
+  <div class="terminal-wrap" style="margin-top:2px;">
+    <div class="terminal-bar">
+      <div class="terminal-dots">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+      </div>
+      <div class="terminal-title" id="termTitle">intel-desk — phone-intelligence</div>
+      <div class="terminal-status idle" id="termStatus">Idle</div>
+    </div>
+    <div class="terminal-body" id="termBody">
+      <div class="t-dim">Enter a phone number and click Analyze for instant carrier and format intelligence.</div>
+      <div class="t-dim">Then click Platform Scan to check if the number is registered on social platforms.</div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Analysis via Google libphonenumber · Platform scan via Ignorant. Use responsibly and within applicable law.</div>
+  </footer>
+</div>
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let evtSource = null;
+let running   = false;
+let currentE164 = null;
+
+function toggleSEO(){const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function appendLine(cls, html) {
+  const body = document.getElementById('termBody');
+  const div = document.createElement('div');
+  div.className = `t-${cls}`;
+  div.innerHTML = html;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function analyze() {
+  const raw = document.getElementById('phoneInput').value.trim();
+  const cc  = document.getElementById('countryCode').value;
+  if (!raw) { alert('Please enter a phone number.'); return; }
+
+  let parsed;
+  try {
+    parsed = window.libphonenumber.parsePhoneNumberFromString(raw, cc === 'OTHER' ? undefined : cc);
+    if (!parsed) parsed = window.libphonenumber.parsePhoneNumberFromString(raw);
+  } catch(e) { parsed = null; }
+
+  const body = document.getElementById('termBody');
+  body.innerHTML = '';
+
+  if (!parsed) {
+    appendLine('error', '  [!] Could not parse this number. Try including country code e.g. +1 202 456-1111');
+    return;
+  }
+
+  const isValid = parsed.isValid();
+  const e164    = parsed.format('E.164');
+  const intl    = parsed.format('INTERNATIONAL');
+  const natl    = parsed.format('NATIONAL');
+  const type    = parsed.getType() || 'UNKNOWN';
+  const country = parsed.country || 'Unknown';
+  const typeLabels = {MOBILE:'Mobile',FIXED_LINE:'Landline',FIXED_LINE_OR_MOBILE:'Landline or Mobile',TOLL_FREE:'Toll-Free',PREMIUM_RATE:'Premium Rate',VOIP:'VoIP',UNKNOWN:'Unknown'};
+  const countryNames = {US:'United States',GB:'United Kingdom',AU:'Australia',CA:'Canada',DE:'Germany',FR:'France',IN:'India',JP:'Japan',BR:'Brazil',NG:'Nigeria'};
+
+  currentE164 = e164;
+  document.getElementById('btnScan').disabled = false;
+
+  // Summary cards
+  const cards = [
+    {label:'Valid',       value: isValid ? '✓ Valid' : '⚠ Possible',          cls: isValid ? 'green' : 'warn'},
+    {label:'Country',     value: (countryNames[country]||country),              cls: ''},
+    {label:'Line Type',   value: typeLabels[type]||type,                        cls: type==='MOBILE'?'green':type==='VOIP'?'warn':''},
+    {label:'E.164',       value: e164,                                           cls: 'accent'},
+    {label:'International',value: intl,                                          cls: ''},
+    {label:'National',    value: natl,                                           cls: ''},
+    {label:'Country Code',value: `+${parsed.countryCallingCode}`,               cls: 'dim'},
+    {label:'National No.',value: parsed.nationalNumber,                          cls: 'dim'},
+  ];
+
+  const grid = document.getElementById('summaryGrid');
+  grid.innerHTML = cards.map(c=>`
+    <div class="summary-card">
+      <div class="summary-card-label">${esc(c.label)}</div>
+      <div class="summary-card-value ${c.cls}">${esc(c.value)}</div>
+    </div>`).join('');
+  grid.classList.add('visible');
+
+  // Terminal output
+  appendLine('cmd', `$ libphonenumber --parse "${esc(e164)}"`);
+  appendLine('info', '');
+  appendLine('found', `  [+] ${esc(isValid?'VALID':'POSSIBLE')} number`);
+  appendLine('text', `  <span class="t-key">E.164         </span>  ${esc(e164)}`);
+  appendLine('text', `  <span class="t-key">International </span>  ${esc(intl)}`);
+  appendLine('text', `  <span class="t-key">National      </span>  ${esc(natl)}`);
+  appendLine('text', `  <span class="t-key">Country       </span>  ${esc(countryNames[country]||country)}`);
+  appendLine('text', `  <span class="t-key">Line Type     </span>  ${esc(typeLabels[type]||type)}`);
+  appendLine('info', '');
+  appendLine('dim',  '  Analysis complete. Click Platform Scan to check social platform registration.');
+  appendLine('dim',  `  <span class="t-cursor"></span>`);
+
+  document.getElementById('termTitle').textContent = `phone-intelligence — ${e164}`;
+}
+
+function scan() {
+  if (!currentE164) { alert('Please analyze a number first.'); return; }
+  if (evtSource) evtSource.close();
+
+  document.getElementById('platformGrid').innerHTML = '';
+  document.getElementById('platformGrid').style.display = 'none';
+  document.getElementById('platformHeader').classList.remove('visible');
+
+  running = true;
+  document.getElementById('btnScan').disabled = true;
+  document.getElementById('btnStop').classList.add('visible');
+  const el = document.getElementById('termStatus');
+  el.className = 'terminal-status running';
+  el.textContent = 'Scanning…';
+
+  const termBody = document.getElementById('termBody');
+  termBody.innerHTML = '';
+  appendLine('cmd', `$ ignorant --no-color ${esc(currentE164)}`);
+  appendLine('dim',  '  Checking platform registration… results appear as found');
+
+  evtSource = new EventSource(`${PROXY}/ignorant?phone=${encodeURIComponent(currentE164)}`);
+
+  evtSource.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === 'line') {
+        const t = d.text;
+        if (t.includes('[+]')) {
+          const m = t.match(/\[\+\]\s*(.+)/);
+          const name = m ? m[1].trim() : t;
+          // Add to platform grid
+          document.getElementById('platformHeader').classList.add('visible');
+          document.getElementById('platformGrid').style.display = 'grid';
+          const card = document.createElement('div');
+          card.className = 'platform-card';
+          card.innerHTML = `<div class="platform-dot"></div><div class="platform-name">${esc(name)}</div>`;
+          document.getElementById('platformGrid').appendChild(card);
+          appendLine('found', `  [+] <strong>${esc(name)}</strong> — account found`);
+        } else if (t.includes('[-]')) {
+          appendLine('notfound', `  [-] ${esc(t.replace('[-]','').trim())}`);
+        } else if (t.includes('[x]') || /rate/i.test(t)) {
+          appendLine('warn', `  [x] ${esc(t.replace('[x]','').trim())} — rate limited`);
+        } else if (t.trim()) {
+          appendLine('dim', `  ${esc(t)}`);
+        }
+      }
+      if (d.type === 'done') {
+        appendLine('info', '');
+        appendLine('found', '  ── Platform scan complete ──');
+        appendLine('dim', `  <span class="t-cursor"></span>`);
+        running = false;
+        document.getElementById('btnScan').disabled = false;
+        document.getElementById('btnStop').classList.remove('visible');
+        el.className = 'terminal-status done';
+        el.textContent = 'Complete';
+        evtSource.close();
+      }
+      if (d.type === 'error') {
+        appendLine('error', `  [!] ${esc(d.text)}`);
+        running = false;
+        document.getElementById('btnScan').disabled = false;
+        document.getElementById('btnStop').classList.remove('visible');
+        el.className = 'terminal-status idle';
+        el.textContent = 'Error';
+        evtSource.close();
+      }
+    } catch(err) {}
+  };
+
+  evtSource.onerror = () => {
+    if (running) {
+      appendLine('warn', '  [~] Connection interrupted.');
+      running = false;
+      document.getElementById('btnScan').disabled = false;
+      document.getElementById('btnStop').classList.remove('visible');
+      el.className = 'terminal-status idle';
+      el.textContent = 'Disconnected';
+    }
+    evtSource.close();
+  };
+}
+
+function stop() {
+  if (evtSource) evtSource.close();
+  running = false;
+  document.getElementById('btnScan').disabled = false;
+  document.getElementById('btnStop').classList.remove('visible');
+  const el = document.getElementById('termStatus');
+  el.className = 'terminal-status idle';
+  el.textContent = 'Stopped';
+  appendLine('warn', '  [~] Scan stopped by user');
+  appendLine('dim', `  <span class="t-cursor"></span>`);
+}
+</script>
+</body>
+</html>
