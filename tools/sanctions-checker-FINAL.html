@@ -1,0 +1,504 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sanctions List Checker — OFAC, UN, EU & UK | The Intel Desk</title>
+<meta name="description" content="Free sanctions list checker. Search across OFAC SDN, UN Security Council, EU Consolidated, and UK OFSI sanctions lists simultaneously. Instant name screening for investigators, compliance officers, journalists, and due diligence professionals.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050505;--bg2:#0a0a0a;--bg3:#111111;--border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);--text:#f5f2ec;--text-muted:rgba(240,236,228,0.75);--text-dim:rgba(240,236,228,0.50);--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);--green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--gray:#666666;--mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;position:relative;overflow-x:hidden}
+body *{color:inherit}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.6;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");background-repeat:repeat;background-size:256px}
+.page-wrap{position:relative;z-index:1;padding:0 48px;max-width:1200px;margin:0 auto}
+.hero{padding:80px 0 60px;border-bottom:1px solid var(--border);animation:fadeUp .6s ease both}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:#c8a96e;flex-shrink:0}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important}
+.hero h1{font-family:var(--serif);font-size:clamp(38px,5vw,68px);font-weight:300;line-height:.95;color:#f5f2ec!important}
+.hero h1 em{font-style:italic;color:#e8d5a3!important}
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;padding:28px 32px;animation:fadeUp .6s .08s ease both}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:#c8a96e!important;margin-bottom:14px;display:flex;align-items:center;gap:10px}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.seo-block p{font-family:var(--mono);font-size:13px;font-weight:400;line-height:1.9;color:rgba(240,236,228,.75)!important}
+.seo-block p strong{color:#e8d5a3!important;font-weight:500}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border)}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.10em;color:rgba(240,236,228,.5)!important;border:1px solid var(--border);padding:4px 10px}
+.list-status-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:var(--border);margin-top:2px;animation:fadeUp .6s .1s ease both}
+.list-status-cell{background:var(--bg2);padding:16px 20px;display:flex;align-items:center;gap:12px}
+.list-status-dot{width:8px;height:8px;border-radius:50%;background:var(--gray);flex-shrink:0;transition:background .3s,box-shadow .3s}
+.list-status-dot.loading{background:var(--orange);animation:pulse-dot 1s ease-in-out infinite}
+.list-status-dot.ready{background:#4ec994;box-shadow:0 0 6px #4ec994}
+.list-status-dot.error{background:var(--red)}
+.list-status-info{display:flex;flex-direction:column;gap:3px;min-width:0}
+.list-status-name{font-family:var(--mono);font-size:11px;font-weight:500;color:#f5f2ec!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.list-status-label{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.5)!important}
+.search-section{padding:48px 0 0;animation:fadeUp .6s .14s ease both}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.5)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.search-hint{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,.5)!important;line-height:1.7;margin-bottom:16px}
+.search-row{display:flex;gap:0}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:15px;font-weight:400;padding:16px 20px;outline:none;transition:border-color .2s;letter-spacing:.02em}
+.search-input::placeholder{color:rgba(240,236,228,.4);font-size:13px}
+.search-input:focus{border-color:rgba(200,169,110,.35)}
+.btn-search{background:var(--accent-dim);border:1px solid rgba(200,169,110,.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:16px 32px;cursor:pointer;white-space:nowrap;transition:background .2s,color .2s}
+.btn-search:hover{background:rgba(200,169,110,.25);color:#e8d5a3!important}
+.btn-search:disabled{opacity:.4;cursor:not-allowed}
+.list-toggles{display:flex;gap:0;margin-top:2px}
+.list-toggle{flex:1;background:transparent;border:1px solid var(--border);border-right:none;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;padding:10px 12px;cursor:pointer;color:rgba(240,236,228,.5)!important;transition:all .2s;text-align:center}
+.list-toggle:last-child{border-right:1px solid var(--border)}
+.list-toggle.active{background:var(--accent-dim);border-color:rgba(200,169,110,.3);color:#c8a96e!important}
+.list-toggle:hover:not(.active){color:#f5f2ec!important;border-color:var(--border-hover)}
+.verdict-banner{display:none;padding:20px 28px;border:1px solid var(--border);margin-top:48px;align-items:center;gap:20px;animation:fadeUp .4s ease both}
+.verdict-banner.visible{display:flex}
+.verdict-banner.clear{border-color:rgba(78,201,148,.3);background:rgba(78,201,148,.06)}
+.verdict-banner.hit{border-color:rgba(192,57,43,.4);background:rgba(192,57,43,.08)}
+.verdict-icon{font-family:var(--mono);font-size:20px;font-weight:500;flex-shrink:0;padding:10px 14px;border:1px solid var(--border)}
+.verdict-icon.clear{color:#4ec994!important;border-color:rgba(78,201,148,.3);background:rgba(78,201,148,.08)}
+.verdict-icon.hit{color:#c0392b!important;border-color:rgba(192,57,43,.3);background:rgba(192,57,43,.08)}
+.verdict-text{flex:1}
+.verdict-title{font-family:var(--serif);font-size:26px;font-weight:400;margin-bottom:5px}
+.verdict-title.clear{color:#4ec994!important}
+.verdict-title.hit{color:#c0392b!important}
+.verdict-sub{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,.5)!important;line-height:1.7}
+.verdict-count{font-family:var(--serif);font-size:52px;font-weight:300;color:rgba(240,236,228,.15)!important;flex-shrink:0;line-height:1}
+.results-section{display:none;flex-direction:column;gap:2px;margin-top:2px;animation:fadeUp .4s ease both}
+.results-section.visible{display:flex}
+.results-group-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.5)!important;display:flex;align-items:center;gap:12px;padding:20px 0 12px}
+.results-group-label::after{content:'';flex:1;height:1px;background:var(--border)}
+.result-list{display:flex;flex-direction:column;gap:1px;background:var(--border)}
+.result-card{background:var(--bg2);cursor:pointer;transition:background .2s;border-left:3px solid transparent}
+.result-card:hover{background:#0d0d0d}
+.result-card.ofac{border-left-color:#c0392b}
+.result-card.un{border-left-color:#7eb8e4}
+.result-card.eu{border-left-color:#4ec994}
+.result-card.uk{border-left-color:#c8a96e}
+.result-card-header{padding:18px 24px;display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start}
+.result-card-name{font-family:var(--mono);font-size:14px;font-weight:500;color:#e8d5a3!important;line-height:1.4;word-break:break-word}
+.result-card-name mark{background:rgba(200,169,110,.25);color:#e8d5a3;padding:0 2px}
+.result-card-type{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.5)!important;text-align:right;white-space:nowrap}
+.result-card-meta{padding:0 24px 16px;display:flex;flex-wrap:wrap;gap:8px}
+.result-meta-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.10em;padding:3px 9px;border:1px solid var(--border)}
+.result-meta-tag.ofac{color:#c0392b!important;border-color:rgba(192,57,43,.3);background:rgba(192,57,43,.08)}
+.result-meta-tag.un{color:#7eb8e4!important;border-color:rgba(126,184,228,.3);background:rgba(126,184,228,.08)}
+.result-meta-tag.eu{color:#4ec994!important;border-color:rgba(78,201,148,.3);background:rgba(78,201,148,.08)}
+.result-meta-tag.uk{color:#c8a96e!important;border-color:rgba(200,169,110,.3);background:rgba(200,169,110,.08)}
+.result-meta-tag.plain{color:rgba(240,236,228,.5)!important}
+.result-card-details{display:none;padding:0 24px 20px;border-top:1px solid var(--border)}
+.result-card-details.open{display:block}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:var(--border);margin-top:16px}
+.detail-cell{background:var(--bg);padding:12px 16px}
+.result-detail-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.5)!important;margin-bottom:4px}
+.result-detail-value{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,.75)!important;word-break:break-word;line-height:1.5}
+.terminal-wrap{border:1px solid var(--border);display:none;margin-top:2px}
+.terminal-wrap.visible{display:block}
+.terminal-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between}
+.terminal-dots{display:flex;gap:7px}
+.dot{width:11px;height:11px;border-radius:50%}
+.dot-red{background:#5a2020}.dot-yellow{background:#5a4a20}.dot-green{background:#1e4a2e}
+.terminal-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.5)!important}
+.terminal-body{background:#050505!important;padding:28px;font-family:var(--mono);font-size:13px;line-height:1.8;overflow-x:auto;max-height:420px;overflow-y:auto}
+.t-cmd{color:#c8a96e!important}.t-found{color:#4ec994!important}.t-warn{color:#e87b4a!important}
+.t-error{color:#c0392b!important}.t-miss{color:#666!important}.t-key{color:#e8d5a3!important}
+.t-dim{color:rgba(240,236,228,.5)!important;font-size:11px}.t-div{color:rgba(240,236,228,.5)!important;user-select:none}
+.t-text{color:rgba(240,236,228,.75)!important}
+.t-cursor{display:inline-block;width:8px;height:14px;background:#c8a96e;vertical-align:middle;animation:blink 1.1s step-end infinite}
+.disclaimer{background:var(--bg2);border:1px solid var(--border);border-top:none;padding:20px 28px;display:flex;gap:14px;align-items:flex-start;margin-top:2px}
+.disclaimer-icon{color:#e87b4a!important;font-family:var(--mono);font-size:12px;flex-shrink:0;padding-top:1px}
+.disclaimer-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.5)!important;line-height:1.7}
+.disclaimer-text strong{color:#e87b4a!important;font-weight:500}
+.footer{margin-top:80px;padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.5)!important}
+.footer-left strong{color:#c8a96e!important;font-weight:500}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.5)!important;max-width:460px;text-align:right;line-height:1.6}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+@keyframes pulse-dot{0%,100%{opacity:1}50%{opacity:.3}}
+@media(max-width:768px){.page-wrap{padding:0 20px}.list-status-bar{grid-template-columns:repeat(2,1fr)}.footer{flex-direction:column;gap:12px}.footer-right{text-align:left}.verdict-count{display:none}}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <section class="hero">
+    <div class="eyebrow"><span>Compliance Intelligence</span></div>
+    <h1>Sanctions List <em>Cross-Checker</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEOBlock()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+    <p>Sanctions screening is a legal requirement in finance, trade, and professional services — and a critical step in any serious due diligence process. This free <strong>sanctions list checker</strong> searches four major government watchlists simultaneously: the <strong>OFAC Specially Designated Nationals (SDN) list</strong> maintained by the US Treasury, the <strong>UN Security Council Consolidated Sanctions List</strong>, the <strong>EU Consolidated Sanctions List</strong>, and the <strong>UK Sanctions List (FCDO)</strong> maintained by HM Treasury. Enter any individual name, entity, vessel, or organization and this tool will scan all four lists in real time, returning any matches with their designation type, listed nationality, sanctioning program, and listing date. Used by <strong>compliance officers</strong>, <strong>investigative journalists</strong>, <strong>legal professionals conducting due diligence</strong>, <strong>financial institutions</strong>, and <strong>OSINT researchers</strong> who need a fast, free, cross-jurisdictional sanctions screen without a paid API subscription. Lists are fetched live from official government sources and cached for six hours.</p>
+    <div class="seo-tags">
+      <span class="seo-tag">OFAC SDN Search</span><span class="seo-tag">Sanctions Screening</span>
+      <span class="seo-tag">UN Sanctions List</span><span class="seo-tag">EU Sanctions</span>
+      <span class="seo-tag">UK OFSI</span><span class="seo-tag">AML Compliance</span>
+      <span class="seo-tag">Due Diligence</span><span class="seo-tag">OSINT</span>
+    </div>
+  </div>
+
+  <div class="list-status-bar" id="statusBar">
+    <div class="list-status-cell"><div class="list-status-dot" id="dot-ofac"></div><div class="list-status-info"><div class="list-status-name">OFAC SDN</div><div class="list-status-label" id="lbl-ofac">Not loaded</div></div></div>
+    <div class="list-status-cell"><div class="list-status-dot" id="dot-un"></div><div class="list-status-info"><div class="list-status-name">UN Security Council</div><div class="list-status-label" id="lbl-un">Not loaded</div></div></div>
+    <div class="list-status-cell"><div class="list-status-dot" id="dot-eu"></div><div class="list-status-info"><div class="list-status-name">EU Consolidated</div><div class="list-status-label" id="lbl-eu">Not loaded</div></div></div>
+    <div class="list-status-cell"><div class="list-status-dot" id="dot-uk"></div><div class="list-status-info"><div class="list-status-name">UK Sanctions List</div><div class="list-status-label" id="lbl-uk">Not loaded</div></div></div>
+  </div>
+
+  <section class="search-section">
+    <div class="section-label">Name Search</div>
+    <p class="search-hint">Enter a full or partial name — individual, entity, vessel, or organization. Search is fuzzy and accent-insensitive.</p>
+    <div class="search-row">
+      <input type="text" class="search-input" id="searchInput" placeholder="e.g. Vladimir Putin · Rosneft · North Korea · Wagner Group" autocomplete="off" spellcheck="false">
+      <button class="btn-search" id="searchBtn" onclick="runSearch()">Screen →</button>
+    </div>
+    <div class="list-toggles">
+      <button class="list-toggle active" data-list="ofac" onclick="toggleList(this)">OFAC SDN</button>
+      <button class="list-toggle active" data-list="un"   onclick="toggleList(this)">UN</button>
+      <button class="list-toggle active" data-list="eu"   onclick="toggleList(this)">EU</button>
+      <button class="list-toggle active" data-list="uk"   onclick="toggleList(this)">UK FCDO</button>
+    </div>
+  </section>
+
+  <div class="verdict-banner" id="verdictBanner">
+    <div class="verdict-icon" id="verdictIcon"></div>
+    <div class="verdict-text">
+      <div class="verdict-title" id="verdictTitle"></div>
+      <div class="verdict-sub"   id="verdictSub"></div>
+    </div>
+    <div class="verdict-count" id="verdictCount"></div>
+  </div>
+
+  <div class="results-section" id="resultsSection"></div>
+
+  <div class="terminal-wrap" id="terminalWrap">
+    <div class="terminal-bar">
+      <div class="terminal-dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+      <div class="terminal-label">intel-desk — sanctions-checker</div>
+    </div>
+    <div class="terminal-body" id="terminalBody"></div>
+  </div>
+
+  <div class="disclaimer">
+    <div class="disclaimer-icon">[~]</div>
+    <div class="disclaimer-text"><strong>For informational and investigative use only.</strong> This tool is not a substitute for professional compliance screening software or legal advice. Sanctions lists change frequently — always verify against the official government source before making compliance or legal decisions. Name matching is approximate and may produce false positives or miss entries due to transliteration differences.</div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Data fetched live from US Treasury, UN, European Commission, and HM Treasury. Cached 6 hours.</div>
+  </footer>
+</div>
+
+<script>
+// ── CONFIG — update this once your Render proxy is deployed ───────────────────
+const PROXY_BASE = 'https://intel-desk-api.onrender.com';
+
+const LISTS = {
+  ofac: { label: 'OFAC SDN (USA)',       short: 'OFAC' },
+  un:   { label: 'UN Security Council',   short: 'UN'   },
+  eu:   { label: 'EU Consolidated',       short: 'EU'   },
+  uk:   { label: 'UK OFSI',              short: 'UK'   },
+};
+
+const listData    = { ofac:null, un:null, eu:null, uk:null };
+const listLoading = { ofac:false, un:false, eu:false, uk:false };
+const listEnabled = { ofac:true, un:true, eu:true, uk:true };
+
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function ln(c,t){ return `<div class="t-${c}">${esc(t)}</div>`; }
+function lnH(c,h){ return `<div class="t-${c}">${h}</div>`; }
+function divider(){ return `<div class="t-div">────────────────────────────────────────────────────────</div>`; }
+function blank(){ return `<div>&nbsp;</div>`; }
+
+function normalize(s){
+  return String(s??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .toLowerCase().replace(/[^a-z0-9\s]/g,'').replace(/\s+/g,' ').trim();
+}
+
+function highlight(text, query){
+  const norm=normalize(text), normQ=normalize(query);
+  if(!normQ||!norm.includes(normQ)) return esc(text);
+  const idx=norm.indexOf(normQ);
+  return esc(text.slice(0,idx))+`<mark>${esc(text.slice(idx,idx+query.length))}</mark>`+esc(text.slice(idx+query.length));
+}
+
+function xmlText(el,tag){
+  const node=el.getElementsByTagName(tag)[0];
+  return node?node.textContent.trim():null;
+}
+
+function setStatus(key,state,label){
+  document.getElementById(`dot-${key}`).className=`list-status-dot ${state}`;
+  document.getElementById(`lbl-${key}`).textContent=label;
+}
+
+async function loadList(key){
+  if(listData[key]||listLoading[key]) return;
+  listLoading[key]=true;
+  setStatus(key,'loading','Loading…');
+  try{
+    const resp=await fetch(`${PROXY_BASE}/sanctions/${key}`,{mode:'cors'});
+    if(!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const text=await resp.text();
+    const xml=new DOMParser().parseFromString(text,'application/xml');
+    if(xml.querySelector('parsererror')) throw new Error('XML parse error');
+    listData[key]=parseList(key,xml);
+    setStatus(key,'ready',`${listData[key].length.toLocaleString()} entries`);
+  }catch(e){
+    console.error(`Failed ${key}:`,e);
+    setStatus(key,'error',`Error: ${e.message}`);
+    listData[key]=[];
+  }
+  listLoading[key]=false;
+}
+
+function parseList(key,xml){
+  switch(key){
+    case 'ofac': return parseOFAC(xml);
+    case 'un':   return parseUN(xml);
+    case 'eu':   return parseEU(xml);
+    case 'uk':   return parseUK(xml);
+    default:     return [];
+  }
+}
+
+function parseOFAC(xml){
+  const entries=[];
+  for(const node of xml.getElementsByTagName('sdnEntry')){
+    const ln2=xmlText(node,'lastName')||'', fn=xmlText(node,'firstName')||'';
+    const primary=[fn,ln2].filter(Boolean).join(' ').trim()||ln2||fn;
+    const akas=[...node.getElementsByTagName('aka')].map(a=>{
+      return [xmlText(a,'firstName')||'',xmlText(a,'lastName')||''].filter(Boolean).join(' ').trim();
+    }).filter(Boolean);
+    entries.push({
+      source:'ofac',
+      uid:xmlText(node,'uid'),
+      type:xmlText(node,'sdnType'),
+      primary,akas,
+      programs:[...node.getElementsByTagName('program')].map(p=>p.textContent.trim()).join(', '),
+      country:xmlText(node,'nationality')||xmlText(node,'placeOfBirth'),
+      dateList:xmlText(node,'dateOfBirth'),
+    });
+  }
+  return entries;
+}
+
+function parseUN(xml){
+  const entries=[];
+  for(const tag of['INDIVIDUAL','ENTITY']){
+    for(const node of xml.getElementsByTagName(tag)){
+      const fn=xmlText(node,'FIRST_NAME')||'', sn=xmlText(node,'SECOND_NAME')||'', tn=xmlText(node,'THIRD_NAME')||'';
+      const primary=xmlText(node,'NAME_ORIGINAL_SCRIPT')||[fn,sn,tn].filter(Boolean).join(' ').trim()||xmlText(node,'NAME')||'';
+      const akas=[...node.getElementsByTagName('ALIAS')].map(a=>xmlText(a,'ALIAS_NAME')||'').filter(Boolean);
+      if(primary) entries.push({
+        source:'un', uid:node.getAttribute('dataId')||xmlText(node,'DATAID'),
+        type:tag==='INDIVIDUAL'?'Individual':'Entity', primary, akas,
+        programs:[...node.getElementsByTagName('UN_LIST_TYPE')].map(p=>p.textContent.trim()).join(', '),
+        country:xmlText(node,'NATIONALITY')||xmlText(node,'COUNTRY_OF_BIRTH'),
+        dateList:xmlText(node,'LISTED_ON'),
+      });
+    }
+  }
+  return entries;
+}
+
+function parseEU(xml){
+  const entries=[];
+  for(const node of xml.getElementsByTagName('sanctionEntity')){
+    const nameNodes=[...node.getElementsByTagName('nameAlias')];
+    const names=nameNodes.map(n=>n.getAttribute('wholeName')||n.getAttribute('fullName')||'').filter(Boolean);
+    const primary=names[0]||'';
+    if(!primary) continue;
+    entries.push({
+      source:'eu',
+      uid:node.getAttribute('logicalId')||node.getAttribute('euReferenceNumber'),
+      type:node.getAttribute('subjectType')||'Entity',
+      primary, akas:names.slice(1),
+      programs:node.getAttribute('programme')||[...node.getElementsByTagName('regulation')].map(r=>r.getAttribute('programme')||'').filter(Boolean).join(', '),
+      country:node.querySelector('citizenship')?.getAttribute('countryIso2Code')||null,
+      dateList:node.getAttribute('regulationDate'),
+    });
+  }
+  return entries;
+}
+
+function parseUK(xmlDoc){
+  // FCDO UK Sanctions List schema (live from Jan 2026)
+  // Strips namespaces first to ensure getElementsByTagName works reliably
+  const entries=[];
+  try {
+    // Get raw XML string and strip all namespace prefixes/declarations
+    const serializer = new XMLSerializer();
+    let raw = serializer.serializeToString(xmlDoc);
+    // Remove namespace declarations and prefixes
+    raw = raw.replace(/xmlns[^"]*"[^"]*"/g,'').replace(/<([a-zA-Z]+):[a-zA-Z]/g,'<$1').replace(/<\/[a-zA-Z]+:/g,'</');
+    const parser2 = new DOMParser();
+    const doc2 = parser2.parseFromString(raw,'application/xml');
+    const nodes = [...doc2.getElementsByTagName('Designation')];
+    for(const node of nodes){
+      let primary='';
+      const akas=[];
+      for(const n of node.getElementsByTagName('n')){
+        const name=(n.getElementsByTagName('Name6')[0]||{}).textContent?.trim()||'';
+        const nameType=(n.getElementsByTagName('NameType')[0]||{}).textContent?.trim()||'';
+        if(!name) continue;
+        if(nameType==='Primary Name') primary=name;
+        else akas.push(name);
+      }
+      if(!primary && akas.length) primary=akas.shift();
+      if(!primary) continue;
+      entries.push({
+        source:'uk',
+        uid:(node.getElementsByTagName('UniqueID')[0]||{}).textContent?.trim()||'',
+        type:(node.getElementsByTagName('IndividualEntityShip')[0]||{}).textContent?.trim()||'Individual',
+        primary, akas,
+        programs:(node.getElementsByTagName('RegimeName')[0]||{}).textContent?.trim()||'',
+        country:'',
+        dateList:(node.getElementsByTagName('DateDesignated')[0]||{}).textContent?.trim()||'',
+      });
+    }
+  } catch(e) { console.error('UK parse error:',e); }
+  return entries;
+}
+
+function searchList(entries,query){
+  const normQ=normalize(query);
+  if(!normQ||normQ.length<2) return [];
+  return entries.filter(e=>normalize(e.primary).includes(normQ)||e.akas.some(a=>normalize(a).includes(normQ)));
+}
+
+async function runSearch(){
+  const query=document.getElementById('searchInput').value.trim();
+  if(!query||query.length<2){ alert('Please enter at least 2 characters.'); return; }
+  const btn=document.getElementById('searchBtn');
+  btn.disabled=true; btn.textContent='Loading…';
+  hideResults();
+  showTerminalLoading(query);
+  await Promise.all(Object.keys(LISTS).filter(k=>listEnabled[k]&&!listData[k]).map(loadList));
+  btn.disabled=false; btn.textContent='Screen →';
+  const allResults={};
+  let total=0;
+  for(const key of Object.keys(LISTS)){
+    if(!listEnabled[key]||!listData[key]) continue;
+    const hits=searchList(listData[key],query);
+    allResults[key]=hits; total+=hits.length;
+  }
+  renderVerdict(query,total);
+  renderResults(query,allResults,total);
+  renderTerminal(query,allResults,total);
+  document.getElementById('verdictBanner').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderVerdict(query,total){
+  const banner=document.getElementById('verdictBanner');
+  const icon=document.getElementById('verdictIcon');
+  const title=document.getElementById('verdictTitle');
+  const sub=document.getElementById('verdictSub');
+  document.getElementById('verdictCount').textContent=String(total);
+  if(total===0){
+    banner.className='verdict-banner visible clear';
+    icon.className='verdict-icon clear'; icon.textContent='[+]';
+    title.className='verdict-title clear'; title.textContent='No sanctions matches found';
+    sub.textContent=`"${query}" does not appear on any active sanctions list searched. This is not a guarantee of clearance — always verify against official sources.`;
+  } else {
+    banner.className='verdict-banner visible hit';
+    icon.className='verdict-icon hit'; icon.textContent='[!]';
+    title.className='verdict-title hit'; title.textContent=`Sanctions match${total>1?'es':''} detected`;
+    sub.textContent=`"${query}" returned ${total} result${total>1?'s':''} across the lists searched. Review each match carefully — partial name matches may be false positives.`;
+  }
+}
+
+function renderResults(query,allResults,total){
+  const section=document.getElementById('resultsSection');
+  if(total===0){ section.classList.remove('visible'); return; }
+  let html='';
+  for(const [key,hits] of Object.entries(allResults)){
+    if(!hits||hits.length===0) continue;
+    html+=`<div class="results-group-label"><span class="result-meta-tag ${key}" style="margin:0">${LISTS[key].short}</span>${esc(LISTS[key].label)} — ${hits.length} match${hits.length!==1?'es':''}</div><div class="result-list">${hits.map((r,i)=>renderCard(r,query,key,i)).join('')}</div>`;
+  }
+  section.innerHTML=html;
+  section.classList.add('visible');
+}
+
+function renderCard(r,query,key,idx){
+  const id=`card-${key}-${idx}`;
+  const details=[];
+  if(r.uid) details.push({label:'ID / Reference',value:r.uid});
+  if(r.type) details.push({label:'Entity Type',value:r.type});
+  if(r.country) details.push({label:'Nationality / Country',value:r.country});
+  if(r.programs) details.push({label:'Program / Regime',value:r.programs});
+  if(r.dateList) details.push({label:'Listed',value:r.dateList});
+  if(r.akas.length>0) details.push({label:'Also Known As',value:r.akas.slice(0,6).join(' · ')});
+  return `<div class="result-card ${key}" onclick="toggleCard('${id}')">
+    <div class="result-card-header">
+      <div class="result-card-name">${highlight(r.primary,query)}</div>
+      <div class="result-card-type">${esc(r.type||'')} · expand</div>
+    </div>
+    <div class="result-card-meta">
+      <span class="result-meta-tag ${key}">${LISTS[key].short}</span>
+      ${r.programs?`<span class="result-meta-tag plain">${esc(r.programs.split(',')[0].trim().slice(0,30))}</span>`:''}
+      ${r.country?`<span class="result-meta-tag plain">${esc(r.country)}</span>`:''}
+    </div>
+    <div class="result-card-details" id="${id}">
+      <div class="detail-grid">${details.map(d=>`<div class="detail-cell"><div class="result-detail-label">${esc(d.label)}</div><div class="result-detail-value">${esc(d.value)}</div></div>`).join('')}</div>
+    </div>
+  </div>`;
+}
+
+function toggleCard(id){ document.getElementById(id)?.classList.toggle('open'); }
+
+function showTerminalLoading(query){
+  document.getElementById('terminalWrap').classList.add('visible');
+  document.getElementById('terminalBody').innerHTML=
+    ln('cmd',`$ intel-desk sanctions-check --query "${query}" --lists ofac,un,eu,uk`)+blank()+`<div class="t-dim">Fetching and searching lists…</div>`;
+}
+
+function renderTerminal(query,allResults,total){
+  let h='';
+  h+=ln('cmd',`$ intel-desk sanctions-check --query "${query}" --lists ofac,un,eu,uk --fuzzy`);
+  h+=blank();h+=divider();h+=ln('key','  LIST LOAD STATUS');h+=divider();
+  for(const [key,info] of Object.entries(LISTS)){
+    if(!listEnabled[key]) h+=ln('miss',`  [-] ${info.label.padEnd(34)} SKIPPED`);
+    else if(!listData[key]) h+=ln('warn',`  [~] ${info.label.padEnd(34)} FAILED`);
+    else h+=ln('found',`  [+] ${info.label.padEnd(34)} ${listData[key].length.toLocaleString()} entries`);
+  }
+  h+=blank();h+=divider();h+=ln('key',`  SEARCH RESULTS  (query: "${query}")`);h+=divider();
+  for(const [key,hits] of Object.entries(allResults)){
+    if(!hits) continue;
+    if(hits.length===0) h+=ln('miss',`  [-] ${LISTS[key].label.padEnd(34)} No matches`);
+    else{
+      h+=ln('found',`  [+] ${LISTS[key].label.padEnd(34)} ${hits.length} match${hits.length!==1?'es':''}`);
+      hits.slice(0,5).forEach(r=>{ h+=lnH('text',`       → <span class="t-key">${esc(r.primary)}</span>  <span class="t-dim">${esc(r.type||'')}${r.country?' · '+r.country:''}</span>`); });
+      if(hits.length>5) h+=ln('dim',`         … and ${hits.length-5} more`);
+    }
+  }
+  h+=blank();h+=divider();
+  if(total===0) h+=ln('found',`  [+] CLEAR — No sanctions matches for "${query}"`);
+  else{ h+=ln('error',`  [!] HIT — ${total} match${total!==1?'es':''} detected for "${query}"`); h+=ln('warn','  [~] Verify all matches against official government sources before acting'); }
+  h+=blank();h+=ln('dim',`  Search complete`);h+=lnH('dim',`  <span class="t-cursor"></span>`);
+  document.getElementById('terminalBody').innerHTML=h;
+}
+
+function toggleList(btn){
+  const key=btn.dataset.list;
+  listEnabled[key]=!listEnabled[key];
+  btn.classList.toggle('active',listEnabled[key]);
+}
+
+function hideResults(){
+  document.getElementById('verdictBanner').classList.remove('visible');
+  document.getElementById('resultsSection').classList.remove('visible');
+  document.getElementById('resultsSection').innerHTML='';
+}
+
+document.getElementById('searchInput').addEventListener('keydown',e=>{ if(e.key==='Enter') runSearch(); });
+window.addEventListener('load',()=>{ for(const key of Object.keys(LISTS)) if(listEnabled[key]) loadList(key); });
+</script>
+</body>
+</html>

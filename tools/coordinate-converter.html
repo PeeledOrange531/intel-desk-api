@@ -1,0 +1,766 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Coordinate Converter — DD, DMS, DDM, MGRS, UTM, USNG, what3words | The Intel Desk</title>
+<meta name="description" content="Free coordinate converter tool. Convert between Decimal Degrees, DMS, Degrees Decimal Minutes, MGRS, UTM, USNG, and what3words instantly. Used by journalists, OSINT investigators, military analysts, and field researchers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #050505; --bg2: #0a0a0a; --bg3: #111111;
+  --border: rgba(255,255,255,0.07); --border-hover: rgba(255,255,255,0.18);
+  --text: #f5f2ec; --text-muted: rgba(240,236,228,0.75); --text-dim: rgba(240,236,228,0.50);
+  --accent: #c8a96e; --accent2: #e8d5a3; --accent-dim: rgba(200,169,110,0.15);
+  --green: #4ec994; --orange: #e87b4a; --blue: #7eb8e4; --red: #c0392b; --gray: #666;
+  --mono: 'DM Mono', monospace; --serif: 'Cormorant Garamond', Georgia, serif; --sans: 'Syne', sans-serif;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body { background: #050505 !important; color: #f5f2ec !important; font-family: var(--sans); min-height: 100vh; position: relative; overflow-x: hidden; }
+body * { color: inherit; }
+body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.6;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat: repeat; background-size: 256px; }
+.page-wrap { position: relative; z-index: 1; padding: 0 48px; max-width: 1200px; margin: 0 auto; }
+
+/* HERO */
+.hero { padding: 80px 0 60px; border-bottom: 1px solid var(--border); animation: fadeUp 0.6s ease both; }
+.eyebrow { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+.eyebrow::before { content: ''; display: block; width: 32px; height: 1px; background: var(--accent); flex-shrink: 0; }
+.eyebrow span { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.20em; color: #c8a96e !important; }
+.hero h1 { font-family: var(--serif); font-size: clamp(38px, 5vw, 68px); font-weight: 300; line-height: 0.95; color: #f5f2ec !important; }
+.hero h1 em { font-style: italic; color: #e8d5a3 !important; }
+
+/* SEO BLOCK */
+.seo-block { background: var(--bg2); border: 1px solid var(--border); border-top: none; padding: 28px 32px; animation: fadeUp 0.6s 0.08s ease both; }
+.seo-block-label { font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; color: #c8a96e !important; margin-bottom: 14px; display: flex; align-items: center; gap: 10px; }
+.seo-block-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.seo-block p { font-family: var(--mono); font-size: 13px; line-height: 1.9; color: rgba(240,236,228,0.75) !important; }
+.seo-block p strong { color: #e8d5a3 !important; font-weight: 500; }
+.seo-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); }
+.seo-tag { font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.10em; color: rgba(240,236,228,0.50) !important; border: 1px solid var(--border); padding: 4px 10px; }
+
+/* INPUT SECTION */
+.input-section { padding: 48px 0 0; animation: fadeUp 0.6s 0.12s ease both; }
+.section-label { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; color: rgba(240,236,228,0.50) !important; display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
+.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+
+/* FORMAT TABS */
+.format-tabs { display: flex; gap: 0; margin-bottom: 2px; flex-wrap: wrap; }
+.format-tab { background: transparent; border: 1px solid var(--border); border-right: none; color: rgba(240,236,228,0.40) !important; font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 11px 18px; cursor: pointer; transition: all 0.2s; }
+.format-tab:last-child { border-right: 1px solid var(--border); }
+.format-tab:hover { color: rgba(240,236,228,0.75) !important; border-color: var(--border-hover); }
+.format-tab.active { background: var(--accent-dim); border-color: rgba(200,169,110,0.3); color: #c8a96e !important; }
+
+/* INPUT PANELS */
+.input-panel { display: none; background: var(--bg2); border: 1px solid var(--border); padding: 28px; }
+.input-panel.active { display: block; }
+.input-grid { display: grid; gap: 2px; }
+.input-grid.two-col { grid-template-columns: 1fr 1fr; }
+.input-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
+.input-grid.four-col { grid-template-columns: 1fr 1fr 1fr 1fr; }
+
+.field-wrap { display: flex; flex-direction: column; gap: 0; }
+.field-label { font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: rgba(240,236,228,0.40) !important; padding: 8px 14px 6px; background: var(--bg3); border: 1px solid var(--border); border-bottom: none; }
+.field-input { background: var(--bg); border: 1px solid var(--border); color: #f5f2ec !important; font-family: var(--mono); font-size: 14px; padding: 14px; outline: none; transition: border-color 0.2s; width: 100%; }
+.field-input::placeholder { color: rgba(240,236,228,0.25) !important; }
+.field-input:focus { border-color: rgba(200,169,110,0.4); }
+select.field-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c8a96e'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
+select.field-input option { background: #0a0a0a; color: #f5f2ec; }
+
+.input-hint-text { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.35) !important; margin-top: 8px; line-height: 1.6; }
+.input-hint-text em { color: #c8a96e !important; font-style: normal; }
+
+/* ACTION BAR */
+.action-bar { display: flex; gap: 0; margin-top: 2px; }
+.btn-convert { background: var(--accent-dim); border: 1px solid rgba(200,169,110,0.3); color: #c8a96e !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 14px 36px; cursor: pointer; transition: background 0.2s, color 0.2s; }
+.btn-convert:hover { background: rgba(200,169,110,0.25); color: #e8d5a3 !important; }
+.btn-clear { background: transparent; border: 1px solid var(--border); border-left: none; color: rgba(240,236,228,0.40) !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 14px 24px; cursor: pointer; transition: all 0.2s; }
+.btn-clear:hover { border-color: var(--border-hover); color: #f5f2ec !important; }
+.btn-example { background: transparent; border: 1px solid var(--border); border-left: none; color: rgba(240,236,228,0.40) !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 14px 24px; cursor: pointer; transition: all 0.2s; margin-left: auto; border-left: 1px solid var(--border); }
+.btn-example:hover { border-color: var(--border-hover); color: #f5f2ec !important; }
+
+/* RESULTS */
+.results-wrap { display: none; flex-direction: column; gap: 2px; margin-top: 48px; animation: fadeUp 0.5s ease both; }
+.results-wrap.visible { display: flex; }
+
+.results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1px; background: var(--border); }
+.result-card { background: var(--bg2); padding: 24px 28px; display: flex; flex-direction: column; gap: 10px; transition: background 0.2s, border-color 0.2s; position: relative; overflow: hidden; cursor: pointer; }
+.result-card:hover { background: #0d0d0d; }
+.result-card::before { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 2px; background: var(--accent); transition: width 0.3s ease; }
+.result-card:hover::before { width: 100%; }
+
+.result-format { font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; color: rgba(240,236,228,0.40) !important; display: flex; align-items: center; gap: 8px; }
+.result-format-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
+.result-value { font-family: var(--mono); font-size: 15px; color: #f5f2ec !important; line-height: 1.5; word-break: break-all; }
+.result-value.large { font-family: var(--serif); font-size: 22px; font-weight: 300; color: #e8d5a3 !important; line-height: 1.2; }
+.result-value.w3w { color: #e87b4a !important; font-size: 18px; font-family: var(--serif); font-weight: 300; }
+.result-value.w3w::before { content: '///'; color: #e87b4a; font-family: var(--mono); font-size: 13px; margin-right: 2px; }
+.result-sub { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.35) !important; line-height: 1.6; }
+.copy-hint { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(240,236,228,0.20) !important; margin-top: 4px; }
+.result-card:hover .copy-hint { color: rgba(200,169,110,0.5) !important; }
+
+/* Copy toast */
+.copy-toast { position: fixed; bottom: 32px; right: 32px; background: var(--bg3); border: 1px solid rgba(200,169,110,0.3); color: #c8a96e !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 12px 20px; z-index: 1000; opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
+.copy-toast.show { opacity: 1; transform: translateY(0); }
+
+/* TERMINAL */
+.terminal-wrap { border: 1px solid var(--border); display: none; margin-top: 2px; }
+.terminal-wrap.visible { display: block; }
+.terminal-bar { background: var(--bg3); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
+.terminal-dots { display: flex; gap: 7px; }
+.dot { width: 11px; height: 11px; border-radius: 50%; }
+.dot-red { background: #5a2020; } .dot-yellow { background: #5a4a20; } .dot-green { background: #1e4a2e; }
+.terminal-label { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: rgba(240,236,228,0.50) !important; }
+.terminal-body { background: #050505 !important; padding: 28px; font-family: var(--mono); font-size: 13px; line-height: 1.8; overflow-x: auto; }
+.t-cmd { color: #c8a96e !important; } .t-found { color: #4ec994 !important; } .t-warn { color: #e87b4a !important; }
+.t-key { color: #e8d5a3 !important; } .t-dim { color: rgba(240,236,228,0.50) !important; font-size: 11px; }
+.t-div { color: rgba(240,236,228,0.50) !important; user-select: none; } .t-text { color: rgba(240,236,228,0.75) !important; }
+.t-cursor { display: inline-block; width: 8px; height: 14px; background: #c8a96e; vertical-align: middle; animation: blink 1.1s step-end infinite; }
+
+/* FOOTER */
+.footer { margin-top: 80px; padding: 28px 0; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+.footer-left { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.50) !important; }
+.footer-left strong { color: #c8a96e !important; font-weight: 500; }
+.footer-right { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.50) !important; max-width: 460px; text-align: right; line-height: 1.6; }
+
+@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
+
+@media (max-width: 768px) {
+  .page-wrap { padding: 0 20px; }
+  .input-grid.two-col, .input-grid.three-col, .input-grid.four-col { grid-template-columns: 1fr; }
+  .results-grid { grid-template-columns: 1fr; }
+  .footer { flex-direction: column; gap: 12px; } .footer-right { text-align: left; }
+  .format-tab { font-size: 9px; padding: 10px 12px; }
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="eyebrow"><span>Geospatial Intelligence</span></div>
+    <h1>Coordinate <em>Converter</em></h1>
+  </section>
+
+  <!-- SEO BLOCK -->
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEOBlock()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+    <p>
+      Coordinates come in many formats depending on who recorded them and what system they were using — and converting between them manually is error-prone and slow. This free <strong>coordinate converter</strong> handles every major format used in the field: <strong>Decimal Degrees (DD)</strong>, the standard used by Google Maps and most digital platforms; <strong>Degrees Minutes Seconds (DMS)</strong>, the traditional format used in paper maps and official documents; <strong>Degrees Decimal Minutes (DDM)</strong>, used in aviation and marine navigation; <strong>MGRS (Military Grid Reference System)</strong>, the NATO standard used by military and defense; <strong>UTM (Universal Transverse Mercator)</strong>, the metric grid system used by surveyors and geographers; <strong>USNG (United States National Grid)</strong>, the civilian equivalent of MGRS used by US emergency services; and <strong>what3words</strong>, the three-word address system increasingly used by journalists, field investigators, and emergency responders. Enter coordinates in any format and instantly receive all others — no manual calculation, no errors. Every conversion is performed in real time with full precision. The tool also supports <strong>reverse what3words lookup</strong> — paste a three-word address like <em>///filled.count.soap</em> and instantly receive the precise GPS coordinates, MGRS grid reference, and all other formats. This makes it the only free tool that converts <strong>bidirectionally between what3words and every major coordinate standard</strong>. Essential for <strong>OSINT investigators geolocating field reports</strong>, <strong>journalists pinpointing locations from sources</strong>, <strong>search and rescue coordinators</strong>, <strong>military analysts working with MGRS grids</strong>, <strong>surveyors and GIS professionals</strong>, and anyone who needs to move coordinates between systems without error. Supports the WGS84 datum used globally by GPS systems.
+    </p>
+    <div class="seo-tags">
+      <span class="seo-tag">Coordinate Converter</span>
+      <span class="seo-tag">DD to DMS</span>
+      <span class="seo-tag">MGRS Converter</span>
+      <span class="seo-tag">UTM Converter</span>
+      <span class="seo-tag">what3words Converter</span>
+      <span class="seo-tag">what3words to GPS</span>
+      <span class="seo-tag">GPS to what3words</span>
+      <span class="seo-tag">USNG Converter</span>
+      <span class="seo-tag">DDM Converter</span>
+      <span class="seo-tag">Lat Long Converter</span>
+      <span class="seo-tag">DMS to Decimal</span>
+      <span class="seo-tag">MGRS to Lat Long</span>
+      <span class="seo-tag">Geolocation OSINT</span>
+      <span class="seo-tag">Military Grid</span>
+    </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <section class="input-section">
+    <div class="section-label">Enter Coordinates</div>
+
+    <!-- Format tabs -->
+    <div class="format-tabs">
+      <button class="format-tab active" data-format="dd"   onclick="switchTab('dd')">DD</button>
+      <button class="format-tab"        data-format="dms"  onclick="switchTab('dms')">DMS</button>
+      <button class="format-tab"        data-format="ddm"  onclick="switchTab('ddm')">DDM</button>
+      <button class="format-tab"        data-format="mgrs" onclick="switchTab('mgrs')">MGRS</button>
+      <button class="format-tab"        data-format="utm"  onclick="switchTab('utm')">UTM</button>
+      <button class="format-tab"        data-format="usng" onclick="switchTab('usng')">USNG</button>
+      <button class="format-tab"        data-format="w3w"  onclick="switchTab('w3w')">///W3W</button>
+    </div>
+
+    <!-- DD panel -->
+    <div class="input-panel active" id="panel-dd">
+      <div class="input-grid two-col">
+        <div class="field-wrap">
+          <div class="field-label">Latitude</div>
+          <input class="field-input" id="dd-lat" type="text" placeholder="e.g. 39.188756" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Longitude</div>
+          <input class="field-input" id="dd-lng" type="text" placeholder="e.g. -76.815275" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+      <p class="input-hint-text">Negative latitude = South &nbsp;·&nbsp; Negative longitude = West &nbsp;·&nbsp; <em>e.g. 51.5074, -0.1278 (London)</em></p>
+    </div>
+
+    <!-- DMS panel -->
+    <div class="input-panel" id="panel-dms">
+      <div class="input-grid four-col">
+        <div class="field-wrap">
+          <div class="field-label">Lat Degrees</div>
+          <input class="field-input" id="dms-latd" type="text" placeholder="39" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Lat Minutes</div>
+          <input class="field-input" id="dms-latm" type="text" placeholder="11" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Lat Seconds</div>
+          <input class="field-input" id="dms-lats" type="text" placeholder="19.52" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">N / S</div>
+          <select class="field-input" id="dms-latdir"><option value="N">N — North</option><option value="S">S — South</option></select>
+        </div>
+      </div>
+      <div class="input-grid four-col" style="margin-top:2px">
+        <div class="field-wrap">
+          <div class="field-label">Lng Degrees</div>
+          <input class="field-input" id="dms-lngd" type="text" placeholder="76" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Lng Minutes</div>
+          <input class="field-input" id="dms-lngm" type="text" placeholder="48" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Lng Seconds</div>
+          <input class="field-input" id="dms-lngs" type="text" placeholder="54.99" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">E / W</div>
+          <select class="field-input" id="dms-lngdir"><option value="E">E — East</option><option value="W">W — West</option></select>
+        </div>
+      </div>
+    </div>
+
+    <!-- DDM panel -->
+    <div class="input-panel" id="panel-ddm">
+      <div class="input-grid four-col">
+        <div class="field-wrap">
+          <div class="field-label">Lat Degrees</div>
+          <input class="field-input" id="ddm-latd" type="text" placeholder="39" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Lat Dec. Minutes</div>
+          <input class="field-input" id="ddm-latm" type="text" placeholder="11.3254" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">N / S</div>
+          <select class="field-input" id="ddm-latdir"><option value="N">N</option><option value="S">S</option></select>
+        </div>
+        <div class="field-wrap" style="visibility:hidden"><div class="field-label">&nbsp;</div><input class="field-input"></div>
+      </div>
+      <div class="input-grid four-col" style="margin-top:2px">
+        <div class="field-wrap">
+          <div class="field-label">Lng Degrees</div>
+          <input class="field-input" id="ddm-lngd" type="text" placeholder="76" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Lng Dec. Minutes</div>
+          <input class="field-input" id="ddm-lngm" type="text" placeholder="48.9165" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">E / W</div>
+          <select class="field-input" id="ddm-lngdir"><option value="E">E</option><option value="W">W</option></select>
+        </div>
+        <div class="field-wrap" style="visibility:hidden"><div class="field-label">&nbsp;</div><input class="field-input"></div>
+      </div>
+    </div>
+
+    <!-- MGRS panel -->
+    <div class="input-panel" id="panel-mgrs">
+      <div class="input-grid two-col">
+        <div class="field-wrap">
+          <div class="field-label">MGRS String</div>
+          <input class="field-input" id="mgrs-input" type="text" placeholder="e.g. 18SUJ2339007417" autocomplete="off" spellcheck="false" style="grid-column:1/-1">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Precision</div>
+          <select class="field-input" id="mgrs-precision">
+            <option value="5">5 — 1 meter</option>
+            <option value="4">4 — 10 meters</option>
+            <option value="3" selected>3 — 100 meters</option>
+            <option value="2">2 — 1 km</option>
+            <option value="1">1 — 10 km</option>
+          </select>
+        </div>
+      </div>
+      <p class="input-hint-text">Enter full MGRS string including grid zone, 100km square ID, and easting/northing &nbsp;·&nbsp; <em>e.g. 18SUJ2339007417</em></p>
+    </div>
+
+    <!-- UTM panel -->
+    <div class="input-panel" id="panel-utm">
+      <div class="input-grid four-col">
+        <div class="field-wrap">
+          <div class="field-label">Zone Number</div>
+          <input class="field-input" id="utm-zone" type="text" placeholder="18" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Zone Letter</div>
+          <input class="field-input" id="utm-band" type="text" placeholder="S" autocomplete="off" maxlength="1">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Easting (m)</div>
+          <input class="field-input" id="utm-e" type="text" placeholder="323900" autocomplete="off">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Northing (m)</div>
+          <input class="field-input" id="utm-n" type="text" placeholder="4340741" autocomplete="off">
+        </div>
+      </div>
+      <p class="input-hint-text">Zone letter is the latitude band (C–X, excluding I and O) &nbsp;·&nbsp; Northern hemisphere if N–X, southern if C–M</p>
+    </div>
+
+    <!-- USNG panel -->
+    <div class="input-panel" id="panel-usng">
+      <div class="input-grid two-col">
+        <div class="field-wrap">
+          <div class="field-label">USNG String</div>
+          <input class="field-input" id="usng-input" type="text" placeholder="e.g. 18S UJ 23390 07417" autocomplete="off" spellcheck="false">
+        </div>
+        <div class="field-wrap">
+          <div class="field-label">Precision</div>
+          <select class="field-input" id="usng-precision">
+            <option value="5">5 — 1 meter</option>
+            <option value="4">4 — 10 meters</option>
+            <option value="3" selected>3 — 100 meters</option>
+            <option value="2">2 — 1 km</option>
+          </select>
+        </div>
+      </div>
+      <p class="input-hint-text">USNG is identical to MGRS for most practical purposes &nbsp;·&nbsp; Spaces between components are optional</p>
+    </div>
+
+    <!-- W3W panel -->
+    <div class="input-panel" id="panel-w3w">
+      <div class="input-grid" style="grid-template-columns:1fr">
+        <div class="field-wrap">
+          <div class="field-label">what3words Address</div>
+          <input class="field-input" id="w3w-input" type="text" placeholder="e.g. filled.count.soap  or  ///filled.count.soap" autocomplete="off" spellcheck="false">
+        </div>
+      </div>
+      <p class="input-hint-text">Enter the three words separated by dots — the <em>///</em> prefix is optional &nbsp;·&nbsp; Language must be English</p>
+    </div>
+
+    <!-- Action bar -->
+    <div class="action-bar">
+      <button class="btn-convert" onclick="convert()">Convert →</button>
+      <button class="btn-clear"   onclick="clearAll()">Clear</button>
+      <button class="btn-example" onclick="loadExample()">Load Example</button>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+    <div class="section-label" style="padding-top:0; margin-bottom:16px">All Formats</div>
+    <div class="results-grid" id="resultsGrid"></div>
+  </div>
+
+  <!-- TERMINAL -->
+  <div class="terminal-wrap" id="terminalWrap">
+    <div class="terminal-bar">
+      <div class="terminal-dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
+      <div class="terminal-label">intel-desk — coordinate-converter</div>
+    </div>
+    <div class="terminal-body" id="terminalBody"></div>
+  </div>
+
+  <!-- FOOTER -->
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">what3words conversion via the what3words API. All other conversions performed client-side. Coordinate precision may vary by format.</div>
+  </footer>
+</div>
+
+<!-- Copy toast -->
+<div class="copy-toast" id="copyToast">Copied to clipboard</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const PROXY_BASE = 'https://intel-desk-api.onrender.com';
+
+// ── TAB SWITCHING ─────────────────────────────────────────────────────────────
+function switchTab(fmt) {
+  document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.format === fmt));
+  document.querySelectorAll('.input-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${fmt}`));
+}
+
+// ── EXAMPLES ──────────────────────────────────────────────────────────────────
+const EXAMPLES = {
+  dd:   () => { document.getElementById('dd-lat').value='39.188756'; document.getElementById('dd-lng').value='-76.815275'; },
+  dms:  () => { document.getElementById('dms-latd').value='39'; document.getElementById('dms-latm').value='11'; document.getElementById('dms-lats').value='19.52'; document.getElementById('dms-latdir').value='N'; document.getElementById('dms-lngd').value='76'; document.getElementById('dms-lngm').value='48'; document.getElementById('dms-lngs').value='54.99'; document.getElementById('dms-lngdir').value='W'; },
+  ddm:  () => { document.getElementById('ddm-latd').value='39'; document.getElementById('ddm-latm').value='11.3253'; document.getElementById('ddm-latdir').value='N'; document.getElementById('ddm-lngd').value='76'; document.getElementById('ddm-lngm').value='48.9165'; document.getElementById('ddm-lngdir').value='W'; },
+  mgrs: () => { document.getElementById('mgrs-input').value='18SUJ2339007417'; },
+  utm:  () => { document.getElementById('utm-zone').value='18'; document.getElementById('utm-band').value='S'; document.getElementById('utm-e').value='323900'; document.getElementById('utm-n').value='4340741'; },
+  usng: () => { document.getElementById('usng-input').value='18S UJ 23390 07417'; },
+  w3w:  () => { document.getElementById('w3w-input').value='filled.count.soap'; },
+};
+
+function loadExample() {
+  const active = document.querySelector('.format-tab.active')?.dataset.format || 'dd';
+  EXAMPLES[active]?.();
+}
+
+// ── INPUT READERS ─────────────────────────────────────────────────────────────
+function readDD() {
+  const lat = parseFloat(document.getElementById('dd-lat').value);
+  const lng = parseFloat(document.getElementById('dd-lng').value);
+  if (isNaN(lat) || isNaN(lng)) throw new Error('Enter valid decimal latitude and longitude');
+  if (lat < -90 || lat > 90)   throw new Error('Latitude must be between -90 and 90');
+  if (lng < -180 || lng > 180) throw new Error('Longitude must be between -180 and 180');
+  return { lat, lng };
+}
+
+function readDMS() {
+  const ld = parseFloat(document.getElementById('dms-latd').value);
+  const lm = parseFloat(document.getElementById('dms-latm').value);
+  const ls = parseFloat(document.getElementById('dms-lats').value);
+  const ld2= parseFloat(document.getElementById('dms-lngd').value);
+  const lm2= parseFloat(document.getElementById('dms-lngm').value);
+  const ls2= parseFloat(document.getElementById('dms-lngs').value);
+  if ([ld,lm,ls,ld2,lm2,ls2].some(isNaN)) throw new Error('Fill in all DMS fields');
+  const latSign = document.getElementById('dms-latdir').value === 'S' ? -1 : 1;
+  const lngSign = document.getElementById('dms-lngdir').value === 'W' ? -1 : 1;
+  return { lat: latSign*(ld + lm/60 + ls/3600), lng: lngSign*(ld2 + lm2/60 + ls2/3600) };
+}
+
+function readDDM() {
+  const ld = parseFloat(document.getElementById('ddm-latd').value);
+  const lm = parseFloat(document.getElementById('ddm-latm').value);
+  const ld2= parseFloat(document.getElementById('ddm-lngd').value);
+  const lm2= parseFloat(document.getElementById('ddm-lngm').value);
+  if ([ld,lm,ld2,lm2].some(isNaN)) throw new Error('Fill in all DDM fields');
+  const latSign = document.getElementById('ddm-latdir').value === 'S' ? -1 : 1;
+  const lngSign = document.getElementById('ddm-lngdir').value === 'W' ? -1 : 1;
+  return { lat: latSign*(ld + lm/60), lng: lngSign*(ld2 + lm2/60) };
+}
+
+function readMGRS() {
+  const s = document.getElementById('mgrs-input').value.trim().replace(/\s/g,'').toUpperCase();
+  if (!s) throw new Error('Enter an MGRS string');
+  return mgrsToLatLng(s);
+}
+
+function readUTM() {
+  const zone = parseInt(document.getElementById('utm-zone').value);
+  const band = document.getElementById('utm-band').value.trim().toUpperCase();
+  const e    = parseFloat(document.getElementById('utm-e').value);
+  const n    = parseFloat(document.getElementById('utm-n').value);
+  if (isNaN(zone)||!band||isNaN(e)||isNaN(n)) throw new Error('Fill in all UTM fields');
+  return utmToLatLng(zone, band, e, n);
+}
+
+function readUSNG() {
+  const s = document.getElementById('usng-input').value.trim().replace(/\s/g,'').toUpperCase();
+  if (!s) throw new Error('Enter a USNG string');
+  return mgrsToLatLng(s); // USNG and MGRS are identical algorithmically
+}
+
+// ── CONVERSION MATH ───────────────────────────────────────────────────────────
+
+// DD → DMS string
+function toDMS(dd, isLat) {
+  const dir = dd < 0 ? (isLat ? 'S' : 'W') : (isLat ? 'N' : 'E');
+  const abs = Math.abs(dd);
+  const deg = Math.floor(abs);
+  const minFull = (abs - deg) * 60;
+  const min = Math.floor(minFull);
+  const sec = ((minFull - min) * 60).toFixed(4);
+  return `${deg}° ${String(min).padStart(2,'0')}' ${sec}" ${dir}`;
+}
+
+// DD → DDM string
+function toDDM(dd, isLat) {
+  const dir = dd < 0 ? (isLat ? 'S' : 'W') : (isLat ? 'N' : 'E');
+  const abs = Math.abs(dd);
+  const deg = Math.floor(abs);
+  const min = ((abs - deg) * 60).toFixed(6);
+  return `${deg}° ${min}' ${dir}`;
+}
+
+// DD → UTM
+function latLngToUTM(lat, lng) {
+  const a = 6378137.0, f = 1/298.257223563;
+  const b = a*(1-f), e2 = 1-(b/a)**2;
+  const k0 = 0.9996;
+  const zoneNum = Math.floor((lng+180)/6)+1;
+  const zoneLetter = 'CDEFGHJKLMNPQRSTUVWXX'[Math.floor((lat+80)/8)];
+  const latR = lat*Math.PI/180, lngR = lng*Math.PI/180;
+  const lng0 = ((zoneNum-1)*6-180+3)*Math.PI/180;
+  const N = a/Math.sqrt(1-e2*Math.sin(latR)**2);
+  const T = Math.tan(latR)**2, C = e2/(1-e2)*Math.cos(latR)**2, A = (lngR-lng0)*Math.cos(latR);
+  const e4=e2**2, e6=e2**3;
+  const M = a*((1-e2/4-3*e4/64-5*e6/256)*latR
+    -(3*e2/8+3*e4/32+45*e6/1024)*Math.sin(2*latR)
+    +(15*e4/256+45*e6/1024)*Math.sin(4*latR)
+    -(35*e6/3072)*Math.sin(6*latR));
+  let E = k0*N*(A+(1-T+C)*A**3/6+(5-18*T+T**2+72*C-58*e2/(1-e2))*A**5/120)+500000;
+  let N2= k0*(M+N*Math.tan(latR)*(A**2/2+(5-T+9*C+4*C**2)*A**4/24+(61-58*T+T**2+600*C-330*e2/(1-e2))*A**6/720));
+  if (lat < 0) N2 += 10000000;
+  return { zone: zoneNum, band: zoneLetter, easting: Math.round(E), northing: Math.round(N2) };
+}
+
+// UTM → DD
+function utmToLatLng(zoneNum, zoneLetter, E, N) {
+  const a=6378137.0, f=1/298.257223563;
+  const b=a*(1-f), e2=1-(b/a)**2, e12=e2/(1-e2);
+  const k0=0.9996;
+  const northern = 'NPQRSTUVWX'.includes(zoneLetter);
+  const x=E-500000, y=northern?N:N-10000000;
+  const lng0=((zoneNum-1)*6-180+3)*Math.PI/180;
+  const M=y/k0;
+  const mu=M/(a*(1-e2/4-3*e2**2/64-5*e2**3/256));
+  const e1=(1-Math.sqrt(1-e2))/(1+Math.sqrt(1-e2));
+  const phi1=mu+(3*e1/2-27*e1**3/32)*Math.sin(2*mu)+(21*e1**2/16-55*e1**4/32)*Math.sin(4*mu)+(151*e1**3/96)*Math.sin(6*mu);
+  const N1=a/Math.sqrt(1-e2*Math.sin(phi1)**2);
+  const T1=Math.tan(phi1)**2, C1=e12*Math.cos(phi1)**2;
+  const R1=a*(1-e2)/Math.pow(1-e2*Math.sin(phi1)**2,1.5);
+  const D=x/(N1*k0);
+  const lat=phi1-(N1*Math.tan(phi1)/R1)*(D**2/2-(5+3*T1+10*C1-4*C1**2-9*e12)*D**4/24+(61+90*T1+298*C1+45*T1**2-252*e12-3*C1**2)*D**6/720);
+  const lon=lng0+(D-(1+2*T1+C1)*D**3/6+(5-2*C1+(28*T1)-(3*C1**2)+(8*e12)+(24*T1**2))*D**5/120)/Math.cos(phi1);
+  return { lat: lat*180/Math.PI, lng: lon*180/Math.PI };
+}
+
+// DD → MGRS
+function latLngToMGRS(lat, lng, precision=5) {
+  const utm = latLngToUTM(lat, lng);
+  const sq100k = get100kID(utm.easting, utm.northing, utm.zone);
+  const eStr = String(utm.easting % 100000).padStart(5,'0').slice(0, precision);
+  const nStr = String(utm.northing % 100000).padStart(5,'0').slice(0, precision);
+  return `${utm.zone}${utm.band}${sq100k}${eStr}${nStr}`;
+}
+
+function get100kID(easting, northing, zone) {
+  const setPad=((zone-1)%3)*8;
+  const setCol=[1,7,13,19,25,31,37];
+  const colArr='ABCDEFGHJKLMNPQRSTUVWXYZ'.split('');
+  const rowArr='ABCDEFGHJKLMNPQRSTUV'.split('');
+  const col=Math.floor(easting/100000);
+  const row=Math.floor((northing%2000000)/100000);
+  const colIdx=((col-1)+setPad)%24;
+  const rowIdx=(row+(zone%2===0?5:0))%20;
+  return colArr[colIdx]+rowArr[rowIdx];
+}
+
+// MGRS → DD (simplified, handles standard MGRS strings)
+function mgrsToLatLng(mgrs) {
+  mgrs = mgrs.replace(/\s/g,'').toUpperCase();
+  const m = mgrs.match(/^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z]{2})(\d{2,10})$/);
+  if (!m) throw new Error(`Invalid MGRS format: ${mgrs}`);
+  const zoneNum=parseInt(m[1]), zoneLetter=m[2], sq=m[3], nums=m[4];
+  const half=nums.length/2;
+  const eRaw=parseInt(nums.slice(0,half)), nRaw=parseInt(nums.slice(half));
+  const mult=Math.pow(10,5-half);
+  const e100k = getEastingFromID(sq[0], zoneNum);
+  const n100k = getNorthingFromID(sq[1], zoneNum, zoneLetter);
+  let easting  = e100k + eRaw*mult + mult/2;
+  let northing = n100k + nRaw*mult + mult/2;
+  const northern = 'NPQRSTUVWX'.includes(zoneLetter);
+  if (!northern) northing += 10000000;
+  return utmToLatLng(zoneNum, zoneLetter, easting, northing);
+}
+
+function getEastingFromID(col, zone) {
+  const setPad=((zone-1)%3)*8;
+  const colArr='ABCDEFGHJKLMNPQRSTUVWXYZ'.split('');
+  const idx=colArr.indexOf(col);
+  return ((idx-setPad+24)%24+1)*100000;
+}
+
+function getNorthingFromID(row, zone, band) {
+  const rowArr='ABCDEFGHJKLMNPQRSTUV'.split('');
+  let idx=rowArr.indexOf(row);
+  if (zone%2===0) idx=(idx-5+20)%20;
+  const bandN={'C':0,'D':2000000,'E':4000000,'F':6000000,'G':8000000,'H':10000000,'J':12000000,'K':14000000,'L':16000000,'M':18000000,'N':0,'P':2000000,'Q':4000000,'R':6000000,'S':8000000,'T':10000000,'U':12000000,'V':14000000,'W':16000000,'X':18000000};
+  const base=bandN[band]||0;
+  return base + idx*100000;
+}
+
+// ── MAIN CONVERT ──────────────────────────────────────────────────────────────
+async function convert() {
+  const active = document.querySelector('.format-tab.active')?.dataset.format || 'dd';
+  let lat, lng;
+
+  try {
+    const readers = { dd:readDD, dms:readDMS, ddm:readDDM, mgrs:readMGRS, utm:readUTM, usng:readUSNG, w3w:readW3W };
+    const result = await readers[active]();
+    lat = result.lat; lng = result.lng;
+  } catch(e) {
+    alert(e.message);
+    return;
+  }
+
+  // Round to 8dp for display
+  lat = Math.round(lat*100000000)/100000000;
+  lng = Math.round(lng*100000000)/100000000;
+
+  const utm  = latLngToUTM(lat, lng);
+  const mgrs = latLngToMGRS(lat, lng, 5);
+
+  const results = {
+    dd:   { label:'Decimal Degrees',           value:`${lat}, ${lng}`,                sub:'Standard · Google Maps · GPS devices' },
+    dms:  { label:'Degrees Minutes Seconds',   value:`${toDMS(lat,true)}\n${toDMS(lng,false)}`, sub:'Traditional cartography · survey documents' },
+    ddm:  { label:'Degrees Decimal Minutes',   value:`${toDDM(lat,true)}\n${toDDM(lng,false)}`, sub:'Aviation · marine navigation · GPS receivers' },
+    mgrs: { label:'MGRS',                      value:mgrs,              sub:'NATO Military Grid Reference System' },
+    utm:  { label:'UTM',                       value:`${utm.zone}${utm.band}  E ${utm.easting}  N ${utm.northing}`, sub:'Universal Transverse Mercator · surveying' },
+    usng: { label:'USNG',                      value:`${utm.zone}${utm.band} ${mgrs.slice(3,5)} ${String(utm.easting%100000).padStart(5,'0')} ${String(utm.northing%100000).padStart(5,'0')}`, sub:'US National Grid · US emergency services' },
+    w3w:  { label:'what3words',                value:'Loading…',        sub:'what3words three-word address', loading:true },
+    gmaps:{ label:'Google Maps Link',          value:`https://maps.google.com/?q=${lat},${lng}`, sub:'Click to open in Google Maps', isUrl:true },
+  };
+
+  renderResults(results);
+  renderTerminal(lat, lng, results, utm, mgrs);
+
+  // Fetch w3w asynchronously
+  fetchW3W(lat, lng);
+}
+
+// ── readW3W — converts w3w address to lat/lng via proxy ─────────────────────────
+async function readW3W() {
+  let words = (document.getElementById('w3w-input').value || '').trim().replace(/^\/\/\//,'').toLowerCase();
+  if (!words || words.split('.').filter(Boolean).length !== 3) {
+    throw new Error('Enter a valid what3words address — three words separated by dots');
+  }
+  // We need to fetch from proxy synchronously-ish — return a promise the convert() flow can await
+  const resp = await fetch(`${PROXY_BASE}/w3w-reverse?words=${encodeURIComponent(words)}`);
+  if (!resp.ok) throw new Error(`what3words lookup failed (HTTP ${resp.status})`);
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  if (!data.lat || !data.lng) throw new Error('No coordinates returned from what3words');
+  return { lat: data.lat, lng: data.lng };
+}
+
+// ── what3words ────────────────────────────────────────────────────────────────
+async function fetchW3W(lat, lng) {
+  try {
+    const resp = await fetch(`${PROXY_BASE}/w3w?lat=${lat}&lng=${lng}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const data = await resp.json();
+    if (data.words) {
+      updateW3WCard(data.words, data.nearestPlace || '');
+    } else {
+      updateW3WCard(null, data.error || 'No result');
+    }
+  } catch(e) {
+    updateW3WCard(null, 'w3w unavailable');
+  }
+}
+
+function updateW3WCard(words, sub) {
+  const card = document.getElementById('w3w-card');
+  if (!card) return;
+  const val  = card.querySelector('.result-value');
+  const subEl= card.querySelector('.result-sub');
+  if (words) {
+    val.className = 'result-value w3w';
+    val.textContent = words;
+    subEl.textContent = sub || 'what3words address';
+  } else {
+    val.className = 'result-value';
+    val.style.color = 'var(--gray)';
+    val.textContent = sub;
+    subEl.textContent = 'what3words unavailable';
+  }
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────────────────────
+function renderResults(results) {
+  const grid = document.getElementById('resultsGrid');
+  grid.innerHTML = Object.entries(results).map(([key, r]) => {
+    const isLarge = ['dd'].includes(key);
+    const isW3W   = key === 'w3w';
+    const isUrl   = r.isUrl;
+    const valClass= isLarge ? 'large' : isW3W ? 'w3w' : '';
+    const idAttr  = key === 'w3w' ? 'id="w3w-card"' : '';
+    const valueHtml = isUrl
+      ? `<a href="${r.value}" target="_blank" rel="noopener" style="color:#7eb8e4;text-decoration:underline;font-family:var(--mono);font-size:12px;word-break:break-all;">${r.value}</a>`
+      : `<div class="result-value ${valClass}" style="${r.loading?'color:var(--gray)':''}">${r.value.replace(/\n/g,'<br>')}</div>`;
+    return `
+      <div class="result-card" ${idAttr} onclick="${isUrl ? `window.open('${r.value}','_blank')` : `copyValue('${r.value.replace(/'/g,"\\'")}', '${r.label}')`}">
+        <div class="result-format"><span class="result-format-dot"></span>${r.label}</div>
+        ${valueHtml}
+        <div class="result-sub">${r.sub}</div>
+        ${!isUrl ? '<div class="copy-hint">Click to copy</div>' : '<div class="copy-hint">Click to open</div>'}
+      </div>`;
+  }).join('');
+
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('terminalWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+
+// ── TERMINAL ──────────────────────────────────────────────────────────────────
+function renderTerminal(lat, lng, results, utm, mgrs) {
+  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const ln  = (cls, t) => `<div class="t-${cls}">${esc(t)}</div>`;
+  const lnH = (cls, h) => `<div class="t-${cls}">${h}</div>`;
+  const div = () => `<div class="t-div">────────────────────────────────────────────────────────</div>`;
+  const b   = () => `<div>&nbsp;</div>`;
+
+  let h = '';
+  h += ln('cmd', `$ intel-desk convert-coordinates --lat ${lat} --lng ${lng} --all-formats`);
+  h += b();
+  h += div();
+  h += ln('key', '  COORDINATE CONVERSIONS');
+  h += div();
+
+  const rows = [
+    ['Decimal Deg',  `${lat}, ${lng}`],
+    ['DMS Lat',      toDMS(lat, true)],
+    ['DMS Lng',      toDMS(lng, false)],
+    ['DDM Lat',      toDDM(lat, true)],
+    ['DDM Lng',      toDDM(lng, false)],
+    ['MGRS',         mgrs],
+    ['UTM',          `${utm.zone}${utm.band} E${utm.easting} N${utm.northing}`],
+    ['USNG',         `${utm.zone}${utm.band} ${mgrs.slice(3,5)} ${String(utm.easting%100000).padStart(5,'0')} ${String(utm.northing%100000).padStart(5,'0')}`],
+    ['what3words',   'fetching via proxy…'],
+    ['Google Maps',  `https://maps.google.com/?q=${lat},${lng}`],
+  ];
+
+  for (const [k, v] of rows) {
+    h += lnH('text', `  <span class="t-key">${k.padEnd(14)}</span>  ${esc(v)}`);
+  }
+
+  h += b();
+  h += div();
+  h += ln('dim', `  Conversion complete — 8 formats · WGS84 datum`);
+  h += lnH('dim', `  <span class="t-cursor"></span>`);
+
+  document.getElementById('terminalBody').innerHTML = h;
+}
+
+// ── COPY ──────────────────────────────────────────────────────────────────────
+function copyValue(val, label) {
+  navigator.clipboard.writeText(val).then(() => {
+    const toast = document.getElementById('copyToast');
+    toast.textContent = `Copied: ${label}`;
+    toast.classList.add('show');
+    setTimeout(() => toast.classList.remove('show'), 2000);
+  });
+}
+
+// ── CLEAR ─────────────────────────────────────────────────────────────────────
+function clearAll() {
+  document.querySelectorAll('.field-input').forEach(el => { if(el.tagName!=='SELECT') el.value=''; });
+  document.getElementById('resultsWrap').classList.remove('visible');
+  document.getElementById('terminalWrap').classList.remove('visible');
+}
+
+// ── ENTER KEY ─────────────────────────────────────────────────────────────────
+document.addEventListener('keydown', e => { if(e.key==='Enter') convert(); });
+</script>
+</body>
+</html>
