@@ -151,7 +151,16 @@ def clear_cache():
         return Response('{"error":"Unauthorized"}', status=401, mimetype="application/json")
     _cache.clear()
     return jsonify({"cleared": True})
-
+@app.route("/debug-env")
+def debug_env():
+    import os
+    return jsonify({
+        "W3W_API_KEY_set":    bool(os.environ.get("W3W_API_KEY", "")),
+        "W3W_API_KEY_length": len(os.environ.get("W3W_API_KEY", "")),
+        "W3W_module_var_set": bool(W3W_API_KEY),
+        "W3W_module_var_len": len(W3W_API_KEY),
+        "all_env_keys": [k for k in os.environ.keys()],
+    })
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port, debug=False)
