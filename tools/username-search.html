@@ -1,0 +1,352 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Username Search — Social Media Account Discovery | The Intel Desk</title>
+<meta name="description" content="Free username search tool. Check if a username exists across 300+ social networks using Sherlock and 3000+ sites using Maigret. Results stream live. No API key required.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050505;--bg2:#0a0a0a;--bg3:#111111;--border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);--text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);--green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 48px;max-width:1200px;margin:0 auto;}
+.hero{padding:80px 0 60px;border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(38px,5vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-meta{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.40)!important;margin-top:16px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.hero-badge{border:1px solid rgba(200,169,110,0.25);padding:4px 12px;color:#c8a96e!important;font-size:10px;text-transform:uppercase;letter-spacing:0.14em;}
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-header:hover{background:rgba(255,255,255,0.01);}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:800px;}
+.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;font-weight:500;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+.input-section{padding:48px 0 0;animation:fadeUp 0.6s 0.1s ease both;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* Engine selector */
+.engine-row{display:flex;gap:0;margin-bottom:2px;}
+.engine-btn{flex:1;background:transparent;border:1px solid var(--border);border-right:none;color:rgba(240,236,228,0.40)!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:13px 20px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:10px;}
+.engine-btn:last-child{border-right:1px solid var(--border);}
+.engine-btn.active{background:var(--accent-dim);border-color:rgba(200,169,110,0.3);color:#c8a96e!important;}
+.engine-btn:hover:not(.active){color:rgba(240,236,228,0.70)!important;}
+.engine-badge{font-size:9px;text-transform:uppercase;letter-spacing:0.10em;padding:2px 8px;border:1px solid;flex-shrink:0;}
+.engine-badge.sherlock{color:#7eb8e4!important;border-color:rgba(126,184,228,0.3);}
+.engine-badge.maigret{color:#e87b4a!important;border-color:rgba(232,123,74,0.3);}
+.engine-info{font-size:9px;color:rgba(240,236,228,0.30)!important;margin-left:auto;}
+
+.search-row{display:flex;gap:0;}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:14px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.search-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.search-input:focus{border-color:rgba(200,169,110,0.35);}
+.btn-run{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-run:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-run:disabled{opacity:0.4;cursor:not-allowed;}
+.btn-stop{background:rgba(192,57,43,0.12);border:1px solid rgba(192,57,43,0.3);color:#c0392b!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 28px;cursor:pointer;display:none;white-space:nowrap;}
+.btn-stop.visible{display:block;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+/* Stats */
+.stats-bar{display:none;background:var(--bg2);border:1px solid var(--border);border-top:none;padding:14px 24px;gap:0;}
+.stats-bar.visible{display:flex;}
+.stat-item{flex:1;display:flex;flex-direction:column;gap:4px;padding:0 20px;border-right:1px solid var(--border);}
+.stat-item:first-child{padding-left:0;}
+.stat-item:last-child{border-right:none;}
+.stat-num{font-family:var(--serif);font-size:32px;font-weight:300;line-height:1;}
+.stat-num.green{color:#4ec994!important;}
+.stat-num.dim{color:rgba(240,236,228,0.40)!important;}
+.stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.30)!important;}
+
+/* Found grid */
+.results-grid{display:none;margin-top:2px;}
+.results-grid.visible{display:block;}
+.results-found-header{background:var(--bg2);border:1px solid var(--border);border-bottom:none;padding:14px 24px;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#4ec994!important;display:flex;align-items:center;gap:10px;}
+.results-found-header::after{content:'';flex:1;height:1px;background:rgba(78,201,148,0.2);}
+.found-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:1px;background:var(--border);}
+.found-card{background:var(--bg2);padding:14px 18px;display:flex;align-items:center;gap:12px;}
+.found-card:hover{background:rgba(78,201,148,0.03);}
+.found-dot{width:7px;height:7px;border-radius:50%;background:#4ec994;box-shadow:0 0 6px #4ec994;flex-shrink:0;}
+.found-name{font-family:var(--mono);font-size:12px;font-weight:500;color:#e8d5a3!important;flex:1;}
+.found-url{font-family:var(--mono);font-size:10px;color:#7eb8e4!important;text-decoration:none;flex-shrink:0;}
+.found-url:hover{color:#a8d4f0!important;}
+
+/* Terminal */
+.terminal-wrap{border:1px solid var(--border);margin-top:2px;}
+.terminal-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;}
+.terminal-dots{display:flex;gap:7px;}
+.dot{width:11px;height:11px;border-radius:50%;}
+.dot-red{background:#5a2020;}.dot-yellow{background:#5a4a20;}.dot-green{background:#1e4a2e;}
+.terminal-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;flex:1;}
+.terminal-status{font-family:var(--mono);font-size:10px;padding:3px 10px;border:1px solid;transition:all 0.3s;}
+.terminal-status.running{color:#e87b4a!important;border-color:rgba(232,123,74,0.3);}
+.terminal-status.done{color:#4ec994!important;border-color:rgba(78,201,148,0.3);}
+.terminal-status.idle{color:rgba(240,236,228,0.25)!important;border-color:rgba(255,255,255,0.07);}
+.terminal-body{background:#050505!important;padding:24px 28px;font-family:var(--mono);font-size:12px;line-height:1.8;height:420px;overflow-y:auto;}
+.terminal-body::-webkit-scrollbar{width:4px;}
+.terminal-body::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.15);border-radius:2px;}
+.t-cmd{color:#c8a96e!important;}.t-found{color:#4ec994!important;}.t-notfound{color:rgba(240,236,228,0.22)!important;}
+.t-error{color:#c0392b!important;}.t-info{color:rgba(240,236,228,0.55)!important;}.t-dim{color:rgba(240,236,228,0.28)!important;}
+.t-warn{color:#e87b4a!important;}
+.t-cursor{display:inline-block;width:7px;height:13px;background:#c8a96e;vertical-align:middle;animation:blink 1.1s step-end infinite;}
+
+.footer{margin-top:80px;padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+@media(max-width:768px){.page-wrap{padding:0 20px;}.engine-row{flex-direction:column;}.engine-btn:last-child{border-right:none;border-top:none;}.found-grid{grid-template-columns:1fr;}.footer{flex-direction:column;gap:12px;}.footer-right{text-align:left;}}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Identity Intelligence</span></div>
+    <h1>Username <em>Search</em></h1>
+    <div class="hero-meta">
+      <span class="hero-badge">Sherlock</span>
+      <span class="hero-badge">Maigret</span>
+      <span>300–3000+ platforms · Live streaming · No API key</span>
+    </div>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>A username is a digital fingerprint — most people reuse the same handle across platforms, creating a traceable thread through their entire online presence. This tool runs two industry-standard open-source intelligence engines: <strong>Sherlock</strong> checks for a username across <strong>300+ social networks and platforms</strong> including Twitter, Instagram, Reddit, GitHub, TikTok, LinkedIn, and hundreds more. <strong>Maigret</strong> goes deeper — scanning <strong>3000+ sites</strong> and extracting profile metadata, linked accounts, and personal information where publicly available. Results stream live into the terminal as each match is found, with direct clickable links to every discovered profile. No API key, no login, and no data is stored. Used by <strong>journalists investigating sources</strong>, <strong>fraud analysts verifying identities</strong>, <strong>HR professionals screening candidates</strong>, <strong>security researchers tracking threat actors</strong>, and <strong>investigators building subject profiles</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Username Search</span><span class="seo-tag">Sherlock OSINT</span>
+        <span class="seo-tag">Maigret</span><span class="seo-tag">Social Media Search</span>
+        <span class="seo-tag">Digital Footprint</span><span class="seo-tag">OSINT</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="input-section">
+    <div class="section-label">Select Engine</div>
+    <div class="engine-row">
+      <button class="engine-btn active" data-engine="sherlock" onclick="setEngine('sherlock')">
+        <span class="engine-badge sherlock">Sherlock</span>
+        Search 300+ platforms
+        <span class="engine-info">~1–2 min</span>
+      </button>
+      <button class="engine-btn" data-engine="maigret" onclick="setEngine('maigret')">
+        <span class="engine-badge maigret">Maigret</span>
+        Search 500 top sites + deep profile
+        <span class="engine-info">~2–4 min</span>
+      </button>
+    </div>
+    <div class="search-row">
+      <input type="text" class="search-input" id="usernameInput"
+        placeholder="e.g. johndoe  (no @ symbol)"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter'&&!running)run()">
+      <button class="btn-run" id="btnRun" onclick="run()">Run Search →</button>
+      <button class="btn-stop" id="btnStop" onclick="stop()">■ Stop</button>
+    </div>
+    <div class="input-hint" id="engineHint">Sherlock checks 300+ platforms · Results stream as found · Typically 1–2 minutes</div>
+  </section>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-item">
+      <div class="stat-num green" id="statFound">0</div>
+      <div class="stat-label">Profiles Found</div>
+    </div>
+    <div class="stat-item">
+      <div class="stat-num dim" id="statChecked">0</div>
+      <div class="stat-label">Sites Checked</div>
+    </div>
+  </div>
+
+  <div class="results-grid" id="resultsGrid">
+    <div class="results-found-header">Profiles Found</div>
+    <div class="found-grid" id="foundGrid"></div>
+  </div>
+
+  <div class="terminal-wrap">
+    <div class="terminal-bar">
+      <div class="terminal-dots">
+        <div class="dot dot-red"></div>
+        <div class="dot dot-yellow"></div>
+        <div class="dot dot-green"></div>
+      </div>
+      <div class="terminal-title" id="termTitle">intel-desk — username-search</div>
+      <div class="terminal-status idle" id="termStatus">Idle</div>
+    </div>
+    <div class="terminal-body" id="termBody">
+      <div class="t-dim">Select an engine above, enter a username, and click Run Search.</div>
+      <div class="t-dim">Matching profiles will appear in the panel above as they are found.</div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Powered by Sherlock (sherlock-project) and Maigret (soxoj/maigret). Use responsibly and within applicable law.</div>
+  </footer>
+</div>
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let evtSource = null;
+let running   = false;
+let engine    = 'sherlock';
+let counts    = { found: 0, checked: 0 };
+
+function toggleSEO(){const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+const hints = {
+  sherlock: 'Sherlock checks 300+ platforms · Results stream as found · Typically 1–2 minutes',
+  maigret:  'Maigret scans 500 top sites with deep profile extraction · Typically 2–4 minutes',
+};
+
+function setEngine(e) {
+  engine = e;
+  document.querySelectorAll('.engine-btn').forEach(b => b.classList.toggle('active', b.dataset.engine === e));
+  document.getElementById('engineHint').textContent = hints[e];
+}
+
+function setRunning(val) {
+  running = val;
+  document.getElementById('btnRun').disabled = val;
+  document.getElementById('btnStop').classList.toggle('visible', val);
+  const el = document.getElementById('termStatus');
+  el.className = `terminal-status ${val ? 'running' : 'done'}`;
+  el.textContent = val ? 'Running…' : 'Complete';
+}
+
+function appendLine(cls, html) {
+  const body = document.getElementById('termBody');
+  const div = document.createElement('div');
+  div.className = `t-${cls}`;
+  div.innerHTML = html;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+
+function addFound(name, url) {
+  counts.found++;
+  document.getElementById('statFound').textContent = counts.found;
+  document.getElementById('resultsGrid').classList.add('visible');
+  document.getElementById('statsBar').classList.add('visible');
+  const grid = document.getElementById('foundGrid');
+  const card = document.createElement('div');
+  card.className = 'found-card';
+  card.innerHTML = `
+    <div class="found-dot"></div>
+    <div class="found-name">${esc(name)}</div>
+    ${url ? `<a class="found-url" href="${esc(url)}" target="_blank" rel="noopener">Visit ↗</a>` : ''}
+  `;
+  grid.appendChild(card);
+}
+
+function parseLine(text) {
+  // Sherlock: "[*] Checking username..." or "[+] Site: url"
+  // Maigret:  "[+] site: url - extra info" or "[-] site"
+
+  if (/\[\+\]/.test(text)) {
+    counts.checked++;
+    document.getElementById('statChecked').textContent = counts.checked;
+    // Extract site and URL
+    const m = text.match(/\[\+\]\s+([^:]+?):\s*(https?:\/\/\S+)/);
+    const siteName = m ? m[1].trim() : text.replace(/\[\+\]\s*/,'').split(':')[0].trim();
+    const url      = m ? m[2] : null;
+    addFound(siteName, url);
+    appendLine('found', `  [+] <strong>${esc(siteName)}</strong>${url ? ` — <a class="t-cursor" style="color:#7eb8e4;text-decoration:underline;cursor:pointer" onclick="window.open('${esc(url)}','_blank')">${esc(url.length>60?url.substring(0,57)+'…':url)}</a>` : ''}`);
+  } else if (/\[-\]/.test(text)) {
+    counts.checked++;
+    document.getElementById('statChecked').textContent = counts.checked;
+    appendLine('notfound', `  [-] ${esc(text.replace(/\[-\]\s*/,''))}`);
+  } else if (/\[\*\]/.test(text)) {
+    appendLine('info', `  ${esc(text)}`);
+  } else if (/error|exception/i.test(text)) {
+    appendLine('error', `  [!] ${esc(text)}`);
+  } else if (text.trim()) {
+    appendLine('dim', `  ${esc(text)}`);
+  }
+}
+
+function run() {
+  const username = document.getElementById('usernameInput').value.trim().replace(/^@/,'');
+  if (!username) { alert('Please enter a username.'); return; }
+
+  if (evtSource) evtSource.close();
+  counts = { found: 0, checked: 0 };
+  document.getElementById('termBody').innerHTML = '';
+  document.getElementById('foundGrid').innerHTML = '';
+  document.getElementById('resultsGrid').classList.remove('visible');
+  document.getElementById('statsBar').classList.add('visible');
+  document.getElementById('statFound').textContent   = '0';
+  document.getElementById('statChecked').textContent = '0';
+  setRunning(true);
+
+  const endpoint = engine === 'sherlock' ? 'sherlock' : 'maigret';
+  document.getElementById('termTitle').textContent = `${endpoint} — ${username}`;
+  appendLine('cmd', `$ ${endpoint} --no-color ${engine === 'sherlock' ? '--print-found' : '--timeout 10'} ${esc(username)}`);
+  appendLine('dim', `  Scanning with ${engine === 'sherlock' ? 'Sherlock (300+ platforms)' : 'Maigret (500 top sites)'}…`);
+
+  evtSource = new EventSource(`${PROXY}/${endpoint}?username=${encodeURIComponent(username)}`);
+
+  evtSource.onmessage = (e) => {
+    try {
+      const d = JSON.parse(e.data);
+      if (d.type === 'line')  parseLine(d.text);
+      if (d.type === 'done') {
+        appendLine('info', '');
+        appendLine('found', `  ── Complete · ${counts.found} profiles found across ${counts.checked} sites checked ──`);
+        appendLine('dim', `  <span class="t-cursor"></span>`);
+        setRunning(false);
+        evtSource.close();
+      }
+      if (d.type === 'error') {
+        appendLine('error', `  [!] ${esc(d.text)}`);
+        setRunning(false);
+        document.getElementById('termStatus').className = 'terminal-status idle';
+        document.getElementById('termStatus').textContent = 'Error';
+        evtSource.close();
+      }
+    } catch(err) {}
+  };
+
+  evtSource.onerror = () => {
+    if (running) {
+      appendLine('warn', '  [~] Connection interrupted. Results above may be partial.');
+      setRunning(false);
+      document.getElementById('termStatus').className = 'terminal-status idle';
+      document.getElementById('termStatus').textContent = 'Disconnected';
+    }
+    evtSource.close();
+  };
+}
+
+function stop() {
+  if (evtSource) evtSource.close();
+  setRunning(false);
+  document.getElementById('termStatus').className = 'terminal-status idle';
+  document.getElementById('termStatus').textContent = 'Stopped';
+  appendLine('warn', '  [~] Search stopped by user');
+  appendLine('dim', `  <span class="t-cursor"></span>`);
+}
+</script>
+</body>
+</html>
