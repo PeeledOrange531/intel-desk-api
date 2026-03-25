@@ -87,6 +87,18 @@ def index():
         "cache_ttl_seconds": CACHE_TTL,
     })
 
+@app.route("/debug-env")
+def debug_env():
+    """Debug endpoint — shows env var status without exposing values."""
+    import os
+    return jsonify({
+        "W3W_API_KEY_set":    bool(os.environ.get("W3W_API_KEY", "")),
+        "W3W_API_KEY_length": len(os.environ.get("W3W_API_KEY", "")),
+        "W3W_module_var_set": bool(W3W_API_KEY),
+        "W3W_module_var_len": len(W3W_API_KEY),
+        "all_env_keys": [k for k in os.environ.keys() if not k.startswith('PATH') and not k.startswith('LD')],
+    })
+
 @app.route("/sanctions/<source>", methods=["GET","OPTIONS"])
 @corsify
 def fetch_sanctions(source):
