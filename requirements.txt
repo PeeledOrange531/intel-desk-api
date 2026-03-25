@@ -1,9 +1,9 @@
 flask==3.0.3
 flask-cors==4.0.1
+requests==2.31.0
 gunicorn==22.0.0
-holehe
-ghunt
-sherlock-project
-ignorant
-requests==2.32.3
-
+python-whois==0.9.4
+holehe==1.61
+sherlock-project==0.15.0
+maigret==0.4.4
+ignorant==1.0.5
