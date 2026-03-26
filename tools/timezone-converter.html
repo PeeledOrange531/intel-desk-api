@@ -1,0 +1,601 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>World Timezone Converter — OSINT Time Intelligence | The Intel Desk</title>
+<meta name="description" content="Free world timezone converter. Convert times across every timezone simultaneously, see world clock, calculate time differences, and identify overlap windows for cross-timezone coordination. Used by journalists, investigators and analysts.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 48px;max-width:1200px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:80px 0 60px;border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(38px,5vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;font-weight:500;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* INPUT */
+.input-section{padding:48px 0 0;animation:fadeUp 0.6s 0.1s ease both;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.source-row{display:flex;gap:0;margin-bottom:2px;}
+.source-tz-select{background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:13px 14px;outline:none;cursor:pointer;min-width:300px;}
+.source-tz-select option{background:#0a0a0a;}
+.source-date{background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:13px 14px;outline:none;}
+.source-time{background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:13px 14px;outline:none;}
+.btn-convert{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:13px 28px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-convert:hover{background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-now{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.45)!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:13px 20px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-now:hover{border-color:var(--border-hover);color:#f5f2ec!important;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+/* ADD TIMEZONE */
+.add-tz-row{display:flex;gap:0;margin-top:2px;}
+.add-tz-select{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:13px 14px;outline:none;cursor:pointer;}
+.add-tz-select option{background:#0a0a0a;}
+.btn-add-tz{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:13px 24px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-add-tz:hover{border-color:rgba(200,169,110,0.3);color:#c8a96e!important;}
+
+/* LIVE CLOCK */
+.live-clock-bar{display:none;background:var(--bg2);border:1px solid var(--border);border-top:none;padding:18px 24px;align-items:center;gap:20px;}
+.live-clock-bar.visible{display:flex;}
+.live-clock-utc{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.40)!important;}
+.live-clock-utc strong{color:#c8a96e!important;}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);flex-shrink:0;animation:pulse-dot 2s ease-in-out infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.4;}}
+
+/* RESULTS GRID */
+.results-section{margin-top:48px;display:none;animation:fadeUp 0.4s ease both;}
+.results-section.visible{display:block;}
+.tz-cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:1px;background:var(--border);}
+.tz-card{background:var(--bg2);padding:20px 24px;position:relative;transition:background 0.15s;}
+.tz-card:hover{background:rgba(255,255,255,0.02);}
+.tz-card.source-card{background:rgba(200,169,110,0.06);border-left:2px solid var(--accent);}
+.tz-card-region{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.30)!important;margin-bottom:4px;}
+.tz-card-city{font-family:var(--mono);font-size:13px;font-weight:500;color:#e8d5a3!important;margin-bottom:8px;}
+.tz-card-time{font-family:var(--serif);font-size:36px;font-weight:300;color:#f5f2ec!important;line-height:1;margin-bottom:4px;}
+.tz-card-time.night{color:rgba(240,236,228,0.35)!important;}
+.tz-card-time.dawn{color:#e87b4a!important;}
+.tz-card-time.day{color:#f5f2ec!important;}
+.tz-card-date{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;margin-bottom:8px;}
+.tz-card-offset{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.55)!important;}
+.tz-card-diff{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.30)!important;margin-top:2px;}
+.tz-card-remove{position:absolute;top:12px;right:12px;background:transparent;border:none;color:rgba(240,236,228,0.20)!important;font-size:14px;cursor:pointer;padding:4px 8px;transition:color 0.15s;line-height:1;}
+.tz-card-remove:hover{color:var(--red)!important;}
+.tz-day-indicator{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;}
+.tz-day-indicator.day{background:#c8a96e;}
+.tz-day-indicator.night{background:#7eb8e4;}
+.tz-day-indicator.dawn{background:#e87b4a;}
+
+/* TIMELINE */
+.timeline-section{margin-top:2px;}
+.timeline-panel{background:var(--bg2);border:1px solid var(--border);padding:24px 28px;}
+.timeline-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.40)!important;margin-bottom:20px;padding-bottom:12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.timeline-row{display:flex;align-items:center;gap:12px;margin-bottom:8px;}
+.timeline-row-label{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;width:180px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.timeline-bar-outer{flex:1;height:28px;background:var(--bg3);border:1px solid var(--border);border-radius:2px;position:relative;overflow:hidden;}
+.timeline-bar-inner{position:absolute;top:0;bottom:0;background:rgba(200,169,110,0.18);border-right:2px solid #c8a96e;}
+.timeline-bar-marker{position:absolute;top:0;bottom:0;width:2px;background:rgba(200,169,110,0.7);}
+.timeline-bar-label{position:absolute;right:6px;top:50%;transform:translateY(-50%);font-family:var(--mono);font-size:10px;color:#c8a96e!important;}
+.timeline-hour-marks{position:absolute;inset:0;pointer-events:none;}
+.timeline-axis{display:flex;justify-content:space-between;padding:0 0 0 192px;font-family:var(--mono);font-size:9px;color:rgba(240,236,228,0.20)!important;margin-top:4px;margin-bottom:16px;}
+
+/* FOOTER */
+.footer{margin-top:80px;padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@media(max-width:900px){
+  .page-wrap{padding:0 20px;}
+  .source-row{flex-wrap:wrap;}
+  .source-tz-select{min-width:100%;border-right:1px solid var(--border);}
+  .source-date,.source-time{border-right:1px solid var(--border);}
+  .timeline-row-label{width:120px;}
+  .footer{flex-direction:column;gap:12px;}.footer-right{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Time Intelligence</span></div>
+    <h1>World Timezone <em>Converter</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Time is one of the most critical — and most frequently misrepresented — elements of any investigation. This tool converts any date and time across every major world timezone simultaneously. Enter a source time and location, and instantly see the equivalent local time in every city you're tracking. Build a custom world clock with only the timezones that matter to your investigation, <strong>identify whether a claimed timestamp is plausible</strong> given business hours or local conditions, calculate exact time differences between locations, and visualize overlap windows for cross-timezone coordination. Used by <strong>journalists coordinating across bureaus</strong>, <strong>investigators correlating event timestamps from different countries</strong>, <strong>fraud analysts verifying alibi timelines</strong>, <strong>OSINT researchers cross-referencing social media posts</strong>, and <strong>security teams tracking incidents across regions</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Timezone Converter</span>
+        <span class="seo-tag">World Clock</span>
+        <span class="seo-tag">Time Difference</span>
+        <span class="seo-tag">Timestamp Verification</span>
+        <span class="seo-tag">OSINT</span>
+        <span class="seo-tag">Investigation Tool</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <section class="input-section">
+    <div class="section-label">Source Time</div>
+    <div class="source-row">
+      <select class="source-tz-select" id="sourceTZ"></select>
+      <input type="date" class="source-date" id="sourceDate">
+      <input type="time" class="source-time" id="sourceTime">
+      <button class="btn-convert" onclick="convert()">Convert →</button>
+      <button class="btn-now" onclick="setNow()">Now</button>
+    </div>
+    <div class="input-hint">Select source timezone · Enter date and time · Add target timezones below</div>
+
+    <div class="section-label" style="margin-top:28px;">Add Timezones to Compare</div>
+    <div class="add-tz-row">
+      <select class="add-tz-select" id="addTZSelect"></select>
+      <button class="btn-add-tz" onclick="addTimezone()">+ Add</button>
+    </div>
+  </section>
+
+  <!-- LIVE UTC CLOCK -->
+  <div class="live-clock-bar" id="liveClockBar">
+    <div class="live-dot"></div>
+    <div class="live-clock-utc">UTC: <strong id="liveUTC">—</strong></div>
+    <div class="live-clock-utc" id="liveSource">—</div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-section" id="resultsSection">
+    <div class="section-label">Converted Times</div>
+    <div class="tz-cards-grid" id="tzCardsGrid"></div>
+
+    <div class="timeline-section" style="margin-top:2px;">
+      <div class="timeline-panel">
+        <div class="timeline-title">24-Hour Overlap View</div>
+        <div class="timeline-axis" id="timelineAxis"></div>
+        <div id="timelineRows"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Uses browser's native Intl.DateTimeFormat API for timezone conversions. All processing client-side.</div>
+  </footer>
+
+</div>
+<script>
+// ── TIMEZONE DATA ─────────────────────────────────────────────────────────────
+const ZONES = [
+  // Americas
+  { id:'America/New_York',      label:'New York',          region:'Americas' },
+  { id:'America/Chicago',       label:'Chicago',           region:'Americas' },
+  { id:'America/Denver',        label:'Denver',            region:'Americas' },
+  { id:'America/Los_Angeles',   label:'Los Angeles',       region:'Americas' },
+  { id:'America/Anchorage',     label:'Anchorage',         region:'Americas' },
+  { id:'Pacific/Honolulu',      label:'Honolulu',          region:'Americas' },
+  { id:'America/Toronto',       label:'Toronto',           region:'Americas' },
+  { id:'America/Vancouver',     label:'Vancouver',         region:'Americas' },
+  { id:'America/Mexico_City',   label:'Mexico City',       region:'Americas' },
+  { id:'America/Bogota',        label:'Bogotá',            region:'Americas' },
+  { id:'America/Lima',          label:'Lima',              region:'Americas' },
+  { id:'America/Santiago',      label:'Santiago',          region:'Americas' },
+  { id:'America/Buenos_Aires',  label:'Buenos Aires',      region:'Americas' },
+  { id:'America/Sao_Paulo',     label:'São Paulo',         region:'Americas' },
+  { id:'America/Halifax',       label:'Halifax',           region:'Americas' },
+  { id:'America/Caracas',       label:'Caracas',           region:'Americas' },
+  // Europe
+  { id:'Europe/London',         label:'London',            region:'Europe'   },
+  { id:'Europe/Dublin',         label:'Dublin',            region:'Europe'   },
+  { id:'Europe/Lisbon',         label:'Lisbon',            region:'Europe'   },
+  { id:'Europe/Paris',          label:'Paris',             region:'Europe'   },
+  { id:'Europe/Berlin',         label:'Berlin',            region:'Europe'   },
+  { id:'Europe/Madrid',         label:'Madrid',            region:'Europe'   },
+  { id:'Europe/Rome',           label:'Rome',              region:'Europe'   },
+  { id:'Europe/Amsterdam',      label:'Amsterdam',         region:'Europe'   },
+  { id:'Europe/Brussels',       label:'Brussels',          region:'Europe'   },
+  { id:'Europe/Zurich',         label:'Zurich',            region:'Europe'   },
+  { id:'Europe/Stockholm',      label:'Stockholm',         region:'Europe'   },
+  { id:'Europe/Oslo',           label:'Oslo',              region:'Europe'   },
+  { id:'Europe/Copenhagen',     label:'Copenhagen',        region:'Europe'   },
+  { id:'Europe/Warsaw',         label:'Warsaw',            region:'Europe'   },
+  { id:'Europe/Prague',         label:'Prague',            region:'Europe'   },
+  { id:'Europe/Vienna',         label:'Vienna',            region:'Europe'   },
+  { id:'Europe/Budapest',       label:'Budapest',          region:'Europe'   },
+  { id:'Europe/Bucharest',      label:'Bucharest',         region:'Europe'   },
+  { id:'Europe/Sofia',          label:'Sofia',             region:'Europe'   },
+  { id:'Europe/Athens',         label:'Athens',            region:'Europe'   },
+  { id:'Europe/Helsinki',       label:'Helsinki',          region:'Europe'   },
+  { id:'Europe/Kyiv',           label:'Kyiv',              region:'Europe'   },
+  { id:'Europe/Moscow',         label:'Moscow',            region:'Europe'   },
+  { id:'Europe/Istanbul',       label:'Istanbul',          region:'Europe'   },
+  // Africa
+  { id:'Africa/Cairo',          label:'Cairo',             region:'Africa'   },
+  { id:'Africa/Lagos',          label:'Lagos',             region:'Africa'   },
+  { id:'Africa/Nairobi',        label:'Nairobi',           region:'Africa'   },
+  { id:'Africa/Johannesburg',   label:'Johannesburg',      region:'Africa'   },
+  { id:'Africa/Casablanca',     label:'Casablanca',        region:'Africa'   },
+  { id:'Africa/Accra',          label:'Accra',             region:'Africa'   },
+  { id:'Africa/Addis_Ababa',    label:'Addis Ababa',       region:'Africa'   },
+  { id:'Africa/Dar_es_Salaam',  label:'Dar es Salaam',     region:'Africa'   },
+  { id:'Africa/Khartoum',       label:'Khartoum',          region:'Africa'   },
+  { id:'Africa/Tunis',          label:'Tunis',             region:'Africa'   },
+  // Middle East
+  { id:'Asia/Dubai',            label:'Dubai',             region:'Middle East' },
+  { id:'Asia/Riyadh',           label:'Riyadh',            region:'Middle East' },
+  { id:'Asia/Qatar',            label:'Doha',              region:'Middle East' },
+  { id:'Asia/Kuwait',           label:'Kuwait City',       region:'Middle East' },
+  { id:'Asia/Baghdad',          label:'Baghdad',           region:'Middle East' },
+  { id:'Asia/Tehran',           label:'Tehran',            region:'Middle East' },
+  { id:'Asia/Jerusalem',        label:'Jerusalem',         region:'Middle East' },
+  { id:'Asia/Beirut',           label:'Beirut',            region:'Middle East' },
+  { id:'Asia/Amman',            label:'Amman',             region:'Middle East' },
+  // Asia
+  { id:'Asia/Kolkata',          label:'Mumbai / Delhi',    region:'Asia'     },
+  { id:'Asia/Karachi',          label:'Karachi',           region:'Asia'     },
+  { id:'Asia/Dhaka',            label:'Dhaka',             region:'Asia'     },
+  { id:'Asia/Colombo',          label:'Colombo',           region:'Asia'     },
+  { id:'Asia/Kathmandu',        label:'Kathmandu',         region:'Asia'     },
+  { id:'Asia/Almaty',           label:'Almaty',            region:'Asia'     },
+  { id:'Asia/Tashkent',         label:'Tashkent',          region:'Asia'     },
+  { id:'Asia/Yekaterinburg',    label:'Yekaterinburg',     region:'Asia'     },
+  { id:'Asia/Omsk',             label:'Omsk',              region:'Asia'     },
+  { id:'Asia/Krasnoyarsk',      label:'Krasnoyarsk',       region:'Asia'     },
+  { id:'Asia/Irkutsk',          label:'Irkutsk',           region:'Asia'     },
+  { id:'Asia/Yangon',           label:'Yangon',            region:'Asia'     },
+  { id:'Asia/Bangkok',          label:'Bangkok',           region:'Asia'     },
+  { id:'Asia/Ho_Chi_Minh',      label:'Ho Chi Minh City',  region:'Asia'     },
+  { id:'Asia/Jakarta',          label:'Jakarta',           region:'Asia'     },
+  { id:'Asia/Kuala_Lumpur',     label:'Kuala Lumpur',      region:'Asia'     },
+  { id:'Asia/Singapore',        label:'Singapore',         region:'Asia'     },
+  { id:'Asia/Manila',           label:'Manila',            region:'Asia'     },
+  { id:'Asia/Hong_Kong',        label:'Hong Kong',         region:'Asia'     },
+  { id:'Asia/Shanghai',         label:'Beijing / Shanghai',region:'Asia'     },
+  { id:'Asia/Taipei',           label:'Taipei',            region:'Asia'     },
+  { id:'Asia/Seoul',            label:'Seoul',             region:'Asia'     },
+  { id:'Asia/Tokyo',            label:'Tokyo',             region:'Asia'     },
+  { id:'Asia/Vladivostok',      label:'Vladivostok',       region:'Asia'     },
+  { id:'Asia/Kabul',            label:'Kabul',             region:'Asia'     },
+  { id:'Asia/Islamabad',        label:'Islamabad',         region:'Asia'     },
+  // Pacific & Oceania
+  { id:'Australia/Perth',       label:'Perth',             region:'Pacific'  },
+  { id:'Australia/Adelaide',    label:'Adelaide',          region:'Pacific'  },
+  { id:'Australia/Darwin',      label:'Darwin',            region:'Pacific'  },
+  { id:'Australia/Brisbane',    label:'Brisbane',          region:'Pacific'  },
+  { id:'Australia/Sydney',      label:'Sydney',            region:'Pacific'  },
+  { id:'Australia/Melbourne',   label:'Melbourne',         region:'Pacific'  },
+  { id:'Pacific/Auckland',      label:'Auckland',          region:'Pacific'  },
+  { id:'Pacific/Fiji',          label:'Fiji',              region:'Pacific'  },
+  { id:'Pacific/Guam',          label:'Guam',              region:'Pacific'  },
+  { id:'Pacific/Apia',          label:'Apia',              region:'Pacific'  },
+  // UTC
+  { id:'UTC',                   label:'UTC',               region:'UTC'      },
+];
+
+// Default displayed timezones
+let activeZones = [
+  'America/New_York',
+  'Europe/London',
+  'Europe/Moscow',
+  'Asia/Dubai',
+  'Asia/Shanghai',
+  'Asia/Tokyo',
+  'Australia/Sydney',
+  'UTC',
+];
+
+let liveInterval = null;
+
+// ── SEO ───────────────────────────────────────────────────────────────────────
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+
+// ── POPULATE SELECTS ──────────────────────────────────────────────────────────
+function populateSelects() {
+  const regions = [...new Set(ZONES.map(z => z.region))];
+
+  [document.getElementById('sourceTZ'), document.getElementById('addTZSelect')].forEach((sel, i) => {
+    regions.forEach(region => {
+      const group = document.createElement('optgroup');
+      group.label = region;
+      ZONES.filter(z => z.region === region).forEach(z => {
+        const opt = document.createElement('option');
+        opt.value = z.id;
+        opt.textContent = `${z.label} (${getOffsetStr(z.id)})`;
+        group.appendChild(opt);
+      });
+      sel.appendChild(group);
+    });
+  });
+
+  // Default source TZ to browser local
+  try {
+    const localTZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if(ZONES.find(z => z.id === localTZ)){
+      document.getElementById('sourceTZ').value = localTZ;
+    }
+  } catch(e) {}
+}
+
+function getOffsetStr(tzId) {
+  try {
+    const now = new Date();
+    const parts = new Intl.DateTimeFormat('en', {
+      timeZone: tzId, timeZoneName: 'shortOffset'
+    }).formatToParts(now);
+    return parts.find(p => p.type === 'timeZoneName')?.value || 'UTC';
+  } catch(e) { return 'UTC'; }
+}
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function setNow() {
+  const now = new Date();
+  document.getElementById('sourceDate').value = now.toISOString().split('T')[0];
+  document.getElementById('sourceTime').value = now.toTimeString().slice(0,5);
+  convert();
+}
+
+function addTimezone() {
+  const sel = document.getElementById('addTZSelect');
+  const tz  = sel.value;
+  if(!activeZones.includes(tz)) {
+    activeZones.push(tz);
+    convert();
+  }
+}
+
+function removeTimezone(tz) {
+  activeZones = activeZones.filter(z => z !== tz);
+  convert();
+}
+
+function getZoneLabel(tzId) {
+  return ZONES.find(z => z.id === tzId)?.label || tzId.split('/').pop().replace(/_/g,' ');
+}
+
+function getZoneRegion(tzId) {
+  return ZONES.find(z => z.id === tzId)?.region || '';
+}
+
+// ── CONVERT ───────────────────────────────────────────────────────────────────
+function convert() {
+  const sourceTZ  = document.getElementById('sourceTZ').value;
+  const dateVal   = document.getElementById('sourceDate').value;
+  const timeVal   = document.getElementById('sourceTime').value;
+
+  if(!dateVal || !timeVal) { alert('Please enter date and time.'); return; }
+
+  // Parse source datetime as UTC via the source timezone
+  const [year,month,day] = dateVal.split('-').map(Number);
+  const [hour,min]       = timeVal.split(':').map(Number);
+
+  // Create the moment in time — treat input as source timezone
+  // Use a trick: format a known UTC time in source TZ and adjust
+  // Simpler: parse as local then adjust by offset difference
+  const inputStr = `${dateVal}T${timeVal}:00`;
+
+  // Get the UTC equivalent
+  // We'll use the Temporal-compatible approach via Intl
+  const utcMs = localToUTC(year, month-1, day, hour, min, 0, sourceTZ);
+  const utcDate = new Date(utcMs);
+
+  // Show results section
+  document.getElementById('resultsSection').classList.add('visible');
+  document.getElementById('liveClockBar').classList.add('visible');
+
+  // Render cards
+  renderCards(utcDate, sourceTZ);
+
+  // Render timeline
+  renderTimeline(utcDate, sourceTZ);
+
+  // Start/restart live clock
+  startLiveClock(sourceTZ);
+}
+
+function localToUTC(year, month, day, hour, min, sec, tzId) {
+  // Strategy: find UTC time that corresponds to local time in tzId
+  // Use binary search / iteration with Intl
+  let guess = Date.UTC(year, month, day, hour, min, sec);
+
+  for(let i=0; i<3; i++){
+    const d = new Date(guess);
+    const local = getLocalParts(d, tzId);
+    const diffMs = (
+      (local.hour - hour)*3600000 +
+      (local.min  - min)*60000 +
+      (local.day  - day)*86400000
+    );
+    guess -= diffMs;
+  }
+  return guess;
+}
+
+function getLocalParts(utcDate, tzId) {
+  const fmt = new Intl.DateTimeFormat('en-CA', {
+    timeZone: tzId,
+    year:'numeric', month:'2-digit', day:'2-digit',
+    hour:'2-digit', minute:'2-digit', second:'2-digit',
+    hour12: false,
+  });
+  const parts = fmt.formatToParts(utcDate);
+  const get   = t => parseInt(parts.find(p=>p.type===t)?.value||'0');
+  return {
+    year: get('year'), month: get('month'), day: get('day'),
+    hour: get('hour'), min: get('minute'), sec: get('second'),
+  };
+}
+
+function formatInTZ(utcDate, tzId) {
+  const p = getLocalParts(utcDate, tzId);
+  return {
+    time:   `${String(p.hour).padStart(2,'0')}:${String(p.min).padStart(2,'0')}`,
+    date:   `${String(p.year)}-${String(p.month).padStart(2,'0')}-${String(p.day).padStart(2,'0')}`,
+    hour:   p.hour,
+    min:    p.min,
+    dayState: p.hour >= 22 || p.hour < 6 ? 'night' : (p.hour < 8 || p.hour >= 18) ? 'dawn' : 'day',
+    dateFmt: new Intl.DateTimeFormat('en', {
+      timeZone: tzId, weekday:'short', month:'short', day:'numeric', year:'numeric'
+    }).format(utcDate),
+  };
+}
+
+// ── RENDER CARDS ──────────────────────────────────────────────────────────────
+function renderCards(utcDate, sourceTZ) {
+  const grid = document.getElementById('tzCardsGrid');
+  grid.innerHTML = '';
+
+  // Source card first, then others
+  const orderedZones = [sourceTZ, ...activeZones.filter(z => z !== sourceTZ)];
+
+  orderedZones.forEach(tz => {
+    const f = formatInTZ(utcDate, tz);
+    const isSource = tz === sourceTZ;
+
+    // Offset string
+    const offsetStr = getOffsetStr(tz);
+
+    // Diff from source
+    const sourceF = formatInTZ(utcDate, sourceTZ);
+    const sourceMinutes = sourceF.hour * 60 + sourceF.min;
+    const thisMinutes   = f.hour * 60 + f.min;
+    let diffMin = thisMinutes - sourceMinutes;
+    // Handle day boundary
+    const sourceDate = formatInTZ(utcDate, sourceTZ).date;
+    const thisDate   = f.date;
+    if(thisDate > sourceDate) diffMin += 1440;
+    if(thisDate < sourceDate) diffMin -= 1440;
+    const diffStr = isSource ? 'Source' :
+      diffMin === 0 ? 'Same time' :
+      `${diffMin > 0 ? '+' : ''}${Math.floor(diffMin/60)}h${Math.abs(diffMin%60) ? ` ${Math.abs(diffMin%60)}m` : ''}`;
+
+    const card = document.createElement('div');
+    card.className = `tz-card${isSource ? ' source-card' : ''}`;
+    card.innerHTML = `
+      ${!isSource ? `<button class="tz-card-remove" onclick="removeTimezone('${tz}')" title="Remove">×</button>` : ''}
+      <div class="tz-card-region">${getZoneRegion(tz)}</div>
+      <div class="tz-card-city">
+        <span class="tz-day-indicator ${f.dayState}"></span>
+        ${getZoneLabel(tz)}
+      </div>
+      <div class="tz-card-time ${f.dayState}">${f.time}</div>
+      <div class="tz-card-date">${f.dateFmt}</div>
+      <div class="tz-card-offset">${offsetStr}</div>
+      <div class="tz-card-diff">${diffStr}</div>
+    `;
+    grid.appendChild(card);
+  });
+}
+
+// ── RENDER TIMELINE ───────────────────────────────────────────────────────────
+function renderTimeline(utcDate, sourceTZ) {
+  const container = document.getElementById('timelineRows');
+  container.innerHTML = '';
+
+  // Hour axis
+  const axis = document.getElementById('timelineAxis');
+  axis.innerHTML = ['00:00','03:00','06:00','09:00','12:00','15:00','18:00','21:00','24:00']
+    .map(t => `<span>${t}</span>`).join('');
+
+  const sourceF   = formatInTZ(utcDate, sourceTZ);
+  const sourceMin = sourceF.hour * 60 + sourceF.min;
+
+  const orderedZones = [sourceTZ, ...activeZones.filter(z => z !== sourceTZ)];
+
+  orderedZones.forEach(tz => {
+    const f      = formatInTZ(utcDate, tz);
+    const tzMin  = f.hour * 60 + f.min;
+    const pct    = tzMin / 1440 * 100;
+
+    // Business hours band (9am–5pm)
+    const bizStart = 9/24*100;
+    const bizEnd   = 17/24*100;
+
+    const row = document.createElement('div');
+    row.className = 'timeline-row';
+    row.innerHTML = `
+      <div class="timeline-row-label" title="${tz}">${getZoneLabel(tz)}</div>
+      <div class="timeline-bar-outer">
+        <!-- Night shade -->
+        <div style="position:absolute;top:0;bottom:0;left:0;width:${6/24*100}%;background:rgba(126,184,228,0.06);"></div>
+        <div style="position:absolute;top:0;bottom:0;right:0;width:${2/24*100}%;background:rgba(126,184,228,0.06);"></div>
+        <!-- Business hours -->
+        <div style="position:absolute;top:0;bottom:0;left:${bizStart}%;width:${bizEnd-bizStart}%;background:rgba(78,201,148,0.06);border-left:1px solid rgba(78,201,148,0.12);border-right:1px solid rgba(78,201,148,0.12);"></div>
+        <!-- Current time marker -->
+        <div class="timeline-bar-marker" style="left:${pct}%;"></div>
+        <div class="timeline-bar-label">${f.time}</div>
+      </div>
+    `;
+    container.appendChild(row);
+  });
+}
+
+// ── LIVE CLOCK ────────────────────────────────────────────────────────────────
+function startLiveClock(sourceTZ) {
+  if(liveInterval) clearInterval(liveInterval);
+  updateLiveClock(sourceTZ);
+  liveInterval = setInterval(() => updateLiveClock(sourceTZ), 1000);
+}
+
+function updateLiveClock(sourceTZ) {
+  const now = new Date();
+  const utcStr = now.toISOString().replace('T',' ').slice(0,19) + ' UTC';
+  document.getElementById('liveUTC').textContent = utcStr;
+
+  const f = formatInTZ(now, sourceTZ);
+  document.getElementById('liveSource').textContent =
+    `${getZoneLabel(sourceTZ)}: ${f.time} · ${f.dateFmt}`;
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+populateSelects();
+
+const now = new Date();
+document.getElementById('sourceDate').value = now.toISOString().split('T')[0];
+document.getElementById('sourceTime').value = now.toTimeString().slice(0,5);
+
+// Auto-convert on load
+setTimeout(() => { convert(); }, 100);
+</script>
+</body>
+</html>
