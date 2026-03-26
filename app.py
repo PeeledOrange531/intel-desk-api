@@ -593,74 +593,63 @@ def url_inspect():
         except Exception as e:
             result['ssl'] = {"valid": None, "error": str(e)[:80]}
 
-        # ── Extract links, emails, phones from page HTML ────────────────
+        # ── Extract links, emails, phones from page HTML
         try:
-            page_resp = req.get(
-                current_url,
-                headers=headers,
-                timeout=10,
-                verify=False,
-            )
+            page_resp = req.get(current_url, headers=headers, timeout=10, verify=False)
             html = page_resp.text
-
-            # Emails
             import re as _re
-            emails = list(set(_re.findall(
-                r'[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}', html
-            )))
-            # Filter out common false positives
-            emails = [e for e in emails if not any(x in e.lower() for x in
-                ['example.', 'sentry', 'wixpress', '@2x', 'schema.org',
-                 'w3.org', 'xmlns', 'openid', '.png', '.jpg', '.gif', '.svg'])][:30]
 
-            # Phone numbers (international + US formats)
+            emails = list(set(_re.findall(
+                r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}", html
+            )))
+            bad = ["example.","sentry","wixpress","@2x","schema.org",
+                   "w3.org","xmlns","openid",".png",".jpg",".gif",".svg"]
+            emails = [e for e in emails if not any(x in e.lower() for x in bad)][:30]
+
             phones = list(set(_re.findall(
-                r'(?:(?:\+|00)[1-9]\d{0,2}[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}', html
+                r"(?:(?:\+|00)[1-9]\d{0,2}[\s\-.]?)?\(?\d{3}\)?[\s\-.]?\d{3}[\s\-.]?\d{4}",
+                html
             )))
             phones = [p.strip() for p in phones if len(p.strip()) >= 10][:20]
 
-            # Links (href)
-            raw_links = _re.findall(r'href=["']([^"']+)["']', html)
+            raw_links = _re.findall(r"""href=["']([^"']+)["']""", html)
             links = []
             seen = set()
             for lnk in raw_links:
-                if lnk.startswith('http') and lnk not in seen:
+                if lnk.startswith("http") and lnk not in seen:
+                    seen.add(lnk); links.append(lnk)
+                elif lnk.startswith("/") and lnk not in seen:
                     seen.add(lnk)
-                    links.append(lnk)
-                elif lnk.startswith('/') and lnk not in seen:
-                    seen.add(lnk)
-                    parsed_base = urllib.parse.urlparse(current_url)
-                    links.append(f"{parsed_base.scheme}://{parsed_base.netloc}{lnk}")
+                    pb = urllib.parse.urlparse(current_url)
+                    links.append(f"{pb.scheme}://{pb.netloc}{lnk}")
             links = links[:50]
 
-            # Social media handles
             socials = {}
-            social_patterns = {
-                'twitter':   r'(?:twitter\.com|x\.com)/([A-Za-z0-9_]{1,15})(?:[/"'\s?#]|$)',
-                'instagram': r'instagram\.com/([A-Za-z0-9_.]{1,30})(?:[/"'\s?#]|$)',
-                'linkedin':  r'linkedin\.com/(?:in|company)/([A-Za-z0-9\-_]{1,60})(?:[/"'\s?#]|$)',
-                'facebook':  r'facebook\.com/([A-Za-z0-9.\-]{1,50})(?:[/"'\s?#]|$)',
-                'github':    r'github\.com/([A-Za-z0-9\-]{1,39})(?:[/"'\s?#]|$)',
-                'youtube':   r'youtube\.com/(?:@|channel/|user/)([A-Za-z0-9_\-]{1,60})(?:[/"'\s?#]|$)',
-                'tiktok':    r'tiktok\.com/@([A-Za-z0-9_.]{1,24})(?:[/"'\s?#]|$)',
+            skip = {"share","sharer","intent","login","signup","home","explore",
+                    "about","privacy","terms","settings","help","www","web","ads"}
+            sp = {
+                "twitter":   r"(?:twitter\.com|x\.com)/([A-Za-z0-9_]{1,15})",
+                "instagram": r"instagram\.com/([A-Za-z0-9_.]{1,30})",
+                "linkedin":  r"linkedin\.com/(?:in|company)/([A-Za-z0-9\-_]{1,60})",
+                "facebook":  r"facebook\.com/([A-Za-z0-9.\-]{1,50})",
+                "github":    r"github\.com/([A-Za-z0-9\-]{1,39})",
+                "youtube":   r"youtube\.com/(?:@|channel/|user/)([A-Za-z0-9_\-]{1,60})",
+                "tiktok":    r"tiktok\.com/@([A-Za-z0-9_.]{1,24})",
             }
-            for platform, pattern in social_patterns.items():
-                found = list(set(_re.findall(pattern, html)))
-                skip = {'share','sharer','intent','login','signup','home','explore',
-                        'about','privacy','terms','settings','help','www','web','ads'}
-                found = [h for h in found if h.lower() not in skip][:5]
+            for platform, pattern in sp.items():
+                found = [h for h in set(_re.findall(pattern, html))
+                         if h.lower() not in skip][:5]
                 if found:
                     socials[platform] = found
 
-            result['extracted'] = {
-                'emails':  emails,
-                'phones':  phones,
-                'links':   links,
-                'socials': socials,
-                'link_count': len(links),
+            result["extracted"] = {
+                "emails": emails, "phones": phones,
+                "links": links, "socials": socials,
+                "link_count": len(links),
             }
         except Exception as ex:
-            result['extracted'] = {'error': str(ex)[:100]}
+            result["extracted"] = {"error": str(ex)[:100]}
+
 
         return jsonify(result)
 
