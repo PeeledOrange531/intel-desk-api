@@ -123,8 +123,8 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
     <h1>Username <em>Search</em></h1>
     <div class="hero-meta">
       <span class="hero-badge">Sherlock</span>
-      <span class="hero-badge">Maigret</span>
-      <span>300–3000+ platforms · Live streaming · No API key</span>
+      <span class="hero-badge">WhatsMyName</span>
+      <span>300–500+ platforms · Live streaming · No API key</span>
     </div>
   </section>
 
@@ -148,12 +148,12 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
     <div class="engine-row">
       <button class="engine-btn active" data-engine="sherlock" onclick="setEngine('sherlock')">
         <span class="engine-badge sherlock">Sherlock</span>
-        Search 300+ platforms
+        Search 300+ social networks & platforms
         <span class="engine-info">~1–2 min</span>
       </button>
       <button class="engine-btn" data-engine="maigret" onclick="setEngine('maigret')">
-        <span class="engine-badge maigret">Maigret</span>
-        Search 500 top sites + deep profile
+        <span class="engine-badge maigret">WhatsMyName</span>
+        Search 500+ sites · Different database
         <span class="engine-info">~2–4 min</span>
       </button>
     </div>
@@ -202,7 +202,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
   <footer class="footer">
     <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
-    <div class="footer-right">Powered by Sherlock (sherlock-project) and Maigret (soxoj/maigret). Use responsibly and within applicable law.</div>
+    <div class="footer-right">Powered by Sherlock (sherlock-project/sherlock) and WhatsMyName (WebBreacher/WhatsMyName). Use responsibly and within applicable law.</div>
   </footer>
 </div>
 <script>
@@ -217,7 +217,7 @@ function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').
 
 const hints = {
   sherlock: 'Sherlock checks 300+ platforms · Results stream as found · Typically 1–2 minutes',
-  maigret:  'Maigret scans 500 top sites with deep profile extraction · Typically 2–4 minutes',
+  maigret:  'WhatsMyName checks 500+ sites with a different database · Complements Sherlock · Typically 2–4 minutes',
 };
 
 function setEngine(e) {
@@ -300,10 +300,10 @@ function run() {
   document.getElementById('statChecked').textContent = '0';
   setRunning(true);
 
-  const endpoint = engine === 'sherlock' ? 'sherlock' : 'maigret';
-  document.getElementById('termTitle').textContent = `${endpoint} — ${username}`;
+  const endpoint = engine === 'sherlock' ? 'sherlock' : 'maigret'; // maigret endpoint now runs WhatsMyName
+  document.getElementById('termTitle').textContent = `${engine === 'sherlock' ? 'sherlock' : 'whatsmyname'} — ${username}`;
   appendLine('cmd', `$ ${endpoint} --no-color ${engine === 'sherlock' ? '--print-found' : '--timeout 10'} ${esc(username)}`);
-  appendLine('dim', `  Scanning with ${engine === 'sherlock' ? 'Sherlock (300+ platforms)' : 'Maigret (500 top sites)'}…`);
+  appendLine('dim', `  Scanning with ${engine === 'sherlock' ? 'Sherlock (300+ platforms)' : 'WhatsMyName (500+ sites)'}…`);
 
   evtSource = new EventSource(`${PROXY}/${endpoint}?username=${encodeURIComponent(username)}`);
 
