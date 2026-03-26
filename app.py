@@ -155,6 +155,67 @@ def what3words_reverse():
     except requests.exceptions.Timeout:
         return Response('{"error":"w3w API timed out"}', status=504, mimetype="application/json")
 
+# ── IP Intelligence proxy route ──────────────────────────────────────────────
+@app.route("/ip", methods=["GET","OPTIONS"])
+@corsify
+def ip_lookup():
+    """
+    IP geolocation proxy — avoids CORS issues with direct browser requests.
+    Query: ?ip=8.8.8.8  (omit for caller's own IP)
+    """
+    ip = request.args.get("ip","").strip()
+    
+    # Use caller's IP if none provided
+    if not ip:
+        ip = request.headers.get("X-Forwarded-For","").split(",")[0].strip()
+        if not ip:
+            ip = request.remote_addr
+
+    # Validate basic format
+    if ip and ip not in ("127.0.0.1","::1","localhost"):
+        target = ip
+    else:
+        target = ""
+
+    try:
+        url = f"https://ipwho.is/{target}" if target else "https://ipwho.is/"
+        r = requests.get(url, timeout=10, headers={"User-Agent":"IntelDesk/1.0"})
+        data = r.json()
+        if data.get("success"):
+            return jsonify(data)
+        # Fallback to ip-api (server-side, no CORS issue)
+        url2 = f"http://ip-api.com/json/{target}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,reverse,mobile,proxy,hosting,query"
+        r2 = requests.get(url2, timeout=10, headers={"User-Agent":"IntelDesk/1.0"})
+        data2 = r2.json()
+        if data2.get("status") == "success":
+            # Normalize to ipwho.is format
+            return jsonify({
+                "success": True,
+                "ip": data2.get("query", target),
+                "country": data2.get("country",""),
+                "country_code": data2.get("countryCode",""),
+                "region": data2.get("regionName",""),
+                "city": data2.get("city",""),
+                "zip": data2.get("zip",""),
+                "latitude": data2.get("lat"),
+                "longitude": data2.get("lon"),
+                "timezone": {"id": data2.get("timezone","")},
+                "connection": {
+                    "isp": data2.get("isp",""),
+                    "org": data2.get("org",""),
+                    "asn": data2.get("as","").split()[0].replace("AS","") if data2.get("as") else "",
+                    "domain": data2.get("asname",""),
+                },
+                "type": "mobile" if data2.get("mobile") else ("hosting" if data2.get("hosting") else ("proxy" if data2.get("proxy") else "business")),
+                "is_mobile": data2.get("mobile", False),
+                "is_proxy": data2.get("proxy", False),
+                "is_hosting": data2.get("hosting", False),
+                "continent": data2.get("continent",""),
+            })
+        return jsonify({"success": False, "error": "Lookup failed", "ip": target}), 400
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e), "ip": target}), 500
+
 # ── WHOIS route ───────────────────────────────────────────────────────────────
 @app.route("/whois", methods=["GET","OPTIONS"])
 @corsify
@@ -166,9 +227,16 @@ def whois_lookup():
     try:
         import whois as python_whois
         import socket
+        import concurrent.futures
         # Set a timeout so it doesn't hang
-        socket.setdefaulttimeout(15)
-        w = python_whois.whois(domain)
+        socket.setdefaulttimeout(12)
+        # Run with thread timeout to prevent hanging
+        with concurrent.futures.ThreadPoolExecutor(max_workers=1) as ex:
+            future = ex.submit(python_whois.whois, domain)
+            try:
+                w = future.result(timeout=14)
+            except concurrent.futures.TimeoutError:
+                return jsonify({"error": "WHOIS lookup timed out for this domain", "domain": domain}), 504
         if w is None:
             return jsonify({"error": "No WHOIS data returned", "domain": domain}), 404
 
@@ -212,7 +280,10 @@ def whois_lookup():
 
 # ── SSE OSINT stream helper ───────────────────────────────────────────────────
 def stream_subprocess(cmd, env=None):
-    """Run a subprocess and yield SSE events for each output line."""
+    """Run a subprocess and yield SSE events for each line.
+    Sends keepalive comments every 15s to prevent proxy/Render timeout."""
+    import select, time
+
     def generate():
         try:
             proc = subprocess.Popen(
@@ -224,15 +295,39 @@ def stream_subprocess(cmd, env=None):
                 env={**os.environ, **(env or {})},
             )
             yield sse({"type":"start","cmd":cmd[0]})
-            for line in iter(proc.stdout.readline, ""):
-                line = line.rstrip()
-                if line:
-                    yield sse({"type":"line","text":line})
+            last_ping = time.time()
+            proc.stdout.flush()
+
+            while True:
+                # Check if data is ready with 1s timeout
+                ready = select.select([proc.stdout], [], [], 1.0)[0]
+                if ready:
+                    line = proc.stdout.readline()
+                    if not line:  # EOF
+                        break
+                    line = line.rstrip()
+                    if line:
+                        yield sse({"type":"line","text":line})
+                        last_ping = time.time()
+                else:
+                    # No data — check if process finished
+                    if proc.poll() is not None:
+                        # Drain any remaining output
+                        for line in proc.stdout:
+                            line = line.rstrip()
+                            if line:
+                                yield sse({"type":"line","text":line})
+                        break
+                    # Send keepalive ping every 15 seconds
+                    if time.time() - last_ping > 15:
+                        yield ": keepalive\n\n"
+                        last_ping = time.time()
+
             proc.stdout.close()
             proc.wait()
             yield sse({"type":"done","returncode":proc.returncode})
         except FileNotFoundError:
-            yield sse({"type":"error","text":f"Tool not found: {cmd[0]}. Is it installed?"})
+            yield sse({"type":"error","text":f"Tool not found: {cmd[0]}. Is it installed on this server?"})
         except Exception as e:
             yield sse({"type":"error","text":str(e)})
     return generate
