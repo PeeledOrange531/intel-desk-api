@@ -5,6 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IP Intelligence — Geolocation, ASN & Threat Analysis | The Intel Desk</title>
 <meta name="description" content="Free IP intelligence tool. Look up any IP address to reveal geolocation, ISP, ASN, organization, timezone, VPN/proxy detection, and threat indicators. Used by security researchers, investigators, and network analysts. No API key required.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -128,7 +130,31 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
-@media(max-width:768px){.page-wrap{padding:0 20px;}.search-row{flex-direction:column;}.search-input{border-right:1px solid var(--border);}.footer{flex-direction:column;gap:12px;}.footer-right{text-align:left;}}
+/* ── MAP ── */
+.map-panel{background:var(--bg2);border:1px solid var(--border);display:none;flex-direction:column;}
+.map-panel.visible{display:flex;}
+.map-header{padding:12px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.map-header-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.40)!important;display:flex;align-items:center;gap:10px;}
+.map-header-label::after{content:'';width:60px;height:1px;background:var(--border);}
+.map-coords{font-family:var(--mono);font-size:11px;color:#c8a96e!important;}
+.map-location-label{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;}
+#ipMap{height:340px;width:100%;background:#050505;}
+/* Override Leaflet defaults to match dark theme */
+.leaflet-container{background:#050505!important;font-family:var(--mono)!important;}
+.leaflet-control-zoom a{background:var(--bg2)!important;color:rgba(240,236,228,0.60)!important;border-color:var(--border)!important;font-family:var(--mono)!important;}
+.leaflet-control-zoom a:hover{background:var(--bg3)!important;color:#c8a96e!important;}
+.leaflet-control-attribution{background:rgba(5,5,5,0.75)!important;color:rgba(240,236,228,0.25)!important;font-size:9px!important;}
+.leaflet-control-attribution a{color:rgba(200,169,110,0.40)!important;}
+.leaflet-popup-content-wrapper{background:var(--bg2)!important;color:#f5f2ec!important;border:1px solid var(--border)!important;border-radius:0!important;box-shadow:0 4px 24px rgba(0,0,0,0.6)!important;}
+.leaflet-popup-tip{background:var(--bg2)!important;}
+.leaflet-popup-content{font-family:var(--mono)!important;font-size:12px!important;line-height:1.7!important;color:rgba(240,236,228,0.75)!important;margin:12px 16px!important;}
+.leaflet-popup-content strong{color:#e8d5a3!important;font-weight:500;}
+.ip-marker-pulse{width:16px;height:16px;position:relative;}
+.ip-marker-pulse::before{content:'';position:absolute;inset:0;border-radius:50%;background:#c8a96e;opacity:0.9;}
+.ip-marker-pulse::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(200,169,110,0.4);animation:markerPulse 2s ease-out infinite;}
+@keyframes markerPulse{0%{transform:scale(0.8);opacity:1;}100%{transform:scale(2.2);opacity:0;}}
+
+@media(max-width:768px){{.page-wrap{padding:0 20px;}.search-row{flex-direction:column;}.search-input{border-right:1px solid var(--border);}.footer{flex-direction:column;gap:12px;}.footer-right{text-align:left;}}
 </style>
 </head>
 <body>
@@ -181,6 +207,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
   <!-- RESULTS -->
   <div class="results-wrap" id="resultsWrap">
     <div class="summary-grid" id="summaryGrid"></div>
+    <div class="map-panel" id="mapPanel">
+      <div class="map-header">
+        <div class="map-header-label">Geolocation Map</div>
+        <span class="map-location-label" id="mapLocationLabel"></span>
+        <span class="map-coords" id="mapCoordsLabel"></span>
+      </div>
+      <div id="ipMap"></div>
+    </div>
     <div class="threat-panel" id="threatPanel">
       <div class="threat-title">Threat & Risk Indicators</div>
       <div class="threat-grid" id="threatGrid"></div>
@@ -238,19 +272,38 @@ function toggleSEOBlock(){
 
 // ── LOOKUP ────────────────────────────────────────────────────────────────────
 async function lookupMyIP() {
-  try {
-    // ipwho.is supports HTTPS on free tier — use for My IP
-    const r = await fetch('https://ipwho.is/');
-    const d = await r.json();
-    if (d.success && d.ip) {
-      document.getElementById('ipInput').value = d.ip;
-      processFallbackData(d, d.ip);
-    } else {
-      showError('Could not determine your public IP address.');
-    }
-  } catch(e) {
-    showError('Could not determine your public IP address.');
+  // Try multiple sources in order
+  const sources = [
+    'https://ipwho.is/',
+    'https://api.ipify.org?format=json',
+    'https://ipapi.co/json/',
+  ];
+  for (const url of sources) {
+    try {
+      const r = await fetch(url);
+      const d = await r.json();
+      // ipwho.is format
+      if (d.success && d.ip) {
+        document.getElementById('ipInput').value = d.ip;
+        processFallbackData(d, d.ip);
+        return;
+      }
+      // ipify format — just returns {ip}
+      if (d.ip && !d.success && !d.error) {
+        document.getElementById('ipInput').value = d.ip;
+        // Trigger full lookup
+        await lookup();
+        return;
+      }
+      // ipapi.co format
+      if (d.ip && d.country_name) {
+        document.getElementById('ipInput').value = d.ip;
+        await lookup();
+        return;
+      }
+    } catch(e) { continue; }
   }
+  showError('Could not determine your public IP. Try entering it manually.');
 }
 
 async function lookup() {
@@ -401,6 +454,11 @@ function renderResults(data, ip) {
 
   document.getElementById('resultsWrap').classList.add('visible');
 
+  // Render map if coordinates available
+  if (data.lat && data.lon) {
+    renderMap(data);
+  }
+
   // Terminal
   renderTerminal(data, ip);
   document.getElementById('terminalWrap').classList.add('visible');
@@ -475,6 +533,75 @@ function renderTerminal(data, ip) {
 
   document.getElementById('terminalBody').innerHTML = h;
   document.getElementById('terminalLabel').textContent = `intel-desk — ip-intelligence — ${ip}`;
+}
+
+// ── MAP ──────────────────────────────────────────────────────────────────────
+let ipMapInstance = null;
+
+function renderMap(data) {
+  const panel = document.getElementById('mapPanel');
+  panel.classList.add('visible');
+
+  // Update labels
+  const loc = [data.city, data.region, data.country].filter(v => v && v !== '—').join(', ');
+  document.getElementById('mapLocationLabel').textContent = loc;
+  document.getElementById('mapCoordsLabel').textContent = `${data.lat.toFixed(4)}, ${data.lon.toFixed(4)}`;
+
+  // Destroy previous map instance if exists
+  if (ipMapInstance) {
+    ipMapInstance.remove();
+    ipMapInstance = null;
+  }
+
+  // Small delay to ensure panel is visible before init
+  setTimeout(() => {
+    ipMapInstance = L.map('ipMap', {
+      center: [data.lat, data.lon],
+      zoom: 10,
+      zoomControl: true,
+      attributionControl: true,
+    });
+
+    // CartoDB Dark Matter — matches site aesthetic
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors © <a href="https://carto.com/attributions">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(ipMapInstance);
+
+    // Custom pulsing marker
+    const pulseIcon = L.divIcon({
+      className: '',
+      html: '<div class="ip-marker-pulse"></div>',
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      popupAnchor: [0, -12],
+    });
+
+    // Popup content
+    const popupHtml = `
+      <strong>${data.ip}</strong><br>
+      ${[data.city, data.region, data.country].filter(Boolean).join(', ')}<br>
+      <span style="color:rgba(240,236,228,0.45)!important">${data.isp || ''}</span>
+      ${data.proxy ? '<br><span style="color:#e87b4a!important">⚠ VPN / Proxy detected</span>' : ''}
+      ${data.hosting ? '<br><span style="color:#e87b4a!important">⚠ Hosting / Datacenter</span>' : ''}
+    `;
+
+    L.marker([data.lat, data.lon], { icon: pulseIcon })
+      .addTo(ipMapInstance)
+      .bindPopup(popupHtml)
+      .openPopup();
+
+    // Accuracy circle — IP geolocation is city-level (~25km radius)
+    L.circle([data.lat, data.lon], {
+      radius: 25000,
+      color: 'rgba(200,169,110,0.25)',
+      fillColor: 'rgba(200,169,110,0.04)',
+      fillOpacity: 1,
+      weight: 1,
+    }).addTo(ipMapInstance);
+
+  }, 100);
 }
 
 // ── LOADING / ERROR ───────────────────────────────────────────────────────────
