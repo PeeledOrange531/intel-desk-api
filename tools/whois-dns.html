@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WHOIS & DNS Lookup — Domain Intelligence | The Intel Desk</title>
+<meta name="description" content="Free WHOIS and DNS lookup tool. Investigate any domain to reveal registration details, registrar, creation and expiry dates, nameservers, and full DNS records including A, MX, TXT, NS, CNAME. Used by security researchers, journalists, and investigators.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#050505;--bg2:#0a0a0a;--bg3:#111111;--border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);--text:#f5f2ec;--text-muted:rgba(240,236,228,0.75);--text-dim:rgba(240,236,228,0.50);--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);--green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--gray:#666;--mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 48px;max-width:1200px;margin:0 auto;}
+.hero{padding:80px 0 60px;border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(38px,5vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;animation:fadeUp 0.6s 0.08s ease both;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-header:hover{background:rgba(255,255,255,0.01);}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;transition:all 0.15s;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:800px;}
+.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;font-weight:500;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px;padding-top:20px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+.input-section{padding:48px 0 0;animation:fadeUp 0.6s 0.12s ease both;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.search-row{display:flex;gap:0;}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:14px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.search-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.search-input:focus{border-color:rgba(200,169,110,0.35);}
+.btn-lookup{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:background 0.2s;white-space:nowrap;}
+.btn-lookup:hover{background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.lookup-toggles{display:flex;gap:0;margin-top:2px;}
+.lookup-toggle{background:transparent;border:1px solid var(--border);border-right:none;color:rgba(240,236,228,0.40)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:10px 18px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:7px;}
+.lookup-toggle:last-child{border-right:1px solid var(--border);}
+.lookup-toggle.active{background:var(--accent-dim);border-color:rgba(200,169,110,0.3);color:#c8a96e!important;}
+.toggle-dot{width:6px;height:6px;border-radius:50%;background:currentColor;flex-shrink:0;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+/* Results */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:48px;animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1px;background:var(--border);}
+.summary-card{background:var(--bg2);padding:22px 24px;display:flex;flex-direction:column;gap:7px;}
+.summary-card-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.40)!important;}
+.summary-card-value{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;word-break:break-all;line-height:1.4;}
+.summary-card-value.accent{color:#e8d5a3!important;}
+.summary-card-value.green{color:#4ec994!important;}
+.summary-card-value.warn{color:#e87b4a!important;}
+.summary-card-value.red{color:#c0392b!important;}
+.summary-card-value.dim{color:#666!important;}
+
+/* DNS records */
+.dns-section{background:var(--bg2);border:1px solid var(--border);}
+.dns-section-header{padding:14px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
+.dns-type-badge{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:3px 10px;border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;background:var(--accent-dim);}
+.dns-section-name{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;}
+.dns-record{padding:12px 24px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.70)!important;display:flex;gap:16px;align-items:baseline;}
+.dns-record:last-child{border-bottom:none;}
+.dns-record-ttl{color:rgba(240,236,228,0.25)!important;flex-shrink:0;font-size:11px;}
+.dns-record-value{flex:1;word-break:break-all;}
+.dns-record-value.highlight{color:#4ec994!important;}
+
+/* Terminal */
+.terminal-wrap{border:1px solid var(--border);display:none;}
+.terminal-wrap.visible{display:block;}
+.terminal-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:12px 20px;display:flex;align-items:center;justify-content:space-between;}
+.terminal-dots{display:flex;gap:7px;}
+.dot{width:11px;height:11px;border-radius:50%;}
+.dot-red{background:#5a2020;}.dot-yellow{background:#5a4a20;}.dot-green{background:#1e4a2e;}
+.terminal-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;}
+.terminal-body{background:#050505!important;padding:28px;font-family:var(--mono);font-size:13px;line-height:1.8;overflow-x:auto;min-height:100px;}
+.t-cmd{color:#c8a96e!important;}.t-found{color:#4ec994!important;}.t-warn{color:#e87b4a!important;}
+.t-error{color:#c0392b!important;}.t-miss{color:#666!important;}.t-key{color:#e8d5a3!important;}
+.t-dim{color:rgba(240,236,228,0.50)!important;font-size:11px;}.t-div{color:rgba(240,236,228,0.50)!important;user-select:none;}
+.t-text{color:rgba(240,236,228,0.75)!important;}
+.t-cursor{display:inline-block;width:8px;height:14px;background:#c8a96e;vertical-align:middle;animation:blink 1.1s step-end infinite;}
+.footer{margin-top:80px;padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;font-weight:500;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;max-width:460px;text-align:right;line-height:1.6;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+@media(max-width:768px){.page-wrap{padding:0 20px;}.footer{flex-direction:column;gap:12px;}.footer-right{text-align:left;}}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+  <section class="hero">
+    <div class="eyebrow"><span>Domain Intelligence</span></div>
+    <h1>WHOIS & DNS <em>Lookup</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Every domain name on the internet has a registration record and a DNS configuration — and both contain intelligence that investigators, security researchers, and journalists rely on daily. This free <strong>WHOIS and DNS lookup tool</strong> performs a comprehensive domain investigation in one query. The <strong>WHOIS lookup</strong> reveals the <strong>registrar</strong>, <strong>registration and expiry dates</strong>, <strong>nameservers</strong>, registrant contact details (where not redacted), and domain status codes. The <strong>DNS lookup</strong> — powered by Cloudflare's DNS-over-HTTPS resolver — returns all record types including <strong>A records</strong> (IP addresses), <strong>MX records</strong> (mail servers), <strong>TXT records</strong> (SPF, DKIM, DMARC, verification tokens), <strong>NS records</strong> (nameservers), <strong>CNAME</strong>, and <strong>AAAA</strong> (IPv6). Used by <strong>security researchers investigating phishing infrastructure</strong>, <strong>journalists tracing domain ownership</strong>, <strong>fraud analysts verifying counterparty legitimacy</strong>, <strong>IT professionals diagnosing email delivery issues</strong>, and <strong>OSINT investigators mapping digital infrastructure</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">WHOIS Lookup</span><span class="seo-tag">DNS Lookup</span>
+        <span class="seo-tag">Domain Intelligence</span><span class="seo-tag">MX Records</span>
+        <span class="seo-tag">SPF DKIM DMARC</span><span class="seo-tag">Registrar Lookup</span>
+        <span class="seo-tag">Domain Expiry</span><span class="seo-tag">OSINT</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="input-section">
+    <div class="section-label">Enter Domain</div>
+    <div class="search-row">
+      <input type="text" class="search-input" id="domainInput"
+        placeholder="e.g. google.com  or  mail.example.org"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')lookup()">
+      <button class="btn-lookup" onclick="lookup()">Look Up →</button>
+    </div>
+    <div class="lookup-toggles">
+      <button class="lookup-toggle active" data-type="both"  onclick="setType('both')"><span class="toggle-dot"></span>WHOIS + DNS</button>
+      <button class="lookup-toggle"        data-type="whois" onclick="setType('whois')"><span class="toggle-dot"></span>WHOIS Only</button>
+      <button class="lookup-toggle"        data-type="dns"   onclick="setType('dns')"><span class="toggle-dot"></span>DNS Only</button>
+    </div>
+    <div class="input-hint">Enter domain without http:// · e.g. example.com · Subdomains supported for DNS</div>
+  </section>
+
+  <div class="results-wrap" id="resultsWrap">
+    <div class="summary-grid" id="summaryGrid"></div>
+    <div id="dnsResults"></div>
+  </div>
+
+  <div class="terminal-wrap" id="terminalWrap" style="margin-top:2px;">
+    <div class="terminal-bar">
+      <div class="terminal-dots">
+        <div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div>
+      </div>
+      <div class="terminal-label" id="terminalLabel">intel-desk — whois-dns</div>
+    </div>
+    <div class="terminal-body" id="terminalBody"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">WHOIS via Intel Desk proxy · DNS via Cloudflare DNS-over-HTTPS · Results for investigative reference only.</div>
+  </footer>
+</div>
+<script>
+const PROXY_BASE = 'https://intel-desk-api.onrender.com';
+let lookupType = 'both';
+
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+function ln(cls,t){return `<div class="t-${cls}">${esc(t)}</div>`;}
+function lnH(cls,h){return `<div class="t-${cls}">${h}</div>`;}
+function div(){return `<div class="t-div">────────────────────────────────────────────────────────</div>`;}
+function blank(){return `<div>&nbsp;</div>`;}
+function toggleSEO(){const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn'),e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';}
+function setType(t){lookupType=t;document.querySelectorAll('.lookup-toggle').forEach(b=>b.classList.toggle('active',b.dataset.type===t));}
+
+function cleanDomain(raw) {
+  return raw.replace(/^https?:\/\//i,'').replace(/\/.*$/,'').trim().toLowerCase();
+}
+
+async function lookup() {
+  const raw = document.getElementById('domainInput').value.trim();
+  if (!raw) { alert('Please enter a domain name.'); return; }
+  const domain = cleanDomain(raw);
+
+  showLoading(domain);
+
+  const results = { domain, whois: null, dns: null, errors: {} };
+
+  await Promise.all([
+    // WHOIS via Render proxy
+    (lookupType === 'both' || lookupType === 'whois') ? (async () => {
+      try {
+        const r = await fetch(`${PROXY_BASE}/whois?domain=${encodeURIComponent(domain)}`);
+        if (r.ok) results.whois = await r.json();
+        else results.errors.whois = `HTTP ${r.status}`;
+      } catch(e) { results.errors.whois = e.message; }
+    })() : Promise.resolve(),
+
+    // DNS via Cloudflare DoH — free, no key, HTTPS
+    (lookupType === 'both' || lookupType === 'dns') ? (async () => {
+      try {
+        const types = ['A','AAAA','MX','NS','TXT','CNAME','SOA'];
+        const dnsData = {};
+        await Promise.all(types.map(async type => {
+          try {
+            const r = await fetch(
+              `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
+              { headers: { Accept: 'application/dns-json' } }
+            );
+            const d = await r.json();
+            if (d.Answer && d.Answer.length > 0) dnsData[type] = d.Answer;
+          } catch(e) {}
+        }));
+        results.dns = dnsData;
+      } catch(e) { results.errors.dns = e.message; }
+    })() : Promise.resolve(),
+  ]);
+
+  renderResults(results);
+}
+
+function renderResults(results) {
+  const { domain, whois, dns, errors } = results;
+  const cards = [];
+
+  cards.push({ label:'Domain', value: domain, cls:'accent' });
+
+  if (whois) {
+    if (whois.registrar)    cards.push({ label:'Registrar',     value: whois.registrar,    cls:'' });
+    if (whois.created)      cards.push({ label:'Created',       value: whois.created,      cls:'' });
+    if (whois.expires)      cards.push({ label:'Expires',       value: whois.expires,      cls: isExpiringSoon(whois.expires) ? 'warn' : '' });
+    if (whois.updated)      cards.push({ label:'Last Updated',  value: whois.updated,      cls:'dim' });
+    if (whois.status)       cards.push({ label:'Status',        value: Array.isArray(whois.status) ? whois.status[0] : whois.status, cls:'' });
+    if (whois.dnssec)       cards.push({ label:'DNSSEC',        value: whois.dnssec,       cls: whois.dnssec === 'signedDelegation' ? 'green' : 'dim' });
+    if (whois.nameservers)  cards.push({ label:'Nameservers',   value: Array.isArray(whois.nameservers) ? whois.nameservers.join('\n') : whois.nameservers, cls:'dim' });
+  } else if (errors.whois) {
+    cards.push({ label:'WHOIS', value: `Error: ${errors.whois}`, cls:'red' });
+  }
+
+  if (dns) {
+    const aRecs = dns['A'] || [];
+    if (aRecs.length) cards.push({ label:'IP Address (A)', value: aRecs.map(r=>r.data).join(', '), cls:'green' });
+  }
+
+  document.getElementById('summaryGrid').innerHTML = cards.map(c=>`
+    <div class="summary-card">
+      <div class="summary-card-label">${esc(c.label)}</div>
+      <div class="summary-card-value ${c.cls}" style="white-space:pre-line">${esc(c.value||'—')}</div>
+    </div>`).join('');
+
+  // DNS sections
+  let dnsHtml = '';
+  if (dns) {
+    const typeDescriptions = {
+      A:     'IPv4 Addresses',
+      AAAA:  'IPv6 Addresses',
+      MX:    'Mail Servers',
+      NS:    'Nameservers',
+      TXT:   'Text Records (SPF · DKIM · DMARC)',
+      CNAME: 'Canonical Names',
+      SOA:   'Start of Authority',
+    };
+    for (const [type, records] of Object.entries(dns)) {
+      dnsHtml += `
+        <div class="dns-section" style="border-top:none;">
+          <div class="dns-section-header">
+            <span class="dns-type-badge">${esc(type)}</span>
+            <span class="dns-section-name">${esc(typeDescriptions[type]||type)}</span>
+          </div>
+          ${records.map(r=>`
+            <div class="dns-record">
+              <span class="dns-record-ttl">TTL ${r.TTL||'—'}</span>
+              <span class="dns-record-value ${type==='A'||type==='AAAA'?'highlight':''}">${esc(r.data)}</span>
+            </div>`).join('')}
+        </div>`;
+    }
+    if (!Object.keys(dns).length) {
+      dnsHtml = `<div class="dns-section" style="border-top:none;padding:20px 24px;font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.35)!important;">No DNS records found for this domain.</div>`;
+    }
+  }
+  document.getElementById('dnsResults').innerHTML = dnsHtml;
+  document.getElementById('resultsWrap').classList.add('visible');
+
+  // Terminal
+  renderTerminal(results);
+  document.getElementById('terminalWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderTerminal(results) {
+  const { domain, whois, dns, errors } = results;
+  let h = '';
+  h += ln('cmd', `$ intel-desk whois-dns --domain ${domain} --type ${lookupType}`);
+  h += blank();
+
+  if (whois) {
+    h += div();
+    h += ln('key', '  WHOIS REGISTRATION DATA');
+    h += div();
+    const w = [
+      ['Registrar', whois.registrar],
+      ['Created',   whois.created],
+      ['Expires',   whois.expires],
+      ['Updated',   whois.updated],
+      ['Status',    Array.isArray(whois.status) ? whois.status.join(', ') : whois.status],
+      ['DNSSEC',    whois.dnssec],
+    ];
+    for (const [k,v] of w) {
+      if (v) h += lnH('text', `  <span class="t-key">${k.padEnd(12)}</span>  ${esc(String(v))}`);
+    }
+    if (whois.nameservers) {
+      const ns = Array.isArray(whois.nameservers) ? whois.nameservers : [whois.nameservers];
+      for (const n of ns) h += lnH('text', `  <span class="t-key">Nameserver  </span>  ${esc(n)}`);
+    }
+  } else if (errors.whois) {
+    h += div();
+    h += ln('error', `  [!] WHOIS: ${errors.whois}`);
+  }
+
+  if (dns) {
+    h += blank();
+    h += div();
+    h += ln('key', '  DNS RECORDS');
+    h += div();
+    for (const [type, records] of Object.entries(dns)) {
+      for (const r of records) {
+        h += lnH('text', `  <span class="t-key">${type.padEnd(8)}</span>  ${esc(r.data)}`);
+      }
+    }
+    if (!Object.keys(dns).length) h += ln('miss', '  [-] No DNS records found');
+  }
+
+  h += blank();
+  h += div();
+  h += ln('dim', `  Lookup complete — ${domain}`);
+  h += lnH('dim', `  <span class="t-cursor"></span>`);
+
+  document.getElementById('terminalBody').innerHTML = h;
+  document.getElementById('terminalLabel').textContent = `intel-desk — whois-dns — ${domain}`;
+}
+
+function isExpiringSoon(dateStr) {
+  try {
+    const d = new Date(dateStr);
+    const now = new Date();
+    const diff = (d - now) / (1000*60*60*24);
+    return diff < 90;
+  } catch { return false; }
+}
+
+function showLoading(domain) {
+  document.getElementById('resultsWrap').classList.remove('visible');
+  document.getElementById('terminalWrap').classList.add('visible');
+  document.getElementById('terminalLabel').textContent = `intel-desk — looking up ${domain}`;
+  document.getElementById('terminalBody').innerHTML =
+    `<div class="t-dim">Running WHOIS + DNS lookup for ${esc(domain)}…&nbsp;<span class="t-cursor"></span></div>`;
+}
+</script>
+</body>
+</html>
