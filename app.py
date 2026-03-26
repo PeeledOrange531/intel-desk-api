@@ -478,6 +478,126 @@ def ignorant_stream():
     gen = stream_subprocess(["ignorant", "--no-color", phone])
     return Response(gen(), headers=sse_headers())
 
+
+# ── URL INTELLIGENCE routes ───────────────────────────────────────────────────
+import ssl
+import socket
+import urllib.parse
+from datetime import datetime
+
+@app.route("/url-inspect", methods=["GET","OPTIONS"])
+@corsify
+def url_inspect():
+    """
+    Follow redirect chain, get final URL, SSL cert, response info.
+    Query: ?url=https://example.com
+    """
+    raw = request.args.get("url","").strip()
+    if not raw:
+        return jsonify({"error": "url parameter required"}), 400
+
+    # Ensure scheme
+    if not raw.startswith(('http://','https://')):
+        raw = 'https://' + raw
+
+    try:
+        import requests as req
+        result = {
+            "original_url": raw,
+            "redirect_chain": [],
+            "final_url": None,
+            "final_domain": None,
+            "status_code": None,
+            "content_type": None,
+            "server": None,
+            "response_time_ms": None,
+            "ssl": None,
+        }
+
+        # Follow redirects manually to capture chain
+        session = req.Session()
+        session.max_redirects = 10
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; IntelDesk/1.0; +https://inteldesk.io)",
+            "Accept": "text/html,application/xhtml+xml,*/*",
+        }
+
+        # Manual redirect chain
+        chain = []
+        current_url = raw
+        import time
+
+        for _ in range(10):
+            t0 = time.time()
+            try:
+                r = req.get(
+                    current_url,
+                    headers=headers,
+                    allow_redirects=False,
+                    timeout=10,
+                    verify=False,  # We check SSL separately
+                )
+                elapsed = int((time.time() - t0) * 1000)
+                chain.append({
+                    "url": current_url,
+                    "status_code": r.status_code,
+                    "elapsed_ms": elapsed,
+                })
+                if r.status_code in (301,302,303,307,308) and 'Location' in r.headers:
+                    loc = r.headers['Location']
+                    # Handle relative redirects
+                    if loc.startswith('/'):
+                        parsed = urllib.parse.urlparse(current_url)
+                        loc = f"{parsed.scheme}://{parsed.netloc}{loc}"
+                    current_url = loc
+                else:
+                    # Final destination
+                    result['status_code']   = r.status_code
+                    result['content_type']  = r.headers.get('Content-Type','').split(';')[0]
+                    result['server']        = r.headers.get('Server','')
+                    result['response_time_ms'] = elapsed
+                    result['x_powered_by']  = r.headers.get('X-Powered-By','')
+                    result['content_length']= r.headers.get('Content-Length','')
+                    break
+            except req.exceptions.SSLError:
+                chain.append({"url": current_url, "status_code": "SSL_ERROR", "elapsed_ms": 0})
+                break
+            except Exception as e:
+                chain.append({"url": current_url, "status_code": f"ERROR: {str(e)[:60]}", "elapsed_ms": 0})
+                break
+
+        result['redirect_chain'] = chain
+        result['final_url']      = current_url
+        parsed_final = urllib.parse.urlparse(current_url)
+        result['final_domain']   = parsed_final.netloc
+
+        # SSL certificate info
+        try:
+            hostname = parsed_final.netloc.split(':')[0]
+            port     = int(parsed_final.port or 443)
+            ctx = ssl.create_default_context()
+            with socket.create_connection((hostname, port), timeout=8) as sock:
+                with ctx.wrap_socket(sock, server_hostname=hostname) as ssock:
+                    cert = ssock.getpeercert()
+                    result['ssl'] = {
+                        "valid": True,
+                        "subject": dict(x[0] for x in cert.get('subject',[])),
+                        "issuer":  dict(x[0] for x in cert.get('issuer',[])),
+                        "not_before": cert.get('notBefore',''),
+                        "not_after":  cert.get('notAfter',''),
+                        "san": [v for t,v in cert.get('subjectAltName',[]) if t=='DNS'],
+                        "version": cert.get('version',''),
+                    }
+        except ssl.SSLCertVerificationError as e:
+            result['ssl'] = {"valid": False, "error": str(e)[:100]}
+        except Exception as e:
+            result['ssl'] = {"valid": None, "error": str(e)[:80]}
+
+        return jsonify(result)
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
