@@ -656,6 +656,14 @@ const CATEGORIES = [
         datasets: 1,
         seo:`Full WHOIS registration data plus live DNS records (A, MX, TXT, NS, CNAME) via Cloudflare DNS-over-HTTPS. No API key required.`,
       },
+      {
+        id:'url-intel', icon:'🔗', live:true,
+        name:'URL Intelligence',
+        desc:'Redirect chain · SSL · Safe preview',
+        url:`${BASE}/url-intelligence.html`,
+        datasets: 0,
+        seo:`Inspect any URL safely without visiting it. See the full redirect chain, final destination, SSL certificate, server info, and screenshot preview. Check against VirusTotal, URLScan, Safe Browsing and more.`,
+      },
     ],
   },
 ];
@@ -728,6 +736,7 @@ function buildTicker() {
     { label: 'Phone Intelligence',        value: 'Carrier · Type · Platform scan' },
     { label: 'IP Intelligence',           value: 'Geolocation · ASN · Threat score' },
     { label: 'WHOIS & DNS',               value: 'Registration · MX · TXT · NS' },
+    { label: 'URL Intelligence',              value: 'Redirect chain · SSL · Preview' },
     { label: 'Sanctions Screening',       value: '4 lists · Real-time' },
     { label: 'what3words API',            value: 'Bidirectional lookup' },
     { label: 'Match Confidence Scoring',  value: '0–100 scale' },
