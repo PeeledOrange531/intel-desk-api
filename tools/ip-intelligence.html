@@ -246,6 +246,9 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 </div>
 <script>
+// ── CONFIG ───────────────────────────────────────────────────────────────────
+const PROXY_BASE = 'https://intel-desk-api.onrender.com';
+
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 function ln(cls,t){return `<div class="t-${cls}">${esc(t)}</div>`;}
@@ -272,38 +275,20 @@ function toggleSEOBlock(){
 
 // ── LOOKUP ────────────────────────────────────────────────────────────────────
 async function lookupMyIP() {
-  // Try multiple sources in order
-  const sources = [
-    'https://ipwho.is/',
-    'https://api.ipify.org?format=json',
-    'https://ipapi.co/json/',
-  ];
-  for (const url of sources) {
-    try {
-      const r = await fetch(url);
-      const d = await r.json();
-      // ipwho.is format
-      if (d.success && d.ip) {
-        document.getElementById('ipInput').value = d.ip;
-        processFallbackData(d, d.ip);
-        return;
-      }
-      // ipify format — just returns {ip}
-      if (d.ip && !d.success && !d.error) {
-        document.getElementById('ipInput').value = d.ip;
-        // Trigger full lookup
-        await lookup();
-        return;
-      }
-      // ipapi.co format
-      if (d.ip && d.country_name) {
-        document.getElementById('ipInput').value = d.ip;
-        await lookup();
-        return;
-      }
-    } catch(e) { continue; }
+  showLoading('your IP');
+  try {
+    // Route through Render proxy — avoids CORS issues
+    const r = await fetch(`${PROXY_BASE}/ip`);
+    const d = await r.json();
+    if (d.success && d.ip) {
+      document.getElementById('ipInput').value = d.ip;
+      processFallbackData(d, d.ip);
+    } else {
+      showError('Could not determine your public IP address.');
+    }
+  } catch(e) {
+    showError('Could not reach lookup server. Please try again.');
   }
-  showError('Could not determine your public IP. Try entering it manually.');
 }
 
 async function lookup() {
@@ -314,28 +299,16 @@ async function lookup() {
   showLoading(raw);
 
   try {
-    // Primary: ipwho.is — free, no key, HTTPS supported
-    const r = await fetch(`https://ipwho.is/${encodeURIComponent(raw)}`);
+    // Route through Render proxy — avoids CORS restrictions
+    const r = await fetch(`${PROXY_BASE}/ip?ip=${encodeURIComponent(raw)}`);
     const d = await r.json();
-
     if (d.success) {
       processFallbackData(d, raw);
     } else {
-      // Fallback: try ip-api via HTTP (may be blocked on HTTPS sites but worth trying)
-      try {
-        const r2 = await fetch(`http://ip-api.com/json/${encodeURIComponent(raw)}?fields=status,message,continent,continentCode,country,countryCode,region,regionName,city,zip,lat,lon,timezone,offset,isp,org,as,asname,reverse,mobile,proxy,hosting,query`);
-        const d2 = await r2.json();
-        if (d2.status === 'success') {
-          processData(d2, raw);
-        } else {
-          showError(d.message || 'Lookup failed for this IP address.');
-        }
-      } catch {
-        showError(d.message || 'Lookup failed for this IP address.');
-      }
+      showError(d.error || 'Lookup failed for this IP address.');
     }
   } catch(e) {
-    showError('Network error. Please check your connection and try again.');
+    showError('Could not reach lookup server. Please try again.');
   }
 }
 
