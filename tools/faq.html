@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FAQ — The Intel Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--text-muted:rgba(240,236,228,0.75);--text-dim:rgba(240,236,228,0.50);
+  --accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page{position:relative;z-index:1;max-width:780px;margin:0 auto;padding:60px 48px 80px;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(36px,5vw,56px);font-weight:300;line-height:1.0;color:#f5f2ec!important;margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+.faq-item{border-bottom:1px solid var(--border);overflow:hidden;}
+.faq-item:first-of-type{border-top:1px solid var(--border);}
+.faq-q{
+  width:100%;background:transparent;border:none;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:20px 0;cursor:pointer;text-align:left;gap:16px;
+  transition:background 0.15s;
+}
+.faq-q:hover{padding-left:8px;}
+.faq-q-text{font-family:var(--mono);font-size:13px;font-weight:500;color:rgba(240,236,228,0.80)!important;letter-spacing:0.02em;transition:color 0.15s;}
+.faq-q:hover .faq-q-text,.faq-item.open .faq-q-text{color:#e8d5a3!important;}
+.faq-icon{font-family:var(--mono);font-size:18px;color:rgba(200,169,110,0.40)!important;transition:transform 0.25s,color 0.15s;flex-shrink:0;line-height:1;width:20px;text-align:center;}
+.faq-item.open .faq-icon{transform:rotate(45deg);color:#c8a96e!important;}
+.faq-a{
+  max-height:0;overflow:hidden;
+  transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1), padding 0.3s;
+  padding:0 0 0 0;
+}
+.faq-item.open .faq-a{max-height:300px;padding:0 0 20px 0;}
+.faq-a p{font-family:var(--mono);font-size:13px;font-weight:400;line-height:1.9;color:rgba(240,236,228,0.55)!important;}
+.faq-a a{color:#7eb8e4!important;text-decoration:underline;}
+
+@media(max-width:768px){.page{padding:40px 20px 60px;}}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="eyebrow"><span>Support</span></div>
+  <h1>Frequently Asked <em>Questions</em></h1>
+
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggle(this)">
+      <span class="faq-q-text">Do I need an account to use Intel Desk?</span>
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-a"><p>No account is required to use Intel Desk. All tools are freely accessible without registration.</p></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggle(this)">
+      <span class="faq-q-text">Why am I seeing rate limit errors?</span>
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-a"><p>Requests are limited to maintain service stability for all users. High request volume may trigger temporary restrictions. Please wait a few minutes before retrying.</p></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggle(this)">
+      <span class="faq-q-text">How do I report a bug or issue?</span>
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-a"><p>If you encounter a bug, please <a href="https://www.inteldesk.io/contact">let us know via the contact page</a>. Please note that unauthorized testing or probing of the platform is not permitted.</p></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggle(this)">
+      <span class="faq-q-text">Is API access available?</span>
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-a"><p>API access is not offered at this time. All tools are available through the web interface only.</p></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggle(this)">
+      <span class="faq-q-text">How quickly will you respond to my message?</span>
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-a"><p>We receive a high volume of inquiries. Messages without clear content may not be reviewed. Please include sufficient detail to receive a response.</p></div>
+  </div>
+
+  <div class="faq-item">
+    <button class="faq-q" onclick="toggle(this)">
+      <span class="faq-q-text">I have a question not covered here.</span>
+      <span class="faq-icon">+</span>
+    </button>
+    <div class="faq-a"><p>For anything not covered here, please <a href="https://www.inteldesk.io/contact">contact us directly</a>.</p></div>
+  </div>
+
+</div>
+<script>
+function toggle(btn) {
+  const item = btn.closest('.faq-item');
+  const wasOpen = item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('open'));
+  if (!wasOpen) item.classList.add('open');
+}
+</script>
+</body>
+</html>

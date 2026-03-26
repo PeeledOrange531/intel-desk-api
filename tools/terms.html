@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Terms of Service & Privacy Policy — The Intel Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--text-muted:rgba(240,236,228,0.75);--text-dim:rgba(240,236,228,0.50);
+  --accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page{position:relative;z-index:1;max-width:780px;margin:0 auto;padding:60px 48px 80px;}
+
+/* Tab switcher */
+.tab-bar{display:flex;gap:0;margin-bottom:48px;border-bottom:1px solid var(--border);}
+.tab-btn{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.40)!important;background:transparent;border:none;border-bottom:2px solid transparent;padding:12px 24px 14px;cursor:pointer;transition:all 0.2s;margin-bottom:-1px;}
+.tab-btn:hover{color:rgba(240,236,228,0.75)!important;}
+.tab-btn.active{color:#c8a96e!important;border-bottom-color:#c8a96e;}
+
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* Eyebrow */
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+
+h1{font-family:var(--serif);font-size:clamp(36px,5vw,56px);font-weight:300;line-height:1.0;color:#f5f2ec!important;margin-bottom:8px;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+.last-updated{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;margin-bottom:48px;padding-bottom:24px;border-bottom:1px solid var(--border);}
+
+/* Doc sections */
+.doc-section{margin-bottom:40px;}
+h2{font-family:var(--serif);font-size:22px;font-weight:400;color:#e8d5a3!important;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--border);}
+h3{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(200,169,110,0.70)!important;margin-bottom:10px;margin-top:20px;}
+p{font-family:var(--mono);font-size:13px;font-weight:400;line-height:1.9;color:rgba(240,236,228,0.68)!important;margin-bottom:14px;}
+ul{list-style:none;padding:0;margin-bottom:14px;}
+ul li{font-family:var(--mono);font-size:13px;font-weight:400;line-height:1.9;color:rgba(240,236,228,0.68)!important;padding:4px 0 4px 20px;position:relative;}
+ul li::before{content:'';position:absolute;left:0;top:13px;width:6px;height:6px;border-radius:50%;background:rgba(200,169,110,0.35);}
+
+@media(max-width:768px){.page{padding:40px 20px 60px;}.tab-btn{padding:10px 14px 12px;font-size:10px;}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Tab bar -->
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="switchTab('privacy')">Privacy Policy</button>
+    <button class="tab-btn" onclick="switchTab('terms')">Terms of Service</button>
+  </div>
+
+  <!-- PRIVACY POLICY -->
+  <div class="tab-panel active" id="tab-privacy">
+    <div class="eyebrow"><span>Legal</span></div>
+    <h1>Privacy <em>Policy</em></h1>
+    <div class="last-updated">Last Updated: March 22, 2026</div>
+
+    <div class="doc-section">
+      <h2>Introduction</h2>
+      <p>This Privacy Policy describes how inteldesk.io ("we," "us," or "our") collects, uses, and protects information when you use our website at inteldesk.io (the "Service"). By using the Service, you agree to the collection and use of information as described in this policy.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Information We Collect</h2>
+      <p>We collect two types of information: information you provide directly, and information collected automatically.</p>
+      <h3>Information You Provide</h3>
+      <ul>
+        <li><strong style="color:#e8d5a3!important">Contact Form Submissions:</strong> When you reach out through our contact form, we collect your name, email address, and the contents of your message.</li>
+        <li><strong style="color:#e8d5a3!important">Email Newsletter Signups:</strong> If you subscribe to our newsletter, we collect your email address and, if provided, your name.</li>
+      </ul>
+      <h3>Information Collected Automatically</h3>
+      <ul>
+        <li><strong style="color:#e8d5a3!important">IP Address:</strong> Used to understand how visitors access our website and to help diagnose technical issues.</li>
+        <li><strong style="color:#e8d5a3!important">Browser Type and Operating System:</strong> Helps us ensure the website functions correctly across different devices and browsers.</li>
+        <li><strong style="color:#e8d5a3!important">Browsing Activity:</strong> We may collect anonymized data on clicks, navigation patterns, geographic location (city/country level), and device type to improve our website.</li>
+        <li><strong style="color:#e8d5a3!important">Cookies:</strong> Small data files stored on your device. See the Cookies section below for details.</li>
+      </ul>
+    </div>
+
+    <div class="doc-section">
+      <h2>How We Use Your Information</h2>
+      <ul>
+        <li>To respond to your inquiries and messages submitted through our contact form</li>
+        <li>To send newsletters and updates you have subscribed to</li>
+        <li>To operate, maintain, and improve the Service</li>
+        <li>To analyze how visitors use the Service</li>
+        <li>To personalize your experience based on your preferences</li>
+        <li>To detect and prevent fraudulent or unauthorized activity</li>
+      </ul>
+    </div>
+
+    <div class="doc-section">
+      <h2>Email Communications</h2>
+      <p>If you subscribe to our newsletter, we will send you periodic updates. You may unsubscribe at any time by clicking the "unsubscribe" link in any email, or by contacting us directly. We do not send unsolicited commercial email and will never sell or rent your email address to third parties.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Cookies and Tracking Technologies</h2>
+      <p>We use cookies and similar tracking technologies to enhance your experience. We use the following types:</p>
+      <ul>
+        <li><strong style="color:#e8d5a3!important">Essential Cookies:</strong> Required for the website to function properly. These cannot be disabled.</li>
+        <li><strong style="color:#e8d5a3!important">Analytics Cookies:</strong> Help us understand how visitors interact with our site. This data is anonymized and aggregated.</li>
+        <li><strong style="color:#e8d5a3!important">Preference Cookies:</strong> Remember your settings and preferences, such as language selection.</li>
+      </ul>
+      <p>You may disable non-essential cookies at any time through your browser settings. Data collected through cookies is retained for up to 12 months.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Data Sharing and Third Parties</h2>
+      <p>We do not sell, trade, or rent your personal information to third parties. We may share your information only in the following limited circumstances:</p>
+      <ul>
+        <li><strong style="color:#e8d5a3!important">Service Providers:</strong> Trusted third-party vendors who assist us in operating the Service, contractually obligated to protect your information.</li>
+        <li><strong style="color:#e8d5a3!important">Legal Requirements:</strong> If required by law or in response to a valid legal request.</li>
+        <li><strong style="color:#e8d5a3!important">Protection of Rights:</strong> Where necessary to protect the rights, property, or safety of inteldesk.io, our users, or others.</li>
+      </ul>
+    </div>
+
+    <div class="doc-section">
+      <h2>Data Retention</h2>
+      <ul>
+        <li>Contact form submissions are retained for up to 24 months.</li>
+        <li>Email newsletter subscriptions are retained until you unsubscribe, removed within 30 days of opt-out.</li>
+        <li>Automatically collected usage data is retained for up to 12 months.</li>
+      </ul>
+    </div>
+
+    <div class="doc-section">
+      <h2>Your Rights and Choices</h2>
+      <ul>
+        <li><strong style="color:#e8d5a3!important">Access:</strong> You may request a copy of the personal information we hold about you.</li>
+        <li><strong style="color:#e8d5a3!important">Correction:</strong> You may request that we correct inaccurate or incomplete information.</li>
+        <li><strong style="color:#e8d5a3!important">Deletion:</strong> You may request that we delete your personal information, subject to certain legal limitations.</li>
+        <li><strong style="color:#e8d5a3!important">Opt-Out:</strong> You may unsubscribe from our email communications at any time.</li>
+      </ul>
+      <p>To exercise any of these rights, please contact us. We will respond within 30 days.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Children's Privacy</h2>
+      <p>The Service is not directed to children under the age of 13. We do not knowingly collect personal information from children under 13. If you believe we have inadvertently collected information from a child under 13, please contact us immediately.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Changes to This Policy</h2>
+      <p>We may update this Privacy Policy from time to time. When we do, we will revise the "Last Updated" date at the top of this page. Your continued use of the Service after any changes constitutes your acceptance of the updated policy.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>Contact Us</h2>
+      <p>If you have any questions, concerns, or requests regarding this Privacy Policy, please <a href="https://www.inteldesk.io/contact" style="color:#7eb8e4!important;text-decoration:underline;">contact us here</a>.</p>
+    </div>
+  </div>
+
+  <!-- TERMS OF SERVICE -->
+  <div class="tab-panel" id="tab-terms">
+    <div class="eyebrow"><span>Legal</span></div>
+    <h1>Terms of <em>Service</em></h1>
+    <div class="last-updated">Last Updated: March 22, 2026</div>
+
+    <div class="doc-section">
+      <h2>1. Acceptance of Terms</h2>
+      <p>By accessing or using the website at inteldesk.io (the "Service"), you agree to be bound by these Terms of Service. If you do not agree to these Terms, please do not use the Service. We reserve the right to update these Terms at any time, and your continued use constitutes acceptance of any changes.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>2. Use of the Service</h2>
+      <p>You agree to use the Service only for lawful purposes and in a manner consistent with all applicable laws. You agree not to:</p>
+      <ul>
+        <li>Use the Service in any way that could damage, disable, or impair the Service or interfere with other users' access</li>
+        <li>Attempt to gain unauthorized access to any part of the Service or its related systems</li>
+        <li>Use automated tools (bots, scrapers, crawlers) to extract content without our prior written consent</li>
+        <li>Upload or transmit any viruses, malicious code, or other harmful content</li>
+        <li>Use the Service to distribute spam or unsolicited communications</li>
+        <li>Impersonate any person or entity or misrepresent your affiliation with any person or entity</li>
+      </ul>
+    </div>
+
+    <div class="doc-section">
+      <h2>3. Intellectual Property</h2>
+      <p>All content on the Service — including text, graphics, logos, images, and software — is the property of inteldesk.io or its content suppliers and is protected by applicable copyright, trademark, and intellectual property laws. You may not reproduce, distribute, modify, or create derivative works from any content on the Service without our express written permission.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>4. Contact Forms and Communications</h2>
+      <p>When you submit a message through our contact form or sign up for our newsletter, you represent that the information you provide is accurate and that you have the right to use any email address you submit. You agree not to use our contact channels to submit spam, offensive content, or any content that violates applicable law.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>5. Third-Party Links</h2>
+      <p>The Service may contain links to third-party websites. These links are provided for your convenience only. We have no control over the content or practices of third-party sites and accept no responsibility for them. Visiting any third-party site is at your own risk.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>6. Disclaimers</h2>
+      <p>The Service is provided on an "as is" and "as available" basis without warranties of any kind. We do not warrant that the Service will be uninterrupted, error-free, or free of viruses or other harmful components. We make no warranties regarding the accuracy, completeness, or reliability of any content on the Service.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>7. Limitation of Liability</h2>
+      <p>To the fullest extent permitted by applicable law, inteldesk.io and its owners, employees, and affiliates shall not be liable for any indirect, incidental, special, consequential, or punitive damages arising out of or related to your use of — or inability to use — the Service.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>8. Indemnification</h2>
+      <p>You agree to indemnify and hold harmless inteldesk.io and its owners, employees, and affiliates from and against any claims, liabilities, damages, losses, and expenses arising out of or in any way connected with your use of the Service or your violation of these Terms.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>9. Termination</h2>
+      <p>We reserve the right to suspend or terminate your access to the Service at any time, without notice, for conduct that we determine violates these Terms or is otherwise harmful to other users, us, or third parties.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>10. Changes to These Terms</h2>
+      <p>We may revise these Terms at any time by posting the updated version on this page. Your continued use of the Service after any changes constitutes your acceptance of the new Terms.</p>
+    </div>
+
+    <div class="doc-section">
+      <h2>11. Contact Us</h2>
+      <p>If you have any questions about these Terms, please <a href="https://www.inteldesk.io/contact" style="color:#7eb8e4!important;text-decoration:underline;">contact us here</a>.</p>
+    </div>
+  </div>
+
+</div>
+<script>
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', ['privacy','terms'][i] === id));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id === `tab-${id}`));
+}
+</script>
+</body>
+</html>
