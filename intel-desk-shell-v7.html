@@ -3,589 +3,999 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>URL Intelligence — Link Inspector & Safe Preview | The Intel Desk</title>
-<meta name="description" content="Free URL intelligence tool. Inspect any link safely without visiting it. See full redirect chain, final destination, SSL certificate details, domain age, server info, and screenshot preview. Used by journalists, investigators and security researchers.">
+<title>The Intel Desk — OSINT & Investigative Tools</title>
+<meta name="description" content="Free OSINT and investigative tools for journalists, researchers, and security professionals.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
-  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
-  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
-  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--gray:#666;
+:root {
+  --bg:#050505;--bg2:#0d0d0d;--bg3:#141414;
+  --border:rgba(255,255,255,0.09);--border-hover:rgba(255,255,255,0.22);
+  --text:#f5f2ec;--text-muted:rgba(240,236,228,0.82);--text-dim:rgba(240,236,228,0.55);
+  --accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --sidebar-w:290px;--topbar-h:56px;--ticker-h:34px;
   --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);
+  height:100vh;height:100dvh;overflow:hidden;}
 body *{color:inherit;}
-body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.5;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
   background-repeat:repeat;background-size:256px;}
 
-.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+/* ── SHELL ── */
+.shell{
+  position:fixed;inset:0;z-index:1;
+  display:grid;
+  grid-template-rows:var(--topbar-h) 1fr var(--ticker-h);
+  grid-template-columns:var(--sidebar-w) 1fr;
+  grid-template-areas:
+    "topbar  topbar"
+    "sidebar workspace"
+    "ticker  ticker";
+  height:100vh;height:100dvh;
+}
 
-.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
-.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
-.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
-.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
-.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
-.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+/* ── TOPBAR ── */
+.topbar{
+  grid-area:topbar;
+  background:rgba(8,8,8,0.98);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;
+  padding:0 0 0 0;gap:0;z-index:20;
+}
+.topbar-logo{
+  display:flex;align-items:center;gap:0;
+  flex-shrink:0;
+  padding:0 22px;
+  border-right:1px solid var(--border);
+  height:100%;
+}
+.topbar-logo-text{
+  font-family:var(--serif);font-size:20px;font-weight:400;
+  color:#f5f2ec!important;white-space:nowrap;letter-spacing:0.01em;
+}
+.topbar-logo-text em{font-style:italic;color:#c8a96e!important;}
+.topbar-badge{
+  font-family:var(--mono);font-size:8px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.16em;
+  color:#c8a96e!important;border:1px solid rgba(200,169,110,0.30);
+  padding:3px 8px;margin-left:10px;
+}
+.topbar-search{
+  flex:1;display:flex;align-items:center;
+  padding:0 18px;height:100%;
+  border-right:1px solid var(--border);
+  position:relative;
+}
+.search-icon{position:absolute;left:30px;font-size:13px;color:rgba(240,236,228,0.30)!important;pointer-events:none;}
+.topbar-search input{
+  width:100%;background:transparent;border:none;outline:none;
+  font-family:var(--mono);font-size:13px;font-weight:400;
+  color:#f5f2ec!important;padding:0 0 0 26px;letter-spacing:0.02em;
+}
+.topbar-search input::placeholder{color:rgba(240,236,228,0.28)!important;}
+.search-dropdown{
+  position:absolute;top:calc(100% + 1px);left:0;right:0;
+  background:var(--bg2);border:1px solid var(--border);border-top:none;
+  z-index:100;display:none;
+}
+.search-dropdown.open{display:block;}
+.search-result-item{
+  display:flex;align-items:center;gap:13px;padding:12px 20px;cursor:pointer;
+  border-bottom:1px solid var(--border);transition:background 0.15s;
+}
+.search-result-item:last-child{border-bottom:none;}
+.search-result-item:hover,.search-result-item.focused{background:rgba(200,169,110,0.07);}
+.sr-icon{font-size:15px;flex-shrink:0;width:22px;text-align:center;}
+.sr-name{font-family:var(--mono);font-size:12px;font-weight:500;color:#e8d5a3!important;}
+.sr-desc{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.42)!important;margin-top:2px;}
+.search-empty{padding:16px 20px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.28)!important;text-align:center;}
 
-/* SEO */
-.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
-.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
-.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
-.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
-.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
-.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
-.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
-.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
-.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
-.seo-block p strong{color:#e8d5a3!important;}
-.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
-.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+.topbar-nav{display:flex;align-items:center;flex-shrink:0;height:100%;}
+.topbar-nav a{
+  font-family:var(--mono);font-size:10px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.16em;
+  color:rgba(240,236,228,0.50)!important;text-decoration:none;
+  padding:0 20px;height:100%;display:flex;align-items:center;
+  border-left:1px solid var(--border);transition:color 0.15s,background 0.15s;white-space:nowrap;
+}
+.topbar-nav a:hover{color:#c8a96e!important;background:rgba(200,169,110,0.05);}
+.hamburger{display:none;flex-direction:column;gap:5px;cursor:pointer;padding:0 18px;background:none;border:none;border-left:1px solid var(--border);height:100%;align-items:center;justify-content:center;}
+.hamburger span{display:block;width:18px;height:1.5px;background:rgba(240,236,228,0.45);}
 
-/* INPUT */
-.input-section{padding:clamp(32px,5vw,48px) 0 0;animation:fadeUp 0.6s 0.1s ease both;}
-.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
-.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+/* ── SIDEBAR ── */
+.sidebar{
+  grid-area:sidebar;background:var(--bg2);
+  border-right:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;z-index:5;
+}
+.sidebar-scroll{flex:1;overflow-y:auto;padding:4px 0 8px;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,0.15) transparent;}
+.sidebar-scroll::-webkit-scrollbar{width:3px;}
+.sidebar-scroll::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.15);border-radius:2px;}
 
-.search-row{display:flex;gap:0;flex-wrap:wrap;}
-.url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
-.url-input:focus{border-color:rgba(200,169,110,0.35);}
-.url-input::placeholder{color:rgba(240,236,228,0.25)!important;}
-.btn-inspect{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
-.btn-inspect:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
-.btn-inspect:disabled{opacity:0.5;cursor:not-allowed;}
-.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+.nav-cat{
+  font-family:var(--mono);font-size:9px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.22em;
+  color:rgba(240,236,228,0.35)!important;
+  padding:12px 18px 8px;
+  display:flex;align-items:center;gap:10px;
+  cursor:pointer;
+  user-select:none;
+  transition:color 0.15s;
+  border-bottom:1px solid var(--border);
+  margin-top:1px;
+  position:relative;
+}
+.nav-cat:hover{color:rgba(240,236,228,0.60)!important;}
+.nav-cat.open{color:#c8a96e!important;border-bottom-color:rgba(200,169,110,0.15);}
+.nav-cat-arrow{
+  margin-left:auto;
+  font-size:10px;
+  color:rgba(240,236,228,0.20)!important;
+  transition:transform 0.2s;
+  line-height:1;
+}
+.nav-cat.open .nav-cat-arrow{transform:rotate(90deg);color:rgba(200,169,110,0.50)!important;}
+.nav-cat-tools{
+  overflow:hidden;
+  max-height:0;
+  transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1);
+}
+.nav-cat-tools.open{max-height:600px;}
+/* Tool count badge on category */
+.nav-cat-count{
+  font-size:8px;
+  background:rgba(255,255,255,0.05);
+  color:rgba(240,236,228,0.25)!important;
+  padding:1px 6px;
+  border-radius:8px;
+  margin-left:2px;
+}
+.nav-cat.open .nav-cat-count{
+  background:rgba(200,169,110,0.12);
+  color:rgba(200,169,110,0.55)!important;
+}
 
-/* LOADING */
-.loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
-.loading-bar.visible{display:block;}
-.loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
-@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+.tool-btn{
+  width:100%;background:transparent;border:none;border-left:2px solid transparent;
+  cursor:pointer;text-align:left;display:flex;align-items:center;
+  transition:background 0.15s,border-color 0.15s;position:relative;
+}
+.tool-btn:hover{background:rgba(255,255,255,0.03);}
+.tool-btn.active{background:rgba(200,169,110,0.07);border-left-color:var(--accent);}
+.tool-btn.soon{opacity:0.42;cursor:default;}
+.tool-btn.soon:hover{background:transparent;}
 
-/* RESULTS */
-.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(32px,5vw,48px);animation:fadeUp 0.4s ease both;}
-.results-wrap.visible{display:flex;}
+.tool-btn-inner{display:flex;align-items:center;gap:12px;padding:10px 16px 10px 14px;width:100%;}
+.tool-icon{width:32px;height:32px;border:1px solid rgba(255,255,255,0.09);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:var(--bg);transition:all 0.15s;}
+.tool-btn.active .tool-icon{border-color:rgba(200,169,110,0.35);background:rgba(200,169,110,0.09);}
+.tool-btn:hover:not(.soon) .tool-icon{border-color:var(--border-hover);}
+.tool-info{display:flex;flex-direction:column;gap:2px;min-width:0;}
+.tool-name{font-family:var(--mono);font-size:11px;font-weight:500;color:rgba(240,236,228,0.75)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:color 0.15s;}
+.tool-btn.active .tool-name,.tool-btn:hover:not(.soon) .tool-name{color:#e8d5a3!important;}
+.tool-desc{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,0.35)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tool-btn.active .tool-desc{color:rgba(200,169,110,0.50)!important;}
+.tool-btn.active::after{content:'';position:absolute;right:12px;top:50%;transform:translateY(-50%);width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 7px var(--accent);}
+.soon-badge{font-family:var(--mono);font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.22)!important;border:1px solid rgba(255,255,255,0.07);padding:1px 6px;margin-left:auto;flex-shrink:0;}
 
-/* Verdict */
-.verdict-banner{padding:20px 24px;display:flex;align-items:center;gap:16px;border:1px solid;flex-wrap:wrap;}
-.verdict-banner.safe{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
-.verdict-banner.warn{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
-.verdict-banner.danger{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.25);}
-.verdict-banner.neutral{background:var(--bg2);border-color:var(--border);}
-.verdict-icon{font-size:24px;flex-shrink:0;}
-.verdict-text{flex:1;min-width:200px;}
-.verdict-title{font-family:var(--serif);font-size:clamp(18px,3vw,24px);font-weight:300;color:#f5f2ec!important;margin-bottom:4px;}
-.verdict-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;line-height:1.7;word-break:break-all;}
+/* ── WORKSPACE ── */
+.workspace{grid-area:workspace;position:relative;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;}
 
-/* Two-col layout */
-.two-col{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+/* WELCOME SCREEN */
+.welcome{
+  position:absolute;inset:0;
+  display:flex;flex-direction:column;
+  overflow:hidden;
+  animation:fadeIn 0.5s ease both;
+}
+.welcome.hidden{display:none;}
 
-/* Screenshot panel */
-.screenshot-panel{background:var(--bg2);border:1px solid var(--border);display:flex;flex-direction:column;}
-.panel-header{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.40)!important;padding:12px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
-.screenshot-wrap{flex:1;min-height:240px;background:#0a0a0a;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;}
-.screenshot-wrap img{width:100%;object-fit:cover;object-position:top;display:block;}
-.screenshot-loading{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;padding:32px;}
-.screenshot-domain{font-family:var(--mono);font-size:11px;color:#c8a96e!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;}
+/* Background pattern */
+.welcome-bg{
+  position:absolute;inset:0;
+  background:
+    linear-gradient(135deg, rgba(200,169,110,0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 70% 50%, rgba(200,169,110,0.04) 0%, transparent 60%);
+}
+.welcome-grid-bg{
+  position:absolute;inset:0;
+  background-image:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+  background-size:48px 48px;
+  mask-image:radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
 
-/* Summary cards */
-.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--border);}
-.summary-card{background:var(--bg2);padding:20px 22px;display:flex;flex-direction:column;gap:6px;}
-.summary-card-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.40)!important;}
-.summary-card-value{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;line-height:1.4;word-break:break-all;}
-.summary-card-value.accent{color:#e8d5a3!important;}
-.summary-card-value.green{color:#4ec994!important;}
-.summary-card-value.warn{color:#e87b4a!important;}
-.summary-card-value.red{color:#c0392b!important;}
-.summary-card-value.dim{color:rgba(240,236,228,0.35)!important;}
+.welcome-content{
+  position:relative;z-index:1;
+  display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  flex:1;
+  padding:48px;
+  gap:32px;
+}
 
-/* Redirect chain */
-.chain-panel{background:var(--bg2);border:1px solid var(--border);}
-.chain-step{display:flex;align-items:flex-start;gap:14px;padding:14px 20px;border-bottom:1px solid var(--border);position:relative;}
-.chain-step:last-child{border-bottom:none;}
-.chain-line{position:absolute;left:28px;top:40px;bottom:-14px;width:1px;background:var(--border);}
-.chain-step:last-child .chain-line{display:none;}
-.chain-num{width:24px;height:24px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.40)!important;flex-shrink:0;margin-top:1px;}
-.chain-num.redirect{border-color:rgba(232,123,74,0.40);color:#e87b4a!important;}
-.chain-num.final{border-color:rgba(78,201,148,0.40);color:#4ec994!important;}
-.chain-num.error{border-color:rgba(192,57,43,0.40);color:#c0392b!important;}
-.chain-url{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.70)!important;word-break:break-all;line-height:1.5;flex:1;}
-.chain-url strong{color:#e8d5a3!important;font-weight:500;}
-.chain-badge{font-family:var(--mono);font-size:10px;font-weight:500;padding:2px 8px;border:1px solid;border-radius:2px;flex-shrink:0;white-space:nowrap;}
-.chain-badge.r301,.chain-badge.r302,.chain-badge.r307,.chain-badge.r308{color:#e87b4a!important;border-color:rgba(232,123,74,0.3);}
-.chain-badge.r200{color:#4ec994!important;border-color:rgba(78,201,148,0.3);}
-.chain-badge.error{color:#c0392b!important;border-color:rgba(192,57,43,0.3);}
+.welcome-eyebrow{
+  display:flex;align-items:center;gap:16px;
+}
+.welcome-eyebrow::before,.welcome-eyebrow::after{content:'';display:block;width:48px;height:1px;background:rgba(200,169,110,0.25);}
+.welcome-eyebrow span{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.24em;color:rgba(200,169,110,0.55)!important;}
 
-/* SSL panel */
-.ssl-panel{background:var(--bg2);border:1px solid var(--border);}
-.ssl-valid{display:flex;align-items:center;gap:10px;padding:16px 20px;border-bottom:1px solid var(--border);}
-.ssl-icon{font-size:18px;}
-.ssl-status-text{font-family:var(--mono);font-size:13px;font-weight:500;}
-.ssl-status-text.valid{color:#4ec994!important;}
-.ssl-status-text.invalid{color:#c0392b!important;}
-.ssl-status-text.unknown{color:rgba(240,236,228,0.40)!important;}
-.ssl-rows{padding:0;}
-.ssl-row{display:flex;gap:12px;padding:10px 20px;border-bottom:1px solid var(--border);}
-.ssl-row:last-child{border-bottom:none;}
-.ssl-row-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.35)!important;width:120px;flex-shrink:0;padding-top:1px;}
-.ssl-row-value{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.70)!important;flex:1;line-height:1.6;word-break:break-all;}
-.ssl-row-value.warn{color:#e87b4a!important;}
-.ssl-row-value.green{color:#4ec994!important;}
+.welcome-title{
+  font-family:var(--serif);
+  font-size:clamp(52px,7vw,96px);
+  font-weight:300;line-height:0.9;
+  text-align:center;color:#f5f2ec!important;
+}
+.welcome-title em{font-style:italic;color:#e8d5a3!important;}
 
-/* External checks */
-.ext-panel{background:var(--bg2);border:1px solid var(--border);padding:20px 24px;}
-.ext-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.40)!important;margin-bottom:14px;}
-.ext-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:2px;}
-.ext-link{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.55)!important;border:1px solid var(--border);padding:12px 16px;text-decoration:none;display:flex;align-items:center;justify-content:space-between;transition:all 0.15s;background:var(--bg3);}
-.ext-link:hover{color:#e8d5a3!important;border-color:rgba(200,169,110,0.3);background:var(--accent-dim);}
-.ext-link-arrow{color:rgba(200,169,110,0.35)!important;font-size:10px;}
+.welcome-sub{
+  font-family:var(--mono);font-size:13px;font-weight:400;
+  color:rgba(240,236,228,0.50)!important;
+  text-align:center;max-width:520px;line-height:1.9;
+}
 
-/* Terminal */
-.terminal-wrap{border:1px solid var(--border);}
-.terminal-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;}
-.terminal-dots{display:flex;gap:7px;}
-.dot{width:11px;height:11px;border-radius:50%;}
-.dot-red{background:#5a2020;}.dot-yellow{background:#5a4a20;}.dot-green{background:#1e4a2e;}
-.terminal-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;}
-.terminal-body{background:#050505!important;padding:24px 28px;font-family:var(--mono);font-size:12px;line-height:1.8;overflow-x:auto;}
-.t-cmd{color:#c8a96e!important;}.t-found{color:#4ec994!important;}.t-warn{color:#e87b4a!important;}
-.t-error{color:#c0392b!important;}.t-key{color:#e8d5a3!important;}.t-dim{color:rgba(240,236,228,0.35)!important;}
-.t-text{color:rgba(240,236,228,0.70)!important;}
-.t-cursor{display:inline-block;width:7px;height:13px;background:#c8a96e;vertical-align:middle;animation:blink 1.1s step-end infinite;}
+/* Stats row */
+.welcome-stats{
+  display:flex;gap:0;background:var(--border);
+  border:1px solid var(--border);
+}
+.welcome-stat{
+  padding:14px 32px;background:var(--bg2);
+  display:flex;flex-direction:column;gap:4px;align-items:center;
+  border-right:1px solid var(--border);
+}
+.welcome-stat:last-child{border-right:none;}
+.ws-num{font-family:var(--serif);font-size:36px;font-weight:300;color:#c8a96e!important;line-height:1;}
+.ws-lbl{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.35)!important;}
 
-.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
-.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
-.footer-left strong{color:#c8a96e!important;}
-.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+/* Divider line */
+.welcome-divider{
+  width:1px;height:60px;
+  background:linear-gradient(to bottom, transparent, rgba(200,169,110,0.3), transparent);
+}
 
-@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
-@keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
+/* CTA hint */
+.welcome-cta{
+  display:flex;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:11px;font-weight:500;
+  color:rgba(240,236,228,0.30)!important;
+  text-transform:uppercase;letter-spacing:0.16em;
+}
+.welcome-cta::before,.welcome-cta::after{content:'';display:block;width:24px;height:1px;background:rgba(255,255,255,0.10);}
 
+/* Category chips */
+.welcome-cats{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;max-width:600px;}
+.welcome-cat{
+  font-family:var(--mono);font-size:10px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.12em;
+  color:rgba(240,236,228,0.35)!important;
+  border:1px solid rgba(255,255,255,0.07);
+  padding:6px 14px;background:var(--bg2);
+  transition:all 0.15s;cursor:default;
+}
+
+/* SEO ACCORDION */
+/* SEO ACCORDION — clamped preview with expand */
+.seo-acc-wrap{flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg3);}
+.seo-preview{
+  padding:10px 24px;
+  display:flex;align-items:flex-start;gap:16px;
+  cursor:pointer;
+  position:relative;
+}
+.seo-preview-text{
+  font-family:var(--mono);font-size:12px;line-height:1.8;
+  color:rgba(240,236,228,0.50)!important;
+  flex:1;
+  /* clamp to 2 lines by default */
+  display:-webkit-box;
+  -webkit-line-clamp:2;
+  -webkit-box-orient:vertical;
+  overflow:hidden;
+  transition:all 0.3s;
+}
+.seo-preview-text.expanded{
+  display:block;
+  -webkit-line-clamp:unset;
+  overflow:visible;
+}
+.seo-preview-text strong{color:#e8d5a3!important;font-weight:500;}
+.seo-toggle-btn{
+  font-family:var(--mono);font-size:9px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.14em;
+  color:rgba(200,169,110,0.45)!important;
+  background:transparent;border:1px solid rgba(200,169,110,0.20);
+  padding:3px 10px;cursor:pointer;flex-shrink:0;
+  transition:all 0.15s;white-space:nowrap;margin-top:2px;
+}
+.seo-toggle-btn:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+/* Keep old classes for compat */
+.seo-lbl{display:none;}
+.seo-plus{display:none;}
+.seo-body{display:none;}
+
+/* LOADER */
+.loader{position:absolute;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;transition:opacity 0.25s;}
+.loader.hide{opacity:0;pointer-events:none;}
+.loader-name{font-family:var(--serif);font-size:28px;font-weight:300;color:rgba(240,236,228,0.30)!important;}
+.loader-dots{display:flex;gap:7px;}
+.loader-dots span{width:6px;height:6px;border-radius:50%;background:rgba(200,169,110,0.35);animation:ldot 1.2s ease-in-out infinite;}
+.loader-dots span:nth-child(2){animation-delay:0.2s;}
+.loader-dots span:nth-child(3){animation-delay:0.4s;}
+
+/* IFRAME */
+.tool-iframe{flex:1;border:none;width:100%;background:var(--bg);display:none;min-height:0;}
+.tool-iframe.visible{display:block;}
+
+/* ── TICKER ── */
+.ticker{
+  grid-area:ticker;
+  background:rgba(8,8,8,0.98);
+  border-top:1px solid var(--border);
+  display:flex;align-items:center;
+  overflow:hidden;
+  z-index:10;
+  gap:0;
+}
+.ticker-segment{
+  display:flex;align-items:center;
+  padding:0 20px;height:100%;
+  border-right:1px solid var(--border);
+  flex-shrink:0;gap:10px;
+}
+.ticker-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.28)!important;}
+.ticker-value{font-family:var(--mono);font-size:11px;font-weight:500;color:#c8a96e!important;}
+.ticker-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse-dot 2s ease-in-out infinite;flex-shrink:0;}
+
+.ticker-scroll-wrap{flex:1;overflow:hidden;position:relative;height:100%;}
+.ticker-scroll-inner{
+  display:flex;align-items:center;height:100%;
+  white-space:nowrap;
+  animation:tickerScroll 40s linear infinite;
+}
+.ticker-scroll-inner:hover{animation-play-state:paused;}
+.ticker-item{
+  font-family:var(--mono);font-size:10px;font-weight:400;
+  color:rgba(240,236,228,0.38)!important;
+  padding:0 32px;
+  display:inline-flex;align-items:center;gap:10px;
+  border-right:1px solid rgba(255,255,255,0.05);
+}
+.ticker-item strong{color:rgba(200,169,110,0.65)!important;font-weight:500;}
+.ticker-item .ti-dot{width:4px;height:4px;border-radius:50%;background:rgba(200,169,110,0.30);flex-shrink:0;}
+
+@keyframes tickerScroll{from{transform:translateX(0);}to{transform:translateX(-50%);}}
+@keyframes pulse-dot{0%,100%{opacity:1;box-shadow:0 0 6px var(--green);}50%{opacity:0.4;box-shadow:0 0 2px var(--green);}}
+@keyframes fadeIn{from{opacity:0;}to{opacity:1;}}
+@keyframes ldot{0%,100%{opacity:0.2;}50%{opacity:1;}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px);}to{opacity:1;transform:translateY(0);}}
+
+/* MOBILE */
 /* ── MOBILE ── */
 @media(max-width:768px){
-  .two-col{grid-template-columns:1fr!important;}
-  .url-input{border-right:1px solid var(--border);min-width:100%;}
-  .btn-inspect{width:100%;margin-top:2px;}
-  .ext-grid{grid-template-columns:1fr 1fr;}
-  .seo-block-header{padding:10px 16px;}
-  .seo-block-body{padding:0 16px 14px;}
-  .footer-right{text-align:left;max-width:100%;}
-  .chain-step{gap:10px;}
-  .ssl-row{flex-direction:column;gap:4px;}
-  .ssl-row-label{width:auto;}
-  .terminal-body{font-size:11px;padding:16px;}
+  :root{--topbar-h:52px;--ticker-h:30px;--sidebar-w:0px;}
+
+  .shell{
+    grid-template-columns:1fr;
+    grid-template-areas:"topbar" "workspace" "ticker";
+  }
+
+  /* Sidebar slides in over content */
+  .sidebar{
+    position:fixed;
+    top:var(--topbar-h);left:0;
+    bottom:var(--ticker-h);
+    width:min(290px,85vw);
+    transform:translateX(-100%);
+    transition:transform 0.28s cubic-bezier(0.4,0,0.2,1);
+    z-index:30;
+    box-shadow:4px 0 24px rgba(0,0,0,0.6);
+  }
+  .sidebar.open{transform:translateX(0);}
+
+  /* Overlay behind open sidebar */
+  .sidebar-overlay{
+    display:none;
+    position:fixed;inset:0;
+    background:rgba(0,0,0,0.55);
+    z-index:29;
+    top:var(--topbar-h);
+    bottom:var(--ticker-h);
+  }
+  .sidebar-overlay.visible{display:block;}
+
+  /* Topbar */
+  .hamburger{display:flex;}
+  .topbar-logo-text{font-size:16px;}
+  .topbar-badge{display:none;}
+  .topbar-nav a{padding:0 10px;font-size:8px;letter-spacing:0.10em;}
+  .topbar-search{padding:0 12px;border-right:none;}
+
+  /* Workspace fills full height */
+  .workspace{min-height:0;}
+
+  /* Tool iframe — allow scrolling inside */
+  .tool-iframe{
+    -webkit-overflow-scrolling:touch;
+  }
+
+  /* Welcome screen */
+  .welcome-content{padding:24px 20px;gap:20px;}
+  .welcome-title{font-size:clamp(40px,12vw,72px);}
+  .welcome-sub{font-size:12px;padding:0 8px;}
+  .welcome-stats{
+    flex-wrap:wrap;
+    width:100%;
+  }
+  .welcome-stat{
+    flex:1 1 40%;
+    padding:12px 16px;
+    min-width:120px;
+  }
+  .ws-num{font-size:28px;}
+  .welcome-cats{display:none;}
+  .welcome-eyebrow{margin-bottom:0;}
+  .welcome-cta{font-size:9px;}
+
+  /* SEO accordion */
+  .seo-acc-wrap{flex-shrink:0;}
+  .seo-preview{padding:8px 16px;}
+
+  /* Ticker — simplified */
+  .ticker-segment:last-child{display:none;}
+  .ticker-label{font-size:8px;}
+  .ticker-value{font-size:10px;}
+
+  /* Search dropdown full width */
+  .search-dropdown{left:-1px;right:-1px;}
+
+  /* Loader */
+  .loader-name{font-size:20px;}
 }
-@media(max-width:480px){
-  .ext-grid{grid-template-columns:1fr;}
-  .summary-grid{grid-template-columns:1fr 1fr;}
+
+/* Extra small phones */
+@media(max-width:380px){
+  .topbar-nav{display:none;}
+  .welcome-stat{flex:1 1 100%;}
 }
 </style>
 </head>
 <body>
-<div class="page-wrap">
+<div class="shell">
 
-  <section class="hero">
-    <div class="eyebrow"><span>Network Intelligence</span></div>
-    <h1>URL <em>Intelligence</em></h1>
-  </section>
-
-  <div class="seo-block">
-    <div class="seo-block-header" onclick="toggleSEO()">
-      <div class="seo-block-label">What This Tool Does</div>
-      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+  <!-- TOPBAR -->
+  <header class="topbar">
+    <div class="topbar-logo">
+      <span class="topbar-logo-text">The <em>Intel</em> Desk</span>
+      <span class="topbar-badge">OSINT Suite</span>
     </div>
-    <div class="seo-block-body" id="seoBlockBody">
-      <p>Every URL carries far more information than its surface appearance suggests — and visiting it directly exposes you to tracking pixels, fingerprinting scripts, and potential malware. This tool inspects any URL safely without you visiting it. It follows the full <strong>redirect chain</strong> step by step, revealing every intermediate destination before reaching the final URL — critical for exposing shortened links, affiliate redirects, and deceptive phishing chains. It returns the <strong>final destination domain</strong>, <strong>HTTP status codes</strong>, <strong>server technology</strong>, <strong>response time</strong>, and a full <strong>SSL certificate inspection</strong> including issuer, validity window, and Subject Alternative Names. A <strong>screenshot preview</strong> shows what the page actually looks like. One-click links open the URL against <strong>VirusTotal, URLScan.io, Google Safe Browsing, URLhaus, and Sucuri</strong> for threat analysis. Used by <strong>journalists verifying source links</strong>, <strong>investigators tracing phishing infrastructure</strong>, <strong>security researchers analysing malicious links</strong>, and <strong>anyone who receives a suspicious link</strong>.</p>
-      <div class="seo-tags">
-        <span class="seo-tag">URL Inspector</span><span class="seo-tag">Link Preview</span>
-        <span class="seo-tag">Redirect Chain</span><span class="seo-tag">SSL Certificate</span>
-        <span class="seo-tag">Phishing Detection</span><span class="seo-tag">OSINT</span>
-        <span class="seo-tag">Safe Browsing</span><span class="seo-tag">Link Expander</span>
+    <div class="topbar-search" id="searchWrap">
+      <span class="search-icon">⌕</span>
+      <input type="text" id="searchInput" placeholder="Search tools…" autocomplete="off" spellcheck="false"
+        oninput="onSearch(this.value)" onkeydown="searchKey(event)" onfocus="openSearch()">
+      <div class="search-dropdown" id="searchDropdown"></div>
+    </div>
+    <nav class="topbar-nav">
+      <a href="#" onclick="loadPage('faq');return false;">FAQ</a>
+      <a href="#" onclick="loadPage('terms');return false;">Terms</a>
+      <a href="#" onclick="loadPage('contact');return false;">Contact</a>
+    </nav>
+    <button class="hamburger" onclick="toggleSidebar()"><span></span><span></span><span></span></button>
+  </header>
+
+  <!-- SIDEBAR OVERLAY -->
+  <div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <nav class="sidebar" id="sidebar">
+    <div class="sidebar-scroll" id="sidebarScroll"></div>
+  </nav>
+
+  <!-- WORKSPACE -->
+  <main class="workspace" id="workspace">
+
+    <!-- Welcome screen -->
+    <div class="welcome" id="welcome">
+      <div class="welcome-bg"></div>
+      <div class="welcome-grid-bg"></div>
+      <div class="welcome-content">
+        <div class="welcome-eyebrow"><span>Open Source Intelligence</span></div>
+        <div class="welcome-title">The <em>Intel</em><br>Desk</div>
+        <div class="welcome-sub">
+          A professional suite of investigative tools for journalists,<br>
+          security researchers, and intelligence analysts.
+        </div>
+        <div class="welcome-stats" id="welcomeStats"></div>
+        <div class="welcome-cta">Select a tool from the sidebar</div>
+        <div class="welcome-cats" id="welcomeCats"></div>
       </div>
+    </div>
+
+    <!-- SEO accordion — hidden until tool loaded -->
+    <div class="seo-acc-wrap" id="seoAcc" style="display:none">
+      <div class="seo-preview" id="seoPreview">
+        <div class="seo-preview-text" id="seoBody"></div>
+        <button class="seo-toggle-btn" id="seoToggle" onclick="toggleSEO()">Read more</button>
+      </div>
+    </div>
+
+    <!-- Loader -->
+    <div class="loader hide" id="loader" style="display:none">
+      <div class="loader-name" id="loaderName">Loading</div>
+      <div class="loader-dots"><span></span><span></span><span></span></div>
+    </div>
+
+    <!-- Iframe -->
+    <iframe class="tool-iframe" id="toolFrame"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+    ></iframe>
+
+  </main>
+
+  <!-- TICKER -->
+  <div class="ticker" id="ticker">
+    <div class="ticker-segment">
+      <div class="ticker-dot"></div>
+      <span class="ticker-label">Live</span>
+      <span class="ticker-value" id="tickerTools">—</span>
+      <span class="ticker-label">Tools</span>
+    </div>
+    <div class="ticker-segment">
+      <span class="ticker-label">Datasets</span>
+      <span class="ticker-value" id="tickerDatasets">—</span>
+    </div>
+    <div class="ticker-scroll-wrap">
+      <div class="ticker-scroll-inner" id="tickerScroll"></div>
     </div>
   </div>
 
-  <!-- INPUT -->
-  <section class="input-section">
-    <div class="section-label">Enter URL to Inspect</div>
-    <div class="search-row">
-      <input type="text" class="url-input" id="urlInput"
-        placeholder="e.g. https://bit.ly/example  or  inteldesk.io"
-        autocomplete="off" spellcheck="false"
-        onkeydown="if(event.key==='Enter')inspect()">
-      <button class="btn-inspect" id="btnInspect" onclick="inspect()">Inspect →</button>
-    </div>
-    <div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
-    <div class="input-hint">URL is inspected server-side — you never visit the link · Supports http:// and https://</div>
-  </section>
-
-  <!-- RESULTS -->
-  <div class="results-wrap" id="resultsWrap">
-
-    <div class="verdict-banner neutral" id="verdictBanner">
-      <div class="verdict-icon" id="verdictIcon"></div>
-      <div class="verdict-text">
-        <div class="verdict-title" id="verdictTitle"></div>
-        <div class="verdict-sub" id="verdictSub"></div>
-      </div>
-    </div>
-
-    <!-- Screenshot + Summary -->
-    <div class="two-col">
-      <div class="screenshot-panel">
-        <div class="panel-header">
-          <span>Page Preview</span>
-          <span class="screenshot-domain" id="screenshotDomain"></span>
-        </div>
-        <div class="screenshot-wrap" id="screenshotWrap">
-          <div class="screenshot-loading">Loading screenshot…</div>
-        </div>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <div class="summary-grid" id="summaryGrid"></div>
-      </div>
-    </div>
-
-    <!-- Redirect chain -->
-    <div class="chain-panel" id="chainPanel">
-      <div class="panel-header">Redirect Chain</div>
-      <div id="chainSteps"></div>
-    </div>
-
-    <!-- SSL -->
-    <div class="ssl-panel" id="sslPanel">
-      <div class="ssl-valid" id="sslValid"></div>
-      <div class="ssl-rows" id="sslRows"></div>
-    </div>
-
-    <!-- External threat checks -->
-    <div class="ext-panel">
-      <div class="ext-title">Threat Intelligence — Check Against External Sources</div>
-      <div class="ext-grid" id="extGrid"></div>
-    </div>
-
-    <!-- Terminal -->
-    <div class="terminal-wrap">
-      <div class="terminal-bar">
-        <div class="terminal-dots">
-          <div class="dot dot-red"></div>
-          <div class="dot dot-yellow"></div>
-          <div class="dot dot-green"></div>
-        </div>
-        <div class="terminal-label" id="termLabel">intel-desk — url-intelligence</div>
-      </div>
-      <div class="terminal-body" id="termBody"></div>
-    </div>
-
-  </div>
-
-  <footer class="footer">
-    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
-    <div class="footer-right">Redirect chain and SSL inspection via Intel Desk proxy. Screenshots via thum.io. Threat links open external services in new tabs.</div>
-  </footer>
 </div>
-
 <script>
-const PROXY = 'https://intel-desk-api.onrender.com';
+// ── TOOL REGISTRY ─────────────────────────────────────────────────────────────
+const BASE = 'https://peeledorange531.github.io/intel-desk-api/tools';
+const PAGES_BASE = 'https://peeledorange531.github.io/intel-desk-api/tools';
 
-function toggleSEO(){
-  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
-  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
-}
-function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function lnH(cls,h){return `<div class="t-${cls}">${h}</div>`;}
-function ln(cls,t){return lnH(cls,esc(t));}
-function div(){return `<div class="t-dim">────────────────────────────────────────────────</div>`;}
-function blank(){return `<div>&nbsp;</div>`;}
-
-function setLoading(on){
-  document.getElementById('loadingBar').classList.toggle('visible',on);
-  document.getElementById('btnInspect').disabled = on;
-  document.getElementById('btnInspect').textContent = on ? 'Inspecting…' : 'Inspect →';
-}
-
-// Screenshot services — tried in order, first to load wins
-const SCREENSHOT_SERVICES = [
-  u => `https://image.thum.io/get/width/680/crop/800/noanimate/${encodeURIComponent(u)}`,
-  u => `https://api.screenshotmachine.com?key=&url=${encodeURIComponent(u)}&dimension=1024x768&format=png&timeout=200`,
-  u => `https://shot.screenshotapi.net/screenshot?url=${encodeURIComponent(u)}&width=1024&height=768&output=image&file_type=png`,
+const CATEGORIES = [
+  {
+    id: 'email-comms',
+    label: 'Email & Communications',
+    tools: [
+      {
+        id:'email', icon:'✉️', live:true,
+        name:'Email Header Analyzer',
+        desc:'Trace server hops, detect spoofing',
+        url:`${BASE}/email-header-analyzer.html`,
+        datasets: 0,
+        seo:`Every email carries a hidden trail of metadata. This tool decodes raw email headers to <strong>trace the full server hop chain</strong>, extract <strong>originating IP addresses</strong>, and evaluate <strong>SPF, DKIM, and DMARC</strong> authentication. Detects spoofing, phishing, and business email compromise.`,
+      },
+      {
+        id:'email-intel', icon:'📧', live:true,
+        name:'Email Intelligence',
+        desc:'Account discovery across 120+ platforms',
+        url:`${BASE}/email-intelligence.html`,
+        datasets: 120,
+        seo:`Check if an email address is registered across 120+ platforms using Holehe. Results stream live — no API key required.`,
+      },
+    ],
+  },
+  {
+    id: 'documents',
+    label: 'Documents & Files',
+    tools: [
+      {
+        id:'exif', icon:'📷', live:true,
+        name:'EXIF Data Extractor',
+        desc:'GPS, camera data & image metadata',
+        url:`${BASE}/exif-extractor.html`,
+        datasets: 0,
+        seo:`Every photograph contains hidden <strong>EXIF metadata</strong> — camera model, settings, timestamp, and <strong>precise GPS coordinates</strong>. This tool extracts all metadata and plots any GPS location on an interactive dark map.`,
+      },
+      {
+        id:'docs', icon:'📄', live:true,
+        name:'PDF & DOCX Metadata',
+        desc:'Author, timestamps & revision history',
+        url:`${BASE}/metadata-extractor.html`,
+        datasets: 0,
+        seo:`PDF and Word documents carry hidden metadata — <strong>original author name</strong>, <strong>creator software</strong>, <strong>timestamps</strong>, and a full <strong>revision history timeline</strong>. Flags forensic anomalies including date paradoxes and software fingerprint conflicts.`,
+      },
+    ],
+  },
+  {
+    id: 'compliance',
+    label: 'Compliance & Sanctions',
+    tools: [
+      {
+        id:'sanctions', icon:'🔍', live:true,
+        name:'Sanctions Checker',
+        desc:'OFAC · UN · EU · UK simultaneous screen',
+        url:`${BASE}/sanctions-checker-FINAL.html`,
+        datasets: 4,
+        seo:`Screen any name against four official government databases simultaneously — <strong>OFAC SDN</strong>, <strong>UN Security Council</strong>, <strong>EU Consolidated</strong>, and <strong>UK FCDO Sanctions List</strong>. Returns match confidence scores, entity type, and aliases.`,
+      },
+    ],
+  },
+  {
+    id: 'geospatial',
+    label: 'Geospatial',
+    tools: [
+      {
+        id:'coords', icon:'🌐', live:true,
+        name:'Coordinate Converter',
+        desc:'DD · DMS · DDM · MGRS · UTM · W3W',
+        url:`${BASE}/coordinate-converter.html`,
+        datasets: 0,
+        seo:`Convert between every major coordinate format — <strong>Decimal Degrees</strong>, <strong>DMS</strong>, <strong>DDM</strong>, <strong>MGRS</strong>, <strong>UTM</strong>, <strong>USNG</strong>, and <strong>what3words</strong>. Supports bidirectional what3words conversion.`,
+      },
+      {
+        id:'sun-shadow', icon:'☀️', live:true,
+        name:'Sun & Shadow Calculator',
+        desc:'Verify photo timestamps via sun angle',
+        url:`${BASE}/sun-shadow.html`,
+        datasets: 0,
+        seo:`Calculate the sun's exact azimuth, elevation, shadow direction and length ratio for any location, date and time. Verify or disprove claimed photo timestamps using solar geometry. Used by journalists and forensic investigators.`,
+      },
+      {
+        id:'timezone', icon:'🕐', live:true,
+        name:'World Timezone Converter',
+        desc:'Convert & compare times across 90+ cities',
+        url:`${BASE}/timezone-converter.html`,
+        datasets: 0,
+        seo:`Convert any time across every major world timezone simultaneously. Build a custom world clock, identify business hour overlaps, and verify whether claimed timestamps are plausible for a given location and time.`,
+      },
+    ],
+  },
+  {
+    id: 'identity',
+    label: 'Identity & People',
+    tools: [
+      {
+        id:'phone-intel', icon:'📱', live:true,
+        name:'Phone Number Intelligence',
+        desc:'Carrier, type, platform scan · live',
+        url:`${BASE}/phone-intelligence.html`,
+        datasets: 5,
+        seo:`Carrier detection, line type, country and region via libphonenumber. Platform scan via Ignorant — checks Instagram, Snapchat and more. Results stream live.`,
+      },
+      {
+        id:'username', icon:'👤', live:true,
+        name:'Username Search',
+        desc:'Sherlock · WhatsMyName · 500+ sites',
+        url:`${BASE}/username-search.html`,
+        datasets: 500,
+        seo:`Search for a username across 300+ platforms with Sherlock or 3000+ sites with Maigret. Found profiles stream live with direct links.`,
+      },
+    ],
+  },
+  {
+    id: 'network',
+    label: 'IP, Domain & Network',
+    tools: [
+      {
+        id:'ip', icon:'🌍', live:true,
+        name:'IP Intelligence',
+        desc:'Geolocation, ASN, VPN & threat score',
+        url:`${BASE}/ip-intelligence.html`,
+        datasets: 2,
+        seo:`Full IP geolocation, ISP, ASN, VPN/proxy/hosting detection. My IP button. One-click links to Shodan, VirusTotal, AbuseIPDB and more.`,
+      },
+      {
+        id:'whois', icon:'🔎', live:true,
+        name:'WHOIS & DNS Lookup',
+        desc:'Registration, expiry & all DNS records',
+        url:`${BASE}/whois-dns.html`,
+        datasets: 1,
+        seo:`Full WHOIS registration data plus live DNS records (A, MX, TXT, NS, CNAME) via Cloudflare DNS-over-HTTPS. No API key required.`,
+      },
+      {
+        id:'url-intel', icon:'🔗', live:true,
+        name:'URL Intelligence',
+        desc:'Redirect chain · SSL · Safe preview',
+        url:`${BASE}/url-intelligence.html`,
+        datasets: 0,
+        seo:`Inspect any URL safely without visiting it. See the full redirect chain, final destination, SSL certificate, server info, and screenshot preview. Check against VirusTotal, URLScan, Safe Browsing and more.`,
+      },
+      {
+        id:'link-extractor', icon:'🕸️', live:true,
+        name:'Link & Content Extractor',
+        desc:'Extract links, emails, phones & socials',
+        url:`${BASE}/link-extractor.html`,
+        datasets: 0,
+        seo:`Fetch any URL and extract all links, email addresses, phone numbers and social media handles from its HTML. Filterable tabs, one-click copy, bulk export.`,
+      },
+    ],
+  },
 ];
 
-function loadScreenshot(url, domain) {
-  const wrap = document.getElementById('screenshotWrap');
-  wrap.innerHTML = '<div class="screenshot-loading">Loading preview…</div>';
+// Flatten live tools for search
+const ALL_TOOLS = CATEGORIES.flatMap(c => c.tools);
+const LIVE_TOOLS = ALL_TOOLS.filter(t => t.live);
+const TOTAL_DATASETS = ALL_TOOLS.reduce((n, t) => n + (t.datasets || 0), 0);
 
-  let tried = 0;
-  function tryNext() {
-    if (tried >= SCREENSHOT_SERVICES.length) {
-      // Final fallback — show favicon + domain info
-      wrap.innerHTML = `
-        <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding:32px;text-align:center;">
-          <img src="https://www.google.com/s2/favicons?domain=${encodeURIComponent(domain)}&sz=64"
-            style="width:48px;height:48px;opacity:0.7;"
-            onerror="this.style.display='none'">
-          <div style="font-family:var(--mono);font-size:13px;color:#e8d5a3">${esc(domain)}</div>
-          <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)">Screenshot unavailable</div>
-          <a href="${esc(url)}" target="_blank" rel="noopener"
-            style="font-family:var(--mono);font-size:10px;color:#7eb8e4;text-transform:uppercase;letter-spacing:0.12em;border:1px solid rgba(126,184,228,0.3);padding:8px 16px;text-decoration:none;">
-            Open link ↗
-          </a>
-        </div>`;
-      return;
-    }
-    const src = SCREENSHOT_SERVICES[tried++](url);
-    const img = new Image();
-    img.onload = () => {
-      wrap.innerHTML = '';
-      img.style.cssText = 'width:100%;display:block;';
-      img.alt = `Preview of ${domain}`;
-      wrap.appendChild(img);
-    };
-    img.onerror = () => tryNext();
-    // Timeout — if no response in 8s, try next
-    setTimeout(() => { if(!img.complete || img.naturalWidth===0) tryNext(); }, 8000);
-    img.src = src;
-  }
-  tryNext();
-}
+// ── BUILD SIDEBAR ─────────────────────────────────────────────────────────────
+let current = null;
 
-async function inspect(){
-  const raw = document.getElementById('urlInput').value.trim();
-  if(!raw){ alert('Please enter a URL.'); return; }
+// Track which categories are open
+const openCats = new Set();
 
-  setLoading(true);
-  document.getElementById('resultsWrap').classList.remove('visible');
+function buildSidebar() {
+  const scroll = document.getElementById('sidebarScroll');
 
-  try {
-    const resp = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(raw)}`);
-    const data = await resp.json();
-
-    if(data.error){
-      showError(data.error);
-      return;
-    }
-
-    renderResults(data, raw);
-  } catch(e){
-    showError('Could not reach inspection server. Please try again.');
-  } finally {
-    setLoading(false);
-  }
-}
-
-function renderResults(d, original){
-  const finalUrl    = d.final_url || original;
-  const finalDomain = d.final_domain || '';
-  const chain       = d.redirect_chain || [];
-  const redirects   = chain.filter(s => [301,302,303,307,308].includes(s.status_code));
-  const status      = d.status_code;
-  const ssl         = d.ssl;
-
-  // ── Verdict ──
-  let verdictCls = 'neutral', verdictIcon = '🔍', verdictTitle = '', verdictSub = '';
-
-  const hasRedirects = redirects.length > 0;
-  const domainChanged = original.replace(/^https?:\/\//,'').split('/')[0] !==
-                        finalDomain.split(':')[0];
-  const sslInvalid  = ssl && ssl.valid === false;
-  const sslMissing  = finalUrl.startsWith('http://');
-
-  if(sslInvalid || sslMissing){
-    verdictCls = 'danger'; verdictIcon = '⚠️';
-    verdictTitle = sslInvalid ? 'SSL Certificate Invalid' : 'No HTTPS — Unencrypted Connection';
-    verdictSub = sslInvalid
-      ? `SSL error: ${ssl.error} · Connection to this URL may be unsafe`
-      : `${finalDomain} does not use HTTPS · Traffic is unencrypted · Do not submit sensitive data`;
-  } else if(hasRedirects && domainChanged){
-    verdictCls = 'warn'; verdictIcon = '↪️';
-    verdictTitle = `Redirects to a different domain`;
-    verdictSub = `Original: ${original.split('/')[2] || original} → Final: ${finalDomain} · ${chain.length} hop${chain.length!==1?'s':''}`;
-  } else if(hasRedirects){
-    verdictCls = 'warn'; verdictIcon = '↪️';
-    verdictTitle = `${redirects.length} redirect${redirects.length!==1?'s':''} detected`;
-    verdictSub = `Stays on ${finalDomain} · Final status: ${status}`;
-  } else if(ssl && ssl.valid === true){
-    verdictCls = 'safe'; verdictIcon = '🔒';
-    verdictTitle = `Valid HTTPS · No redirects`;
-    verdictSub = `${finalDomain} · SSL issued by ${ssl.issuer?.organizationName || ssl.issuer?.commonName || '—'}`;
-  } else {
-    verdictTitle = `Inspection complete`;
-    verdictSub = finalUrl;
+  // Auto-open the category containing the active tool (or first cat by default)
+  if(openCats.size === 0) {
+    openCats.add(CATEGORIES[0].id);
   }
 
-  const banner = document.getElementById('verdictBanner');
-  banner.className = `verdict-banner ${verdictCls}`;
-  document.getElementById('verdictIcon').textContent = verdictIcon;
-  document.getElementById('verdictTitle').textContent = verdictTitle;
-  document.getElementById('verdictSub').textContent = verdictSub;
-
-  // ── Screenshot ──
-  document.getElementById('screenshotDomain').textContent = finalDomain;
-  const screenshotURL = `https://image.thum.io/get/width/640/crop/800/noanimate/${encodeURIComponent(finalUrl)}`;
-  document.getElementById('screenshotWrap').innerHTML = `
-    <img src="${screenshotURL}"
-      alt="Screenshot of ${esc(finalDomain)}"
-      onerror="this.parentElement.innerHTML='<div class=\\'screenshot-loading\\'>Screenshot unavailable</div>'"
-      style="width:100%;display:block;">`;
-
-  // ── Summary cards ──
-  const sslExpiry = ssl?.not_after ? new Date(ssl.not_after) : null;
-  const sslDaysLeft = sslExpiry ? Math.ceil((sslExpiry - new Date()) / 86400000) : null;
-  const sslExpiryStr = sslExpiry ? sslExpiry.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}) : '—';
-
-  const cards = [
-    { label:'Final Domain',    value: finalDomain || '—',                cls:'accent' },
-    { label:'HTTP Status',     value: status ? String(status) : '—',     cls: status===200?'green':status>=400?'red':'warn' },
-    { label:'Redirect Hops',   value: String(redirects.length),          cls: redirects.length>0?'warn':'dim' },
-    { label:'Response Time',   value: d.response_time_ms ? `${d.response_time_ms}ms` : '—', cls:'dim' },
-    { label:'SSL Valid',       value: ssl?.valid===true ? '✓ Valid' : ssl?.valid===false ? '✗ Invalid' : '—', cls: ssl?.valid===true?'green':ssl?.valid===false?'red':'dim' },
-    { label:'SSL Expires',     value: sslExpiryStr,                      cls: sslDaysLeft!==null ? (sslDaysLeft<30?'red':sslDaysLeft<90?'warn':'green') : 'dim' },
-    { label:'Days Until Expiry',value: sslDaysLeft!==null ? `${sslDaysLeft} days` : '—', cls: sslDaysLeft!==null?(sslDaysLeft<30?'red':sslDaysLeft<90?'warn':'green'):'dim' },
-    { label:'Server',          value: d.server || '—',                   cls:'dim' },
-    { label:'Content Type',    value: d.content_type || '—',             cls:'dim' },
-    { label:'Protocol',        value: finalUrl.startsWith('https')? 'HTTPS':'HTTP', cls: finalUrl.startsWith('https')?'green':'red' },
-  ];
-
-  document.getElementById('summaryGrid').innerHTML = cards.map(c=>`
-    <div class="summary-card">
-      <div class="summary-card-label">${esc(c.label)}</div>
-      <div class="summary-card-value ${c.cls}">${esc(c.value)}</div>
-    </div>`).join('');
-
-  // ── Redirect chain ──
-  document.getElementById('chainSteps').innerHTML = chain.map((step, i) => {
-    const isLast   = i === chain.length-1;
-    const isRedirect = [301,302,303,307,308].includes(step.status_code);
-    const isError  = typeof step.status_code === 'string' && step.status_code.includes('ERROR');
-    const numCls   = isError?'error':isLast?'final':isRedirect?'redirect':'';
-    const badgeCls = isError?'error':isRedirect?`r${step.status_code}`:`r${step.status_code}`;
+  scroll.innerHTML = CATEGORIES.map((cat, ci) => {
+    const isOpen = openCats.has(cat.id);
+    const liveCount = cat.tools.filter(t => t.live).length;
     return `
-      <div class="chain-step">
-        <div class="chain-num ${numCls}">${i+1}</div>
-        <div class="chain-line"></div>
-        <div class="chain-url">
-          <strong>${isLast?'FINAL':isRedirect?'REDIRECT':'DESTINATION'}</strong><br>
-          ${esc(step.url)}
-          ${step.elapsed_ms?`<br><span style="color:rgba(240,236,228,0.25);font-size:10px">${step.elapsed_ms}ms</span>`:''}
-        </div>
-        <div class="chain-badge ${badgeCls}">${esc(String(step.status_code))}</div>
-      </div>`;
+    <div class="nav-cat${isOpen?' open':''}" onclick="toggleCat('${cat.id}')">
+      ${cat.label}
+      <span class="nav-cat-count">${cat.tools.length}</span>
+      <span class="nav-cat-arrow">›</span>
+    </div>
+    <div class="nav-cat-tools${isOpen?' open':''}" id="cat-${cat.id}">
+      ${cat.tools.map((t, ti) => `
+        <button
+          class="tool-btn${t.live ? '' : ' soon'}"
+          id="btn-${t.id}"
+          onclick="${t.live ? `loadTool('${t.id}')` : ''}"
+          style="animation:fadeUp 0.25s ${ti*0.04}s ease both;opacity:0"
+        >
+          <div class="tool-btn-inner">
+            <div class="tool-icon">${t.icon}</div>
+            <div class="tool-info">
+              <div class="tool-name">${t.name}</div>
+              <div class="tool-desc">${t.desc}</div>
+            </div>
+            ${!t.live ? '<span class="soon-badge">Soon</span>' : ''}
+          </div>
+        </button>`).join('')}
+    </div>`;
   }).join('');
+}
 
-  // ── SSL ──
-  const sslIcon = ssl?.valid===true ? '🔒' : ssl?.valid===false ? '🔓' : '—';
-  const sslStatusCls = ssl?.valid===true?'valid':ssl?.valid===false?'invalid':'unknown';
-  const sslStatusText = ssl?.valid===true?'Valid Certificate':ssl?.valid===false?'Invalid Certificate':'No SSL Data';
+function toggleCat(id) {
+  const toolsEl = document.getElementById(`cat-${id}`);
+  const catEl   = toolsEl ? toolsEl.previousElementSibling : null;
+  if(!toolsEl || !catEl) return;
 
-  document.getElementById('sslValid').innerHTML = `
-    <span class="ssl-icon">${sslIcon}</span>
-    <span class="ssl-status-text ${sslStatusCls}">${sslStatusText}</span>
-    ${ssl?.error ? `<span style="font-family:var(--mono);font-size:11px;color:rgba(232,123,74,0.70)">${esc(ssl.error)}</span>` : ''}
+  if(openCats.has(id)){
+    openCats.delete(id);
+    toolsEl.classList.remove('open');
+    catEl.classList.remove('open');
+  } else {
+    openCats.add(id);
+    toolsEl.classList.add('open');
+    catEl.classList.add('open');
+  }
+}
+
+function openCatForTool(toolId) {
+  for(const cat of CATEGORIES){
+    if(cat.tools.find(t => t.id === toolId)){
+      openCats.add(cat.id);
+      const toolsEl = document.getElementById(`cat-${cat.id}`);
+      const catEl   = toolsEl?.previousElementSibling;
+      if(toolsEl) toolsEl.classList.add('open');
+      if(catEl)   catEl.classList.add('open');
+      break;
+    }
+  }
+}
+
+// ── BUILD WELCOME ─────────────────────────────────────────────────────────────
+function buildWelcome() {
+  // Stats
+  document.getElementById('welcomeStats').innerHTML = `
+    <div class="welcome-stat"><div class="ws-num">${LIVE_TOOLS.length}</div><div class="ws-lbl">Live Tools</div></div>
+    <div class="welcome-stat"><div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div><div class="ws-lbl">Data Sources</div></div>
+    <div class="welcome-stat"><div class="ws-num">4</div><div class="ws-lbl">Sanctions Lists</div></div>
+    <div class="welcome-stat"><div class="ws-num">24k+</div><div class="ws-lbl">Sanctioned Entities</div></div>
   `;
 
-  if(ssl && ssl.valid===true){
-    const rows = [
-      ['Issued To',  ssl.subject?.commonName || ssl.subject?.organizationName || '—'],
-      ['Issuer',     ssl.issuer?.organizationName || ssl.issuer?.commonName || '—'],
-      ['Valid From', ssl.not_before || '—'],
-      ['Valid Until',ssl.not_after || '—',  sslDaysLeft!==null?(sslDaysLeft<30?'warn':'green'):''],
-      ['Alt Names',  ssl.san?.slice(0,6).join(', ') || '—'],
-    ];
-    document.getElementById('sslRows').innerHTML = rows.map(([label,value,cls])=>`
-      <div class="ssl-row">
-        <div class="ssl-row-label">${esc(label)}</div>
-        <div class="ssl-row-value ${cls||''}">${esc(value)}</div>
-      </div>`).join('');
-  } else {
-    document.getElementById('sslRows').innerHTML = '';
-  }
-
-  // ── External checks ──
-  const encFinal = encodeURIComponent(finalUrl);
-  const encDomain= encodeURIComponent(finalDomain);
-  const extLinks = [
-    { label:'VirusTotal',      url:`https://www.virustotal.com/gui/url/${btoa(finalUrl).replace(/=/g,'')}/detection` },
-    { label:'URLScan.io',      url:`https://urlscan.io/search/#page.domain:${encDomain}` },
-    { label:'Safe Browsing',   url:`https://transparencyreport.google.com/safe-browsing/search?url=${encFinal}` },
-    { label:'URLhaus',         url:`https://urlhaus.abuse.ch/browse.php?search=${encDomain}` },
-    { label:'Sucuri SiteCheck',url:`https://sitecheck.sucuri.net/results/${encDomain}` },
-    { label:'Web Archive',     url:`https://web.archive.org/web/*/${encodeURIComponent(finalUrl)}` },
-  ];
-  document.getElementById('extGrid').innerHTML = extLinks.map(l=>`
-    <a class="ext-link" href="${l.url}" target="_blank" rel="noopener">
-      ${esc(l.label)}
-      <span class="ext-link-arrow">↗</span>
-    </a>`).join('');
-
-  // ── Terminal ──
-  let h = '';
-  h += ln('cmd', `$ url-inspect "${original}"`);
-  h += blank();
-  h += div();
-  h += ln('key', '  REDIRECT CHAIN');
-  h += div();
-  chain.forEach((step,i) => {
-    const isLast = i === chain.length-1;
-    const cls = typeof step.status_code==='string'&&step.status_code.includes('ERROR') ? 'error'
-              : isLast ? 'found' : 'warn';
-    h += lnH(cls, `  ${String(i+1).padEnd(3)} ${esc(String(step.status_code).padEnd(5))} ${esc(step.url)}`);
-  });
-  h += blank();
-  h += div();
-  h += ln('key', '  SERVER RESPONSE');
-  h += div();
-  [
-    ['Final URL',    d.final_url||'—'],
-    ['Status',       String(status||'—')],
-    ['Server',       d.server||'—'],
-    ['Content-Type', d.content_type||'—'],
-    ['Response',     d.response_time_ms ? `${d.response_time_ms}ms` : '—'],
-  ].forEach(([k,v]) => {
-    h += lnH('text', `  <span class="t-key">${k.padEnd(14)}</span>  ${esc(v)}`);
-  });
-  h += blank();
-  h += div();
-  h += ln('key', '  SSL CERTIFICATE');
-  h += div();
-  if(ssl?.valid===true){
-    h += lnH('found', `  [+] Valid certificate`);
-    h += lnH('text', `  <span class="t-key">Issuer        </span>  ${esc(ssl.issuer?.organizationName||'—')}`);
-    h += lnH('text', `  <span class="t-key">Expires       </span>  ${esc(ssl.not_after||'—')}`);
-    h += sslDaysLeft !== null
-      ? lnH(sslDaysLeft<30?'error':sslDaysLeft<90?'warn':'found',
-          `  [${sslDaysLeft<30?'!':'+'}] ${sslDaysLeft} days until expiry`)
-      : '';
-  } else if(ssl?.valid===false){
-    h += lnH('error', `  [!] Invalid SSL: ${esc(ssl.error||'unknown error')}`);
-  } else {
-    h += lnH('dim', '  [-] No SSL data');
-  }
-  h += blank();
-  h += div();
-  h += ln('dim', '  Inspection complete — URL was not visited by your browser');
-  h += lnH('dim', `  <span class="t-cursor"></span>`);
-
-  document.getElementById('termBody').innerHTML = h;
-  document.getElementById('termLabel').textContent = `url-intelligence — ${finalDomain}`;
-  document.getElementById('resultsWrap').classList.add('visible');
-  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+  // Category chips
+  document.getElementById('welcomeCats').innerHTML = CATEGORIES
+    .map(c => `<div class="welcome-cat">${c.label}</div>`).join('');
 }
 
-function showError(msg){
-  const banner = document.getElementById('verdictBanner');
-  banner.className = 'verdict-banner danger';
-  document.getElementById('verdictIcon').textContent = '⚠️';
-  document.getElementById('verdictTitle').textContent = 'Inspection Failed';
-  document.getElementById('verdictSub').textContent = msg;
-  document.getElementById('summaryGrid').innerHTML = '';
-  document.getElementById('chainSteps').innerHTML = '';
-  document.getElementById('sslRows').innerHTML = '';
-  document.getElementById('screenshotWrap').innerHTML = '<div class="screenshot-loading">—</div>';
-  document.getElementById('resultsWrap').classList.add('visible');
+// ── BUILD TICKER ──────────────────────────────────────────────────────────────
+function buildTicker() {
+  document.getElementById('tickerTools').textContent = LIVE_TOOLS.length;
+  document.getElementById('tickerDatasets').textContent = TOTAL_DATASETS + '+';
+
+  // Scroll items — duplicate for seamless loop
+  const items = [
+    { label: 'OFAC SDN List',            value: '~13,000 entries' },
+    { label: 'UN Security Council',       value: '~900 entries' },
+    { label: 'EU Consolidated Sanctions', value: '~5,800 entries' },
+    { label: 'UK FCDO Sanctions List',    value: '~4,200 entries' },
+    { label: 'Email Header Parsing',      value: 'SPF · DKIM · DMARC' },
+    { label: 'EXIF Extraction',           value: 'GPS · Camera · Timestamp' },
+    { label: 'PDF/DOCX Forensics',        value: 'Author · Revision history' },
+    { label: 'Coordinate Conversion',     value: '7 formats · W3W' },
+    { label: 'Sun & Shadow Calculator',     value: 'Photo timestamp forensics' },
+    { label: 'World Timezone Converter',      value: '90+ cities · Overlap view' },
+    { label: 'Email Intelligence',        value: 'Holehe · 120+ platforms' },
+    { label: 'Username Search',           value: 'Sherlock · WhatsMyName · 500+ sites' },
+    { label: 'Phone Intelligence',        value: 'Carrier · Type · Platform scan' },
+    { label: 'IP Intelligence',           value: 'Geolocation · ASN · Threat score' },
+    { label: 'WHOIS & DNS',               value: 'Registration · MX · TXT · NS' },
+    { label: 'URL Intelligence',              value: 'Redirect chain · SSL · Preview' },
+    { label: 'Sanctions Screening',       value: '4 lists · Real-time' },
+    { label: 'what3words API',            value: 'Bidirectional lookup' },
+    { label: 'Match Confidence Scoring',  value: '0–100 scale' },
+  ];
+
+  const html = [...items, ...items].map(item => `
+    <div class="ticker-item">
+      <div class="ti-dot"></div>
+      <strong>${item.label}</strong>
+      <span style="color:rgba(240,236,228,0.28)!important">—</span>
+      ${item.value}
+    </div>`).join('');
+
+  document.getElementById('tickerScroll').innerHTML = html;
+}
+
+// ── LOAD TOOL ─────────────────────────────────────────────────────────────────
+function loadTool(id) {
+  const t = ALL_TOOLS.find(t => t.id === id);
+  if (!t || !t.live || current === id) return;
+  current = id;
+
+  // Sidebar — open the right category and mark active
+  openCatForTool(id);
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-${id}`)?.classList.add('active');
+
+  // Hide welcome, show tool UI
+  document.getElementById('welcome').classList.add('hidden');
+  document.getElementById('seoAcc').style.display = '';
+  // seoLbl no longer used
+  document.getElementById('seoBody').innerHTML = t.seo || '';
+  document.getElementById('seoBody').classList.remove('expanded');
+  document.getElementById('seoToggle').textContent='Read more';
+
+  // Loader
+  const loader = document.getElementById('loader');
+  const frame  = document.getElementById('toolFrame');
+  loader.style.display = 'flex';
+  loader.classList.remove('hide');
+  document.getElementById('loaderName').textContent = t.name;
+
+  frame.classList.remove('visible');
+  frame.src = '';
+  frame.onload = () => {
+    loader.classList.add('hide');
+    frame.classList.add('visible');
+    setTimeout(() => { loader.style.display = 'none'; }, 280);
+  };
+  setTimeout(() => { frame.src = t.url; }, 30);
+
+  closeSidebar();
+  history.replaceState(null, '', `#${id}`);
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+let searchFocus = -1;
+let filtered = [...LIVE_TOOLS];
+
+function onSearch(val) {
+  const q = val.trim().toLowerCase();
+  searchFocus = -1;
+  filtered = q ? LIVE_TOOLS.filter(t =>
+    t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)
+  ) : [...LIVE_TOOLS];
+  renderDropdown();
+  document.getElementById('searchDropdown').classList.add('open');
+}
+
+function renderDropdown() {
+  const dd = document.getElementById('searchDropdown');
+  if (!filtered.length) {
+    dd.innerHTML = `<div class="search-empty">No tools match your search</div>`;
+    return;
+  }
+  dd.innerHTML = filtered.map((t,i) => `
+    <div class="search-result-item" data-idx="${i}"
+      onclick="loadTool('${t.id}')"
+      onmouseenter="searchFocus=${i};highlightItem()">
+      <span class="sr-icon">${t.icon}</span>
+      <div>
+        <div class="sr-name">${t.name}</div>
+        <div class="sr-desc">${t.desc}</div>
+      </div>
+    </div>`).join('');
+}
+
+function highlightItem() {
+  document.querySelectorAll('.search-result-item').forEach((el,i) => el.classList.toggle('focused', i === searchFocus));
+}
+
+function searchKey(e) {
+  const items = document.querySelectorAll('.search-result-item');
+  if (e.key==='ArrowDown'){e.preventDefault();searchFocus=Math.min(searchFocus+1,items.length-1);highlightItem();}
+  else if(e.key==='ArrowUp'){e.preventDefault();searchFocus=Math.max(searchFocus-1,0);highlightItem();}
+  else if(e.key==='Enter'){if(searchFocus>=0&&filtered[searchFocus]){loadTool(filtered[searchFocus].id);document.getElementById('searchInput').value='';}}
+  else if(e.key==='Escape'){closeSearch();}
+}
+
+function openSearch(){filtered=[...LIVE_TOOLS];renderDropdown();document.getElementById('searchDropdown').classList.add('open');}
+function closeSearch(){document.getElementById('searchDropdown').classList.remove('open');searchFocus=-1;}
+document.addEventListener('click',e=>{if(!document.getElementById('searchWrap').contains(e.target))closeSearch();});
+
+// ── MOBILE ────────────────────────────────────────────────────────────────────
+function toggleSidebar(){
+  const open = document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('visible', open);
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('visible');
+}
+
+// ── LOAD PAGE (FAQ / Terms / Contact) ────────────────────────────────────────
+function loadPage(id) {
+  const names = { faq:'FAQ', terms:'Terms & Privacy', contact:'Contact Us' };
+  const seo   = {
+    faq:     'Frequently asked questions about The Intel Desk — account registration, rate limits, bug reporting, API access, and response times.',
+    terms:   'Privacy Policy and Terms of Service for inteldesk.io. Information on data collection, cookies, intellectual property, and your rights.',
+    contact: 'Get in touch with The Intel Desk team. Report bugs, suggest tools, or ask questions.',
+  };
+
+  // Clear sidebar active state
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  current = null;
+
+  // Update SEO accordion
+  document.getElementById('seoAcc').style.display = '';
+  // seoLbl no longer used (pages)
+  document.getElementById('seoBody').innerHTML   = seo[id];
+  document.getElementById('seoBody').classList.remove('expanded');
+  document.getElementById('seoToggle').textContent='Read more';
+
+  // Hide welcome
+  document.getElementById('welcome').classList.add('hidden');
+
+  // Loader
+  const loader = document.getElementById('loader');
+  const frame  = document.getElementById('toolFrame');
+  loader.style.display = 'flex';
+  loader.classList.remove('hide');
+  document.getElementById('loaderName').textContent = names[id];
+
+  frame.classList.remove('visible');
+  frame.src = '';
+  frame.onload = () => { loader.classList.add('hide'); frame.classList.add('visible'); setTimeout(()=>loader.style.display='none',280); };
+  setTimeout(() => { frame.src = `${PAGES_BASE}/${id}.html`; }, 30);
+
+  closeSidebar();
+  history.replaceState(null, '', `#${id}`);
+}
+
+// ── SEO TOGGLE ───────────────────────────────────────────────────────────────
+function toggleSEO() {
+  const body = document.getElementById('seoBody');
+  const btn  = document.getElementById('seoToggle');
+  const expanded = body.classList.toggle('expanded');
+  btn.textContent = expanded ? 'Show less' : 'Read more';
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildSidebar();
+buildWelcome();
+buildTicker();
+
+const hash = location.hash.slice(1);
+if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
+  openCatForTool(hash);
+  loadTool(hash);
 }
 </script>
 </body>
