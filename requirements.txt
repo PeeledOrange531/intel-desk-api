@@ -6,4 +6,4 @@ python-whois==0.9.4
 holehe==1.61
 sherlock-project==0.15.0
 maigret==0.4.4
-ignorant==1.0.5
+ignorant==1.2
