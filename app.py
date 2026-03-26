@@ -8,12 +8,14 @@ import threading
 import queue
 from functools import wraps
 from flask import Flask, Response, request, jsonify
+from flask_cors import CORS
 import requests
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
 app = Flask(__name__)
+CORS(app, origins='*', supports_credentials=False)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 ALLOWED_ORIGIN = os.environ.get("ALLOWED_ORIGIN", "*")
@@ -42,7 +44,9 @@ def sse_headers():
         "Content-Type":                "text/event-stream",
         "Cache-Control":               "no-cache",
         "X-Accel-Buffering":           "no",
-        "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods":"GET, OPTIONS",
+        "Access-Control-Allow-Headers":"Content-Type",
     }
 
 def sse(data: dict) -> str:
@@ -161,22 +165,31 @@ def whois_lookup():
     domain = domain.replace("https://","").replace("http://","").split("/")[0]
     try:
         import whois as python_whois
+        import socket
+        # Set a timeout so it doesn't hang
+        socket.setdefaulttimeout(15)
         w = python_whois.whois(domain)
+        if w is None:
+            return jsonify({"error": "No WHOIS data returned", "domain": domain}), 404
+
         def fmt_date(d):
             if d is None: return None
             if isinstance(d, list): d = d[0]
             try: return d.strftime("%Y-%m-%d")
             except: return str(d)
+
         def clean(v):
             if v is None: return None
             if isinstance(v, list):
                 seen = set(); out = []
                 for i in v:
-                    s = str(i).strip()
-                    if s and s.lower() not in seen:
-                        seen.add(s.lower()); out.append(s)
+                    s = str(i).strip().lower()
+                    if s and s not in seen:
+                        seen.add(s); out.append(str(i).strip())
                 return out if len(out) > 1 else (out[0] if out else None)
-            return str(v).strip() or None
+            s = str(v).strip()
+            return s if s else None
+
         result = {
             "domain":      domain,
             "registrar":   clean(w.registrar),
@@ -189,9 +202,13 @@ def whois_lookup():
             "org":         clean(w.org),
             "country":     clean(w.country),
         }
-        return jsonify({k:v for k,v in result.items() if v is not None})
+        filtered = {k:v for k,v in result.items() if v is not None}
+        if len(filtered) <= 1:
+            return jsonify({"error": "No WHOIS data available for this domain", "domain": domain}), 404
+        return jsonify(filtered)
     except Exception as e:
-        return jsonify({"error": str(e), "domain": domain}), 400
+        log.error(f"WHOIS error for {domain}: {e}")
+        return jsonify({"error": f"WHOIS lookup failed: {str(e)}", "domain": domain}), 400
 
 # ── SSE OSINT stream helper ───────────────────────────────────────────────────
 def stream_subprocess(cmd, env=None):
@@ -222,7 +239,6 @@ def stream_subprocess(cmd, env=None):
 
 # ── HOLEHE — email → platform check ──────────────────────────────────────────
 @app.route("/holehe", methods=["GET","OPTIONS"])
-@corsify
 def holehe_stream():
     email = request.args.get("email","").strip()
     if not email or "@" not in email:
@@ -232,7 +248,6 @@ def holehe_stream():
 
 # ── SHERLOCK — username → social networks ─────────────────────────────────────
 @app.route("/sherlock", methods=["GET","OPTIONS"])
-@corsify
 def sherlock_stream():
     username = request.args.get("username","").strip()
     if not username:
@@ -246,7 +261,6 @@ def sherlock_stream():
 
 # ── MAIGRET — username → deep profile ─────────────────────────────────────────
 @app.route("/maigret", methods=["GET","OPTIONS"])
-@corsify
 def maigret_stream():
     username = request.args.get("username","").strip()
     if not username:
@@ -262,7 +276,6 @@ def maigret_stream():
 
 # ── IGNORANT — phone → platform check ────────────────────────────────────────
 @app.route("/ignorant", methods=["GET","OPTIONS"])
-@corsify
 def ignorant_stream():
     phone = request.args.get("phone","").strip()
     if not phone:
