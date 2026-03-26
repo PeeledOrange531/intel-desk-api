@@ -354,18 +354,118 @@ def sherlock_stream():
     ])
     return Response(gen(), headers=sse_headers())
 
-# ── MAIGRET — username → deep profile ─────────────────────────────────────────
+# ── WHATSMYNAME — username → 500+ sites via live JSON database ──────────────
+WMN_DB_URL = "https://raw.githubusercontent.com/WebBreacher/WhatsMyName/main/wmn-data.json"
+_wmn_cache = {"data": None, "ts": 0}
+
+def get_wmn_db():
+    import time
+    now = time.time()
+    if _wmn_cache["data"] and (now - _wmn_cache["ts"]) < 3600:
+        return _wmn_cache["data"]
+    try:
+        r = requests.get(WMN_DB_URL, timeout=15, headers={"User-Agent":"IntelDesk/1.0"})
+        r.raise_for_status()
+        _wmn_cache["data"] = r.json()
+        _wmn_cache["ts"] = now
+        return _wmn_cache["data"]
+    except Exception as e:
+        log.error(f"WMN DB fetch: {e}")
+        return None
+
 @app.route("/maigret", methods=["GET","OPTIONS"])
+@corsify
 def maigret_stream():
+    """WhatsMyName check — replaces maigret endpoint."""
+    username = request.args.get("username","").strip()
+    if not username:
+        return Response('{"error":"username required"}', status=400, mimetype="application/json")
+
+    def generate():
+        try:
+            import asyncio, httpx
+            yield sse({"type":"start","cmd":"whatsmyname"})
+            yield sse({"type":"line","text":"[*] Loading WhatsMyName database..."})
+
+            db = get_wmn_db()
+            if not db:
+                yield sse({"type":"error","text":"Could not load WhatsMyName database."})
+                return
+
+            sites = db.get("sites",[])
+            yield sse({"type":"line","text":f"[*] Checking {username} across {len(sites)} sites..."})
+            yield sse({"type":"line","text":""})
+
+            found_count = 0
+
+            async def run():
+                nonlocal found_count
+                results = []
+                BATCH = 25
+                for i in range(0, len(sites), BATCH):
+                    batch = sites[i:i+BATCH]
+                    async with httpx.AsyncClient(
+                        timeout=7, follow_redirects=True,
+                        headers={"User-Agent":"Mozilla/5.0 (compatible; IntelDesk/1.0)"},
+                        limits=httpx.Limits(max_connections=25),
+                    ) as client:
+                        urls = [s.get("uri_check","").replace("{account}", username) for s in batch]
+                        resps = await asyncio.gather(*[client.get(u) for u in urls], return_exceptions=True)
+                        for site, url, resp in zip(batch, urls, resps):
+                            name = site.get("name","")
+                            if isinstance(resp, Exception):
+                                continue
+                            e_code   = site.get("e_code", 200)
+                            e_string = site.get("e_string","")
+                            m_string = site.get("m_string","")
+                            try:
+                                hit = (
+                                    resp.status_code == e_code and
+                                    (not e_string or e_string in resp.text) and
+                                    (not m_string or m_string not in resp.text)
+                                )
+                            except Exception:
+                                hit = False
+                            profile = site.get("uri_pretty","").replace("{account}", username) or url
+                            results.append((hit, name, profile))
+                return results
+
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                all_results = loop.run_until_complete(run())
+            finally:
+                loop.close()
+
+            for hit, name, url in all_results:
+                if hit:
+                    found_count += 1
+                    yield sse({"type":"line","text":f"[+] {name}: {url}"})
+                else:
+                    yield sse({"type":"line","text":f"[-] {name}"})
+
+            yield sse({"type":"line","text":""})
+            yield sse({"type":"line","text":f"[*] Complete — {found_count} profiles found across {len(sites)} sites"})
+            yield sse({"type":"done","returncode":0})
+
+        except Exception as e:
+            yield sse({"type":"error","text":f"Error: {str(e)}"})
+
+    return Response(generate(), headers=sse_headers())
+
+
+# ── WHATSMYNAME via Naminter ─────────────────────────────────────────────────
+@app.route("/whatsmyname", methods=["GET","OPTIONS"])
+@corsify
+def whatsmyname_stream():
     username = request.args.get("username","").strip()
     if not username:
         return Response('{"error":"username required"}', status=400, mimetype="application/json")
     gen = stream_subprocess([
-        "maigret", username,
+        "naminter",
+        "--username", username,
+        "--found-only",
         "--no-color",
-        "--timeout", "10",
-        "--retries", "1",
-        "-n", "500",       # top 500 sites by popularity
     ])
     return Response(gen(), headers=sse_headers())
 
@@ -377,24 +477,7 @@ def ignorant_stream():
         return Response('{"error":"phone required"}', status=400, mimetype="application/json")
     gen = stream_subprocess(["ignorant", "--no-color", phone])
     return Response(gen(), headers=sse_headers())
-@app.route("/ip", methods=["GET","OPTIONS"])
-@corsify
-def ip_lookup():
-    ip = request.args.get("ip","").strip()
-    if not ip:
-        ip = request.headers.get("X-Forwarded-For","").split(",")[0].strip() or request.remote_addr
-    try:
-        r = requests.get(f"https://ipwho.is/{ip}", timeout=10, headers={"User-Agent":"IntelDesk/1.0"})
-        d = r.json()
-        if d.get("success"):
-            return jsonify(d)
-        r2 = requests.get(f"http://ip-api.com/json/{ip}?fields=status,message,continent,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,mobile,proxy,hosting,query", timeout=10)
-        d2 = r2.json()
-        if d2.get("status") == "success":
-            return jsonify({"success":True,"ip":d2.get("query",ip),"country":d2.get("country",""),"country_code":d2.get("countryCode",""),"region":d2.get("regionName",""),"city":d2.get("city",""),"latitude":d2.get("lat"),"longitude":d2.get("lon"),"timezone":{"id":d2.get("timezone","")},"connection":{"isp":d2.get("isp",""),"org":d2.get("org",""),"asn":d2.get("as","").split()[0].replace("AS","") if d2.get("as") else "","domain":d2.get("asname","")},"is_mobile":d2.get("mobile",False),"is_proxy":d2.get("proxy",False),"is_hosting":d2.get("hosting",False),"continent":d2.get("continent","")})
-        return jsonify({"success":False,"error":"Lookup failed"}), 400
-    except Exception as e:
-        return jsonify({"success":False,"error":str(e)}), 500
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
