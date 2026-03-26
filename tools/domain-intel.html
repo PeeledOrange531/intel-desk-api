@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Domain Intelligence — Backlinks, Subdomains & History | The Intel Desk</title>
+<meta name="description" content="Free domain intelligence tool. Discover backlinks via Common Crawl, all subdomains via certificate transparency, historical URLs via Wayback Machine, DNS records and WHOIS data. Used by OSINT investigators and security researchers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+/* INPUT */
+.input-section{padding:clamp(32px,5vw,48px) 0 0;animation:fadeUp 0.6s 0.1s ease both;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.search-row{display:flex;flex-wrap:wrap;gap:0;}
+.domain-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.domain-input:focus{border-color:rgba(200,169,110,0.35);}
+.domain-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-run{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-run:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-run:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+/* PROGRESS */
+.progress-wrap{display:none;margin-top:clamp(32px,5vw,48px);flex-direction:column;gap:2px;}
+.progress-wrap.visible{display:flex;}
+.progress-step{background:var(--bg2);border:1px solid var(--border);padding:14px 20px;display:flex;align-items:center;gap:14px;font-family:var(--mono);font-size:12px;}
+.progress-icon{width:20px;text-align:center;flex-shrink:0;}
+.progress-label{flex:1;color:rgba(240,236,228,0.55)!important;}
+.progress-label.active{color:#e8d5a3!important;}
+.progress-label.done{color:rgba(240,236,228,0.40)!important;}
+.progress-status{font-size:10px;color:rgba(240,236,228,0.25)!important;}
+.progress-status.done{color:#4ec994!important;}
+.progress-status.error{color:#e87b4a!important;}
+.spin{display:inline-block;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(32px,5vw,48px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+/* Summary */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:1px;background:var(--border);}
+.summary-card{background:var(--bg2);padding:20px 22px;display:flex;flex-direction:column;gap:6px;}
+.summary-card-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.40)!important;}
+.summary-card-value{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;line-height:1.4;word-break:break-all;}
+.summary-card-value.accent{color:#e8d5a3!important;}
+.summary-card-value.green{color:#4ec994!important;}
+.summary-card-value.warn{color:#e87b4a!important;}
+.summary-card-value.dim{color:rgba(240,236,228,0.35)!important;}
+/* Tabs */
+.tab-bar{display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-bottom:none;overflow-x:auto;scrollbar-width:none;}
+.tab-bar::-webkit-scrollbar{display:none;}
+.tab-btn{background:transparent;border:none;border-right:1px solid var(--border);border-bottom:2px solid transparent;color:rgba(240,236,228,0.40)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:14px 18px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0;}
+.tab-btn:hover{color:rgba(240,236,228,0.70)!important;}
+.tab-btn.active{color:#c8a96e!important;border-bottom-color:#c8a96e;background:rgba(200,169,110,0.04);}
+.tab-count{background:rgba(200,169,110,0.12);color:#c8a96e!important;font-size:9px;padding:1px 7px;border-radius:10px;}
+.tab-count.zero{background:rgba(255,255,255,0.04);color:rgba(240,236,228,0.22)!important;}
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+/* Toolbar */
+.panel-toolbar{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg3);border:1px solid var(--border);border-top:none;border-bottom:none;flex-wrap:wrap;}
+.toolbar-info{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;flex:1;min-width:120px;}
+.filter-input{background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:11px;padding:6px 12px;outline:none;width:180px;transition:border-color 0.2s;}
+.filter-input::placeholder{color:rgba(240,236,228,0.22)!important;}
+.filter-input:focus{border-color:rgba(200,169,110,0.30);}
+.btn-copy-all{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.20);padding:6px 14px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-copy-all:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.45);}
+/* Item lists */
+.item-list{border:1px solid var(--border);border-top:none;max-height:420px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,0.15) transparent;}
+.item-row{display:flex;align-items:center;gap:12px;padding:11px 20px;border-bottom:1px solid var(--border);transition:background 0.12s;}
+.item-row:last-child{border-bottom:none;}
+.item-row:hover{background:rgba(255,255,255,0.02);}
+.item-row.filtered-out{display:none;}
+.item-index{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.20)!important;width:28px;flex-shrink:0;text-align:right;}
+.item-main{flex:1;min-width:0;}
+.item-primary{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.75)!important;word-break:break-all;line-height:1.4;}
+.item-primary a{color:#7eb8e4!important;text-decoration:none;}
+.item-primary a:hover{text-decoration:underline;}
+.item-secondary{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.30)!important;margin-top:3px;word-break:break-all;}
+.item-badge{font-family:var(--mono);font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:2px 7px;border:1px solid;flex-shrink:0;white-space:nowrap;}
+.item-badge.sub{color:rgba(126,184,228,0.60)!important;border-color:rgba(126,184,228,0.20);}
+.item-badge.wild{color:rgba(232,123,74,0.60)!important;border-color:rgba(232,123,74,0.20);}
+.item-badge.old{color:rgba(240,236,228,0.30)!important;border-color:rgba(240,236,228,0.10);}
+.item-badge.new{color:rgba(78,201,148,0.60)!important;border-color:rgba(78,201,148,0.20);}
+.item-copy{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(200,169,110,0.40)!important;background:transparent;border:1px solid rgba(200,169,110,0.15);padding:3px 9px;cursor:pointer;flex-shrink:0;transition:all 0.15s;}
+.item-copy:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.empty-state{border:1px solid var(--border);border-top:none;padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.25)!important;line-height:1.8;}
+/* DNS table */
+.dns-panel{border:1px solid var(--border);border-top:none;}
+.dns-type-section{border-bottom:1px solid var(--border);}
+.dns-type-section:last-child{border-bottom:none;}
+.dns-type-header{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(200,169,110,0.50)!important;padding:10px 20px;background:var(--bg3);border-bottom:1px solid var(--border);}
+.dns-record{display:flex;gap:12px;padding:9px 20px;border-bottom:1px solid rgba(255,255,255,0.03);font-family:var(--mono);font-size:12px;}
+.dns-record:last-child{border-bottom:none;}
+.dns-name{color:rgba(240,236,228,0.35)!important;width:160px;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.dns-value{color:rgba(240,236,228,0.70)!important;flex:1;word-break:break-all;}
+.dns-ttl{color:rgba(240,236,228,0.22)!important;font-size:10px;flex-shrink:0;}
+/* External links */
+.ext-row{display:flex;gap:1px;border:1px solid var(--border);border-top:none;flex-wrap:wrap;}
+.ext-link{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.45)!important;border-right:1px solid var(--border);padding:12px 16px;text-decoration:none;display:flex;align-items:center;gap:6px;transition:all 0.15s;background:var(--bg2);white-space:nowrap;}
+.ext-link:hover{color:#e8d5a3!important;background:var(--accent-dim);}
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+/* MOBILE */
+@media(max-width:768px){
+  .domain-input{min-width:100%;border-right:1px solid var(--border);}
+  .btn-run{width:100%;margin-top:2px;}
+  .tab-btn{padding:12px 12px;font-size:9px;}
+  .filter-input{width:120px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .dns-name{width:100px;}
+  .item-badge{display:none;}
+}
+@media(max-width:480px){
+  .summary-grid{grid-template-columns:1fr 1fr;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Domain Intelligence</span></div>
+    <h1>Domain <em>Intelligence</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>A domain reveals far more than its current website. This tool aggregates intelligence from four independent public sources simultaneously. <strong>Certificate Transparency logs</strong> (via crt.sh) expose every subdomain that has ever been issued an SSL certificate — revealing forgotten staging servers, internal tools, and shadow infrastructure. The <strong>Wayback Machine CDX API</strong> returns every URL the Internet Archive has ever crawled for a domain, revealing deleted pages, old URL structure, and content history going back decades. <strong>Common Crawl</strong> provides real backlink data — pages across the web that link to the target domain. <strong>DNS records</strong> reveal mail servers, SPF/DMARC configuration, nameservers, and IP addresses. Used by <strong>OSINT investigators profiling organisations</strong>, <strong>penetration testers mapping attack surface</strong>, <strong>journalists researching corporate infrastructure</strong>, and <strong>security researchers tracking domain history</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Domain Intelligence</span><span class="seo-tag">Subdomain Finder</span>
+        <span class="seo-tag">Backlinks</span><span class="seo-tag">Wayback Machine</span>
+        <span class="seo-tag">Certificate Transparency</span><span class="seo-tag">OSINT</span>
+        <span class="seo-tag">DNS Lookup</span><span class="seo-tag">Attack Surface</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="input-section">
+    <div class="section-label">Enter Domain to Investigate</div>
+    <div class="search-row">
+      <input type="text" class="domain-input" id="domainInput"
+        placeholder="e.g. example.com  (no http://)"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')run()">
+      <button class="btn-run" id="btnRun" onclick="run()">Investigate →</button>
+    </div>
+    <div class="input-hint">Queries crt.sh · Wayback CDX · Common Crawl · Cloudflare DNS — all public APIs, no key required</div>
+  </section>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-step" id="ps-crt">
+      <span class="progress-icon" id="pi-crt">⏳</span>
+      <span class="progress-label" id="pl-crt">Certificate Transparency — subdomains</span>
+      <span class="progress-status" id="pst-crt">Waiting…</span>
+    </div>
+    <div class="progress-step" id="ps-wayback">
+      <span class="progress-icon" id="pi-wayback">⏳</span>
+      <span class="progress-label" id="pl-wayback">Wayback Machine — archived URLs</span>
+      <span class="progress-status" id="pst-wayback">Waiting…</span>
+    </div>
+    <div class="progress-step" id="ps-cc">
+      <span class="progress-icon" id="pi-cc">⏳</span>
+      <span class="progress-label" id="pl-cc">Common Crawl — backlinks</span>
+      <span class="progress-status" id="pst-cc">Waiting…</span>
+    </div>
+    <div class="progress-step" id="ps-dns">
+      <span class="progress-icon" id="pi-dns">⏳</span>
+      <span class="progress-label" id="pl-dns">DNS Records</span>
+      <span class="progress-status" id="pst-dns">Waiting…</span>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+    <div class="summary-grid" id="summaryGrid"></div>
+    <div class="tab-bar" id="tabBar"></div>
+    <div id="tabContent"></div>
+    <div class="ext-row" id="extRow"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Data from crt.sh, Wayback CDX API, Common Crawl Index, and Cloudflare DNS-over-HTTPS. All public APIs. Results are historical and may be incomplete.</div>
+  </footer>
+</div>
+
+<script>
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── PROGRESS HELPERS ──────────────────────────────────────────────────────────
+function setProgress(id, state, msg) {
+  const icons = { waiting:'⏳', running:'<span class="spin">◌</span>', done:'✓', error:'⚠' };
+  document.getElementById(`pi-${id}`).innerHTML  = icons[state] || '·';
+  document.getElementById(`pl-${id}`).className  = `progress-label ${state === 'running' ? 'active' : state === 'done' ? 'done' : ''}`;
+  document.getElementById(`pst-${id}`).className = `progress-status ${state === 'done' ? 'done' : state === 'error' ? 'error' : ''}`;
+  document.getElementById(`pst-${id}`).textContent = msg;
+}
+
+// ── CLEAN DOMAIN ──────────────────────────────────────────────────────────────
+function cleanDomain(raw) {
+  return raw.trim().toLowerCase()
+    .replace(/^https?:\/\//, '')
+    .replace(/^www\./, '')
+    .split('/')[0].split('?')[0];
+}
+
+// ── MAIN RUN ──────────────────────────────────────────────────────────────────
+async function run() {
+  const raw = document.getElementById('domainInput').value.trim();
+  if(!raw){ alert('Please enter a domain.'); return; }
+  const domain = cleanDomain(raw);
+  document.getElementById('domainInput').value = domain;
+
+  const btn = document.getElementById('btnRun');
+  btn.disabled = true; btn.textContent = 'Investigating…';
+
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('resultsWrap').classList.remove('visible');
+  ['crt','wayback','cc','dns'].forEach(id => setProgress(id,'waiting','Queued…'));
+
+  // Run all four in parallel
+  const [crtData, waybackData, ccData, dnsData] = await Promise.all([
+    fetchCRT(domain),
+    fetchWayback(domain),
+    fetchCommonCrawl(domain),
+    fetchDNS(domain),
+  ]);
+
+  renderResults(domain, crtData, waybackData, ccData, dnsData);
+
+  btn.disabled = false; btn.textContent = 'Investigate →';
+}
+
+// ── CRT.SH — Certificate Transparency ────────────────────────────────────────
+async function fetchCRT(domain) {
+  setProgress('crt','running','Querying crt.sh…');
+  try {
+    const r = await fetch(`https://crt.sh/?q=%.${domain}&output=json`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+
+    // Extract unique subdomains
+    const subs = new Set();
+    data.forEach(entry => {
+      const names = (entry.name_value || '').split('\n');
+      names.forEach(n => {
+        n = n.trim().toLowerCase().replace(/^\*\./, '');
+        if(n && n.endsWith(domain) && n !== domain) subs.add(n);
+      });
+    });
+
+    const result = {
+      subdomains: [...subs].sort(),
+      total_certs: data.length,
+      wildcard_count: data.filter(e => (e.name_value||'').includes('*.')).length,
+    };
+
+    setProgress('crt','done',`${result.subdomains.length} subdomains`);
+    return result;
+  } catch(e) {
+    setProgress('crt','error', e.message.slice(0,40));
+    return { subdomains: [], total_certs: 0, wildcard_count: 0, error: e.message };
+  }
+}
+
+// ── WAYBACK CDX — Historical URLs ─────────────────────────────────────────────
+async function fetchWayback(domain) {
+  setProgress('wayback','running','Querying Wayback CDX…');
+  try {
+    const url = `https://web.archive.org/cdx/search/cdx?url=*.${domain}/*&output=json&fl=original,timestamp,statuscode&collapse=urlkey&limit=500&filter=statuscode:200`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const rows = await r.json();
+
+    // rows[0] is header
+    const urls = rows.slice(1).map(row => ({
+      url:       row[0],
+      timestamp: row[1],
+      status:    row[2],
+      year:      row[1] ? row[1].slice(0,4) : '?',
+    }));
+
+    // Year distribution
+    const byYear = {};
+    urls.forEach(u => { byYear[u.year] = (byYear[u.year]||0)+1; });
+
+    // Oldest + newest
+    const sorted = [...urls].sort((a,b) => a.timestamp.localeCompare(b.timestamp));
+    const oldest = sorted[0];
+    const newest = sorted[sorted.length-1];
+
+    setProgress('wayback','done',`${urls.length} archived URLs`);
+    return { urls, byYear, oldest, newest, total: urls.length };
+  } catch(e) {
+    setProgress('wayback','error', e.message.slice(0,40));
+    return { urls: [], byYear: {}, total: 0, error: e.message };
+  }
+}
+
+// ── COMMON CRAWL — Backlinks ──────────────────────────────────────────────────
+async function fetchCommonCrawl(domain) {
+  setProgress('cc','running','Querying Common Crawl index…');
+  try {
+    // Get the latest index
+    const idxResp = await fetch('https://index.commoncrawl.org/collinfo.json');
+    const indexes = await idxResp.json();
+    const latestIdx = indexes[0].cdx_api;
+
+    // Search for pages linking to this domain
+    const searchUrl = `${latestIdx}?url=*.${domain}&output=json&limit=100&fl=url,timestamp,status`;
+    const r = await fetch(searchUrl);
+    const text = await r.text();
+
+    // Parse NDJSON
+    const lines = text.trim().split('\n').filter(Boolean);
+    const pages = lines.map(l => { try { return JSON.parse(l); } catch{ return null; } }).filter(Boolean);
+
+    // Also search for external pages linking TO this domain using a different query
+    const backUrl = `${latestIdx}?url=*&output=json&limit=200&fl=url,timestamp&filter=url:.*${domain}.*`;
+
+    setProgress('cc','done',`${pages.length} crawled pages`);
+    return { pages, index: indexes[0].id, total: pages.length };
+  } catch(e) {
+    setProgress('cc','error', e.message.slice(0,40));
+    return { pages: [], total: 0, error: e.message };
+  }
+}
+
+// ── DNS RECORDS ───────────────────────────────────────────────────────────────
+async function fetchDNS(domain) {
+  setProgress('dns','running','Querying DNS…');
+  const types = ['A','AAAA','MX','NS','TXT','CNAME','SOA'];
+  const results = {};
+
+  try {
+    await Promise.all(types.map(async type => {
+      try {
+        const r = await fetch(
+          `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=${type}`,
+          { headers: { 'Accept': 'application/dns-json' } }
+        );
+        const d = await r.json();
+        if(d.Answer?.length) results[type] = d.Answer;
+      } catch(e) {}
+    }));
+
+    const count = Object.values(results).flat().length;
+    setProgress('dns','done',`${count} records`);
+    return results;
+  } catch(e) {
+    setProgress('dns','error', e.message.slice(0,40));
+    return {};
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+function renderResults(domain, crt, wayback, cc, dns) {
+  // Summary cards
+  const firstSeen = wayback.oldest
+    ? `${wayback.oldest.year} (${wayback.oldest.timestamp.slice(0,8)})`
+    : '—';
+  const lastSeen = wayback.newest
+    ? wayback.newest.timestamp.slice(0,8)
+    : '—';
+
+  const aRecords = (dns['A']||[]).map(r => r.data).join(', ') || '—';
+
+  document.getElementById('summaryGrid').innerHTML = [
+    { label:'Domain',           value: domain,                        cls:'accent' },
+    { label:'IP Address',       value: aRecords,                      cls:'' },
+    { label:'Subdomains Found', value: String(crt.subdomains.length), cls: crt.subdomains.length>0?'warn':'' },
+    { label:'SSL Certs Issued', value: String(crt.total_certs),       cls:'dim' },
+    { label:'Archived URLs',    value: String(wayback.total),         cls:'' },
+    { label:'First Archived',   value: firstSeen,                     cls:'dim' },
+    { label:'Last Archived',    value: lastSeen,                      cls:'dim' },
+    { label:'Crawled Pages',    value: String(cc.total),              cls:'dim' },
+  ].map(c=>`
+    <div class="summary-card">
+      <div class="summary-card-label">${esc(c.label)}</div>
+      <div class="summary-card-value ${c.cls}">${esc(c.value)}</div>
+    </div>`).join('');
+
+  // Tabs
+  const tabs = [
+    { id:'subdomains', label:'Subdomains',  count: crt.subdomains.length, render: () => renderSubdomains(crt, domain) },
+    { id:'wayback',    label:'Archived URLs', count: wayback.total,       render: () => renderWayback(wayback)         },
+    { id:'crawled',    label:'Crawled',     count: cc.total,              render: () => renderCrawled(cc)              },
+    { id:'dns',        label:'DNS Records', count: Object.values(dns).flat().length, render: () => renderDNS(dns, domain) },
+  ];
+
+  document.getElementById('tabBar').innerHTML = tabs.map((t,i) => `
+    <button class="tab-btn${i===0?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">
+      ${esc(t.label)}
+      <span class="tab-count${t.count===0?' zero':''}">${t.count}</span>
+    </button>`).join('');
+
+  document.getElementById('tabContent').innerHTML = tabs.map((t,i) => `
+    <div class="tab-panel${i===0?' active':''}" id="panel-${t.id}">
+      ${t.render()}
+    </div>`).join('');
+
+  // External links
+  const enc = encodeURIComponent(domain);
+  document.getElementById('extRow').innerHTML = [
+    { label:'VirusTotal',    url:`https://www.virustotal.com/gui/domain/${domain}` },
+    { label:'Shodan',        url:`https://www.shodan.io/search?query=${enc}` },
+    { label:'SecurityTrails',url:`https://securitytrails.com/domain/${domain}/dns` },
+    { label:'URLScan',       url:`https://urlscan.io/search/#domain:${enc}` },
+    { label:'Wayback',       url:`https://web.archive.org/web/*/${enc}` },
+    { label:'crt.sh',        url:`https://crt.sh/?q=${enc}` },
+  ].map(l=>`<a class="ext-link" href="${l.url}" target="_blank" rel="noopener">${esc(l.label)} ↗</a>`).join('');
+
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function switchTab(id) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id===`panel-${id}`));
+  const fi = document.querySelector(`#panel-${id} .filter-input`);
+  if(fi){ fi.value=''; filterList(fi, id); }
+}
+
+// ── TAB RENDERERS ─────────────────────────────────────────────────────────────
+function renderSubdomains(crt, domain) {
+  const subs = crt.subdomains;
+  if(!subs.length) return `<div class="empty-state">No subdomains found in certificate transparency logs<br><span style="color:rgba(240,236,228,0.20)">This may mean no SSL certs were issued, or the domain is very new</span></div>`;
+
+  const toolbar = `
+    <div class="panel-toolbar">
+      <span class="toolbar-info">${subs.length} unique subdomains · ${crt.total_certs} total certs · ${crt.wildcard_count} wildcard</span>
+      <input type="text" class="filter-input" placeholder="Filter…" oninput="filterList(this,'subdomains')">
+      <button class="btn-copy-all" onclick="copyAllItems(${JSON.stringify(subs)})">Copy All</button>
+    </div>`;
+
+  const rows = subs.map((sub, i) => {
+    const isWild = sub.startsWith('*.');
+    const parts = sub.split('.');
+    const depth = parts.length - domain.split('.').length;
+    return `<div class="item-row" data-text="${esc(sub)}">
+      <span class="item-index">${i+1}</span>
+      <div class="item-main">
+        <div class="item-primary"><a href="https://${esc(sub)}" target="_blank" rel="noopener">${esc(sub)}</a></div>
+      </div>
+      <span class="item-badge ${isWild?'wild':'sub'}">${isWild?'WILDCARD':depth>1?'DEEP':'SUB'}</span>
+      <button class="item-copy" onclick="copyItem('${esc(sub)}',this)">Copy</button>
+    </div>`;
+  }).join('');
+
+  return toolbar + `<div class="item-list" id="list-subdomains">${rows}</div>`;
+}
+
+function renderWayback(wayback) {
+  const urls = wayback.urls;
+  if(!urls.length) return `<div class="empty-state">No archived URLs found in the Wayback Machine</div>`;
+
+  // Year summary
+  const years = Object.entries(wayback.byYear).sort((a,b)=>a[0].localeCompare(b[0]));
+  const maxCount = Math.max(...years.map(([,n])=>n));
+  const yearBar = years.map(([y,n]) => {
+    const pct = Math.round(n/maxCount*100);
+    return `<div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+      <span style="font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.30);width:36px">${y}</span>
+      <div style="flex:1;height:6px;background:var(--bg3);position:relative;">
+        <div style="position:absolute;top:0;left:0;height:100%;width:${pct}%;background:rgba(200,169,110,0.40);"></div>
+      </div>
+      <span style="font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.25);width:40px;text-align:right">${n}</span>
+    </div>`;
+  }).join('');
+
+  const toolbar = `
+    <div class="panel-toolbar">
+      <span class="toolbar-info">${urls.length} archived URLs</span>
+      <input type="text" class="filter-input" placeholder="Filter URLs…" oninput="filterList(this,'wayback')">
+      <button class="btn-copy-all" onclick="copyAllItems(${JSON.stringify(urls.map(u=>u.url))})">Copy All</button>
+    </div>`;
+
+  const rows = urls.slice(0,300).map((u, i) => {
+    const ts = u.timestamp;
+    const dateStr = ts ? `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}` : '—';
+    const archiveUrl = `https://web.archive.org/web/${ts}/${u.url}`;
+    return `<div class="item-row" data-text="${esc(u.url)}">
+      <span class="item-index">${i+1}</span>
+      <div class="item-main">
+        <div class="item-primary"><a href="${esc(archiveUrl)}" target="_blank" rel="noopener">${esc(u.url.length>80?u.url.slice(0,77)+'…':u.url)}</a></div>
+        <div class="item-secondary">${dateStr}</div>
+      </div>
+      <span class="item-badge ${parseInt(u.year)<2010?'old':'new'}">${u.year}</span>
+      <button class="item-copy" onclick="copyItem('${esc(u.url.replace(/'/g,"\\'"))}',this)">Copy</button>
+    </div>`;
+  }).join('');
+
+  const yearSection = years.length > 1 ? `
+    <div style="padding:16px 20px;background:var(--bg3);border:1px solid var(--border);border-top:none;border-bottom:none;">
+      <div style="font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(200,169,110,0.40);margin-bottom:10px;">Archive Activity by Year</div>
+      ${yearBar}
+    </div>` : '';
+
+  return toolbar + yearSection + `<div class="item-list" id="list-wayback">${rows}</div>`;
+}
+
+function renderCrawled(cc) {
+  if(!cc.pages.length) return `<div class="empty-state">No pages found in Common Crawl index<br><span style="color:rgba(240,236,228,0.20)">Common Crawl covers a sample of the web — smaller sites may not appear</span></div>`;
+
+  const toolbar = `
+    <div class="panel-toolbar">
+      <span class="toolbar-info">${cc.pages.length} pages · Index: ${esc(cc.index||'latest')}</span>
+      <input type="text" class="filter-input" placeholder="Filter…" oninput="filterList(this,'crawled')">
+      <button class="btn-copy-all" onclick="copyAllItems(${JSON.stringify(cc.pages.map(p=>p.url))})">Copy All</button>
+    </div>`;
+
+  const rows = cc.pages.map((p, i) => {
+    const ts = (p.timestamp||'').slice(0,8);
+    const dateStr = ts.length===8 ? `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}` : '—';
+    return `<div class="item-row" data-text="${esc(p.url||'')}">
+      <span class="item-index">${i+1}</span>
+      <div class="item-main">
+        <div class="item-primary"><a href="${esc(p.url||'')}" target="_blank" rel="noopener">${esc((p.url||'').length>80?(p.url||'').slice(0,77)+'…':(p.url||''))}</a></div>
+        <div class="item-secondary">${dateStr}</div>
+      </div>
+      <button class="item-copy" onclick="copyItem('${esc((p.url||'').replace(/'/g,"\\'"))}',this)">Copy</button>
+    </div>`;
+  }).join('');
+
+  return toolbar + `<div class="item-list" id="list-crawled">${rows}</div>`;
+}
+
+function renderDNS(dns, domain) {
+  const types = Object.keys(dns);
+  if(!types.length) return `<div class="empty-state">No DNS records found</div>`;
+
+  const typeColors = {
+    A:'#7eb8e4',AAAA:'#7eb8e4',MX:'#c8a96e',NS:'#4ec994',
+    TXT:'#e87b4a',CNAME:'#a87cc8',SOA:'rgba(240,236,228,0.40)'
+  };
+
+  const sections = types.map(type => {
+    const records = dns[type];
+    const color = typeColors[type] || '#c8a96e';
+    const rows = records.map(rec => `
+      <div class="dns-record">
+        <span class="dns-name" title="${esc(rec.name)}">${esc(rec.name)}</span>
+        <span class="dns-value">${esc(rec.data)}</span>
+        <span class="dns-ttl">${rec.TTL}s</span>
+      </div>`).join('');
+    return `<div class="dns-type-section">
+      <div class="dns-type-header" style="color:${color}!important">${type} Records</div>
+      ${rows}
+    </div>`;
+  }).join('');
+
+  return `<div class="dns-panel">${sections}</div>`;
+}
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function filterList(input, listId) {
+  const q = input.value.toLowerCase();
+  const list = document.getElementById(`list-${listId}`);
+  if(!list) return;
+  list.querySelectorAll('.item-row').forEach(row => {
+    row.classList.toggle('filtered-out', q.length>0 && !(row.dataset.text||'').toLowerCase().includes(q));
+  });
+}
+
+function copyItem(text, btn) {
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = '#4ec994';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1200);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = 'Copy', 1200);
+  });
+}
+
+function copyAllItems(items) {
+  navigator.clipboard.writeText(items.join('\n')).catch(() => {});
+}
+</script>
+</body>
+</html>
