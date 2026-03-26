@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Link & Content Extractor — Extract URLs, Emails & Phones | The Intel Desk</title>
+<meta name="description" content="Free link and content extractor. Paste any URL to extract all links, email addresses, phone numbers, and social media handles from its HTML. No API key required. Used by journalists, investigators and OSINT researchers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+.input-section{padding:clamp(32px,5vw,48px) 0 0;animation:fadeUp 0.6s 0.1s ease both;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.search-row{display:flex;flex-wrap:wrap;gap:0;}
+.url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.url-input:focus{border-color:rgba(200,169,110,0.35);}
+.url-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-extract{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-extract:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-extract:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+.loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
+.loading-bar.visible{display:block;}
+.loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(32px,5vw,48px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+/* Stats bar */
+.stats-row{display:flex;gap:1px;background:var(--border);}
+.stat-card{flex:1;background:var(--bg2);padding:18px 20px;display:flex;flex-direction:column;gap:5px;min-width:0;}
+.stat-num{font-family:var(--serif);font-size:32px;font-weight:300;color:#c8a96e!important;line-height:1;}
+.stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.30)!important;}
+
+/* Tabs */
+.tab-bar{display:flex;gap:0;background:var(--bg2);border:1px solid var(--border);border-bottom:none;overflow-x:auto;}
+.tab-btn{background:transparent;border:none;border-right:1px solid var(--border);border-bottom:2px solid transparent;color:rgba(240,236,228,0.40)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:14px 20px;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px;white-space:nowrap;flex-shrink:0;}
+.tab-btn:hover{color:rgba(240,236,228,0.70)!important;}
+.tab-btn.active{color:#c8a96e!important;border-bottom-color:#c8a96e;background:rgba(200,169,110,0.04);}
+.tab-count{background:rgba(200,169,110,0.12);color:#c8a96e!important;font-size:9px;padding:1px 7px;border-radius:10px;}
+.tab-count.zero{background:rgba(255,255,255,0.04);color:rgba(240,236,228,0.22)!important;}
+
+/* Tab panels */
+.tab-panel{display:none;}
+.tab-panel.active{display:block;}
+
+/* Toolbar */
+.panel-toolbar{display:flex;align-items:center;gap:8px;padding:10px 20px;background:var(--bg3);border:1px solid var(--border);border-top:none;border-bottom:none;flex-wrap:wrap;}
+.toolbar-info{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;flex:1;}
+.btn-copy-all{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.20);padding:6px 14px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-copy-all:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.45);}
+.filter-input{background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:11px;padding:6px 12px;outline:none;width:200px;transition:border-color 0.2s;}
+.filter-input::placeholder{color:rgba(240,236,228,0.22)!important;}
+.filter-input:focus{border-color:rgba(200,169,110,0.30);}
+
+/* Item list */
+.item-list{border:1px solid var(--border);border-top:none;max-height:400px;overflow-y:auto;}
+.item-list::-webkit-scrollbar{width:4px;}
+.item-list::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.15);border-radius:2px;}
+.item-row{display:flex;align-items:center;gap:12px;padding:11px 20px;border-bottom:1px solid var(--border);transition:background 0.12s;}
+.item-row:last-child{border-bottom:none;}
+.item-row:hover{background:rgba(255,255,255,0.02);}
+.item-row.filtered-out{display:none;}
+.item-index{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.20)!important;width:28px;flex-shrink:0;text-align:right;}
+.item-text{flex:1;font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.70)!important;word-break:break-all;line-height:1.4;}
+.item-text a{color:#7eb8e4!important;text-decoration:none;}
+.item-text a:hover{color:#a8d4f0!important;text-decoration:underline;}
+.item-text .highlight{background:rgba(200,169,110,0.20);color:#e8d5a3!important;border-radius:2px;padding:0 2px;}
+.item-copy{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(200,169,110,0.40)!important;background:transparent;border:1px solid rgba(200,169,110,0.15);padding:3px 9px;cursor:pointer;flex-shrink:0;transition:all 0.15s;}
+.item-copy:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.item-type-badge{font-family:var(--mono);font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:2px 7px;border:1px solid;flex-shrink:0;}
+.item-type-badge.internal{color:rgba(78,201,148,0.60)!important;border-color:rgba(78,201,148,0.20);}
+.item-type-badge.external{color:rgba(126,184,228,0.60)!important;border-color:rgba(126,184,228,0.20);}
+
+/* Social grid */
+.social-grid{border:1px solid var(--border);border-top:none;padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:var(--border);}
+.social-card{background:var(--bg2);padding:14px 18px;display:flex;flex-direction:column;gap:5px;}
+.social-platform{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(200,169,110,0.50)!important;}
+.social-handle{font-family:var(--mono);font-size:13px;color:#e8d5a3!important;}
+.social-url{font-family:var(--mono);font-size:10px;color:#7eb8e4!important;text-decoration:none;margin-top:2px;}
+.social-url:hover{color:#a8d4f0!important;}
+
+.empty-state{border:1px solid var(--border);border-top:none;padding:32px;text-align:center;font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.25)!important;}
+
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* MOBILE */
+@media(max-width:768px){
+  .stats-row{flex-wrap:wrap;}
+  .stat-card{flex:1 1 40%;min-width:120px;}
+  .tab-btn{padding:12px 14px;font-size:9px;}
+  .filter-input{width:120px;}
+  .social-grid{grid-template-columns:1fr 1fr;}
+  .footer-right{text-align:left;max-width:100%;}
+  .url-input{min-width:100%;border-right:1px solid var(--border);}
+  .btn-extract{width:100%;margin-top:2px;}
+}
+@media(max-width:480px){
+  .stat-card{flex:1 1 45%;}
+  .social-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Content Intelligence</span></div>
+    <h1>Link & Content <em>Extractor</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Every webpage contains a wealth of intelligence embedded in its HTML that isn't visible on the surface. This tool fetches any URL server-side and extracts all <strong>links</strong> (internal and external), <strong>email addresses</strong>, <strong>phone numbers</strong>, and <strong>social media handles</strong> found in the page source. Results are displayed in filterable, sortable tabs with one-click copy for individual items or bulk export of entire categories. Used by <strong>journalists mapping a website's network of links</strong>, <strong>investigators harvesting contact information</strong>, <strong>OSINT researchers identifying social media presences</strong>, <strong>SEO analysts auditing outbound links</strong>, and <strong>security researchers profiling web infrastructure</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Link Extractor</span><span class="seo-tag">Email Harvester</span>
+        <span class="seo-tag">Phone Extractor</span><span class="seo-tag">Social Media Finder</span>
+        <span class="seo-tag">OSINT</span><span class="seo-tag">Web Intelligence</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="input-section">
+    <div class="section-label">Enter URL to Extract From</div>
+    <div class="search-row">
+      <input type="text" class="url-input" id="urlInput"
+        placeholder="e.g. https://example.com/contact  or  inteldesk.io"
+        autocomplete="off" spellcheck="false"
+        onkeydown="if(event.key==='Enter')extract()">
+      <button class="btn-extract" id="btnExtract" onclick="extract()">Extract →</button>
+    </div>
+    <div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
+    <div class="input-hint">Fetched server-side — you never visit the URL directly · Works on most public pages</div>
+  </section>
+
+  <div class="results-wrap" id="resultsWrap">
+
+    <!-- Stats -->
+    <div class="stats-row" id="statsRow"></div>
+
+    <!-- Tabs -->
+    <div class="tab-bar" id="tabBar"></div>
+
+    <!-- Tab content -->
+    <div id="tabContent"></div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Content fetched via Intel Desk proxy. All extraction is server-side. Results depend on page structure and may not capture dynamically loaded content.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function setLoading(on){
+  document.getElementById('loadingBar').classList.toggle('visible',on);
+  const btn = document.getElementById('btnExtract');
+  btn.disabled = on;
+  btn.textContent = on ? 'Extracting…' : 'Extract →';
+}
+
+// ── EXTRACT ───────────────────────────────────────────────────────────────────
+async function extract(){
+  const raw = document.getElementById('urlInput').value.trim();
+  if(!raw){ alert('Please enter a URL.'); return; }
+
+  setLoading(true);
+  document.getElementById('resultsWrap').classList.remove('visible');
+
+  try {
+    const resp = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(raw)}`);
+    const data = await resp.json();
+
+    if(data.error){
+      alert('Extraction failed: ' + data.error);
+      return;
+    }
+
+    const ex = data.extracted || {};
+    if(ex.error){
+      alert('Could not extract page content: ' + ex.error);
+      return;
+    }
+
+    renderResults(ex, data.final_domain || raw);
+  } catch(e){
+    alert('Could not reach server. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── RENDER ────────────────────────────────────────────────────────────────────
+let currentData = {};
+
+function renderResults(ex, domain){
+  currentData = ex;
+
+  const links   = ex.links   || [];
+  const emails  = ex.emails  || [];
+  const phones  = ex.phones  || [];
+  const socials = ex.socials || {};
+  const socialCount = Object.values(socials).flat().length;
+
+  // Stats
+  document.getElementById('statsRow').innerHTML = [
+    { label:'Links Found',    num: links.length,   color:'#c8a96e' },
+    { label:'Emails Found',   num: emails.length,  color:'#4ec994' },
+    { label:'Phone Numbers',  num: phones.length,  color:'#7eb8e4' },
+    { label:'Social Handles', num: socialCount,    color:'#e87b4a' },
+  ].map(s=>`
+    <div class="stat-card">
+      <div class="stat-num" style="color:${s.color}!important">${s.num}</div>
+      <div class="stat-label">${s.label}</div>
+    </div>`).join('');
+
+  // Tab definitions
+  const tabs = [
+    { id:'links',   label:'Links',        count: links.length,   render: () => renderLinks(links, domain)   },
+    { id:'emails',  label:'Emails',       count: emails.length,  render: () => renderSimple(emails,'email') },
+    { id:'phones',  label:'Phones',       count: phones.length,  render: () => renderSimple(phones,'phone') },
+    { id:'socials', label:'Social',       count: socialCount,    render: () => renderSocials(socials)       },
+  ];
+
+  // Tab bar
+  document.getElementById('tabBar').innerHTML = tabs.map((t,i)=>`
+    <button class="tab-btn${i===0?' active':''}" data-tab="${t.id}" onclick="switchTab('${t.id}')">
+      ${esc(t.label)}
+      <span class="tab-count${t.count===0?' zero':''}">${t.count}</span>
+    </button>`).join('');
+
+  // Tab content
+  document.getElementById('tabContent').innerHTML = tabs.map((t,i)=>`
+    <div class="tab-panel${i===0?' active':''}" id="panel-${t.id}">
+      ${t.render()}
+    </div>`).join('');
+
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function switchTab(id){
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.toggle('active', b.dataset.tab===id));
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.toggle('active', p.id===`panel-${id}`));
+  // Reset filter
+  const fi = document.querySelector(`#panel-${id} .filter-input`);
+  if(fi){ fi.value=''; filterItems(fi, id); }
+}
+
+// ── LINK RENDERER ─────────────────────────────────────────────────────────────
+function renderLinks(links, domain){
+  if(!links.length) return '<div class="empty-state">No links found on this page</div>';
+
+  const baseDomain = domain.replace(/^www\./,'');
+  const internal = links.filter(l => l.includes(baseDomain));
+  const external = links.filter(l => !l.includes(baseDomain));
+
+  const toolbar = `
+    <div class="panel-toolbar">
+      <span class="toolbar-info">${links.length} links · ${internal.length} internal · ${external.length} external</span>
+      <input type="text" class="filter-input" placeholder="Filter links…"
+        oninput="filterItems(this,'links')">
+      <button class="btn-copy-all" onclick="copyAll('links')">Copy All</button>
+    </div>`;
+
+  const rows = links.map((url, i) => {
+    const isInt = url.includes(baseDomain.replace(/^www\./,''));
+    return `<div class="item-row" data-text="${esc(url)}">
+      <span class="item-index">${i+1}</span>
+      <span class="item-text"><a href="${esc(url)}" target="_blank" rel="noopener">${esc(url.length>80?url.slice(0,77)+'…':url)}</a></span>
+      <span class="item-type-badge ${isInt?'internal':'external'}">${isInt?'INT':'EXT'}</span>
+      <button class="item-copy" onclick="copyItem('${esc(url.replace(/'/g,"\\'"))}',this)">Copy</button>
+    </div>`;
+  }).join('');
+
+  return toolbar + `<div class="item-list" id="list-links">${rows}</div>`;
+}
+
+// ── SIMPLE LIST RENDERER (emails, phones) ──────────────────────────────────────
+function renderSimple(items, type){
+  if(!items.length) return `<div class="empty-state">No ${type === 'email' ? 'email addresses' : 'phone numbers'} found on this page</div>`;
+
+  const toolbar = `
+    <div class="panel-toolbar">
+      <span class="toolbar-info">${items.length} ${type === 'email' ? 'email addresses' : 'phone numbers'} found</span>
+      <input type="text" class="filter-input" placeholder="Filter…"
+        oninput="filterItems(this,'${type === 'email' ? 'emails' : 'phones'}')">
+      <button class="btn-copy-all" onclick="copyAll('${type === 'email' ? 'emails' : 'phones'}')">Copy All</button>
+    </div>`;
+
+  const tabId = type === 'email' ? 'emails' : 'phones';
+  const rows = items.map((item, i) => `
+    <div class="item-row" data-text="${esc(item)}">
+      <span class="item-index">${i+1}</span>
+      <span class="item-text">${type==='email'
+        ? `<a href="mailto:${esc(item)}">${esc(item)}</a>`
+        : esc(item)}</span>
+      <button class="item-copy" onclick="copyItem('${esc(item.replace(/'/g,"\\'"))}',this)">Copy</button>
+    </div>`).join('');
+
+  return toolbar + `<div class="item-list" id="list-${tabId}">${rows}</div>`;
+}
+
+// ── SOCIALS RENDERER ──────────────────────────────────────────────────────────
+function renderSocials(socials){
+  const entries = Object.entries(socials);
+  if(!entries.length) return '<div class="empty-state">No social media handles found on this page</div>';
+
+  const platformUrls = {
+    twitter:   h => `https://x.com/${h}`,
+    instagram: h => `https://instagram.com/${h}`,
+    linkedin:  h => `https://linkedin.com/in/${h}`,
+    facebook:  h => `https://facebook.com/${h}`,
+    github:    h => `https://github.com/${h}`,
+    youtube:   h => `https://youtube.com/@${h}`,
+    tiktok:    h => `https://tiktok.com/@${h}`,
+  };
+
+  return `<div class="social-grid">${
+    entries.flatMap(([platform, handles]) =>
+      handles.map(handle => `
+        <div class="social-card">
+          <div class="social-platform">${esc(platform)}</div>
+          <div class="social-handle">@${esc(handle)}</div>
+          ${platformUrls[platform]
+            ? `<a class="social-url" href="${platformUrls[platform](handle)}" target="_blank" rel="noopener">View profile ↗</a>`
+            : ''}
+        </div>`)
+    ).join('')
+  }</div>`;
+}
+
+// ── FILTER ────────────────────────────────────────────────────────────────────
+function filterItems(input, tabId){
+  const q = input.value.toLowerCase();
+  const list = document.getElementById(`list-${tabId}`);
+  if(!list) return;
+  list.querySelectorAll('.item-row').forEach(row => {
+    const text = row.dataset.text || '';
+    row.classList.toggle('filtered-out', q.length > 0 && !text.toLowerCase().includes(q));
+  });
+}
+
+// ── COPY HELPERS ──────────────────────────────────────────────────────────────
+function copyItem(text, btn){
+  navigator.clipboard.writeText(text).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    btn.style.color = '#4ec994';
+    setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1200);
+  }).catch(() => {
+    const ta = document.createElement('textarea');
+    ta.value = text; document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = 'Copy', 1200);
+  });
+}
+
+function copyAll(tabId){
+  const map = { links: currentData.links, emails: currentData.emails, phones: currentData.phones };
+  const items = map[tabId] || [];
+  if(!items.length) return;
+  navigator.clipboard.writeText(items.join('\n')).then(() => {
+    const btn = document.querySelector(`[onclick="copyAll('${tabId}')"]`);
+    if(btn){ btn.textContent = '✓ Copied'; setTimeout(()=>btn.textContent='Copy All',1500); }
+  });
+}
+</script>
+</body>
+</html>
