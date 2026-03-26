@@ -377,7 +377,24 @@ def ignorant_stream():
         return Response('{"error":"phone required"}', status=400, mimetype="application/json")
     gen = stream_subprocess(["ignorant", "--no-color", phone])
     return Response(gen(), headers=sse_headers())
-
+@app.route("/ip", methods=["GET","OPTIONS"])
+@corsify
+def ip_lookup():
+    ip = request.args.get("ip","").strip()
+    if not ip:
+        ip = request.headers.get("X-Forwarded-For","").split(",")[0].strip() or request.remote_addr
+    try:
+        r = requests.get(f"https://ipwho.is/{ip}", timeout=10, headers={"User-Agent":"IntelDesk/1.0"})
+        d = r.json()
+        if d.get("success"):
+            return jsonify(d)
+        r2 = requests.get(f"http://ip-api.com/json/{ip}?fields=status,message,continent,country,countryCode,region,regionName,city,zip,lat,lon,timezone,isp,org,as,asname,mobile,proxy,hosting,query", timeout=10)
+        d2 = r2.json()
+        if d2.get("status") == "success":
+            return jsonify({"success":True,"ip":d2.get("query",ip),"country":d2.get("country",""),"country_code":d2.get("countryCode",""),"region":d2.get("regionName",""),"city":d2.get("city",""),"latitude":d2.get("lat"),"longitude":d2.get("lon"),"timezone":{"id":d2.get("timezone","")},"connection":{"isp":d2.get("isp",""),"org":d2.get("org",""),"asn":d2.get("as","").split()[0].replace("AS","") if d2.get("as") else "","domain":d2.get("asname","")},"is_mobile":d2.get("mobile",False),"is_proxy":d2.get("proxy",False),"is_hosting":d2.get("hosting",False),"continent":d2.get("continent","")})
+        return jsonify({"success":False,"error":"Lookup failed"}), 400
+    except Exception as e:
+        return jsonify({"success":False,"error":str(e)}), 500
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
