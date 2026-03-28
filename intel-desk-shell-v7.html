@@ -650,6 +650,37 @@ const CATEGORIES = [
     ],
   },
   {
+    id: 'live',
+    label: 'Live Intelligence',
+    tools: [
+      {
+        id:'world-intel', icon:'🌍', live:true,
+        name:'World Intelligence',
+        desc:'Live map · Layers · Charts · Analytics',
+        url:`${BASE}/world-intelligence.html`,
+        datasets: 4,
+        seo:`Real-time world intelligence dashboard. Monitor armed conflicts and protests via GDELT and ACLED. Track earthquakes via USGS and wildfires via NASA FIRMS.`,
+      },
+      {
+        id:'cyber-threat', icon:'🛡️', live:true,
+        name:'Cyber Threat Feed',
+        desc:'C2 botnets · IP reputation · CVEs',
+        url:`${BASE}/cyber-threat-feed.html`,
+        datasets: 3,
+        seo:`Live cyber threat intelligence. Track active C2 botnet servers via Feodo Tracker. Check IP reputation via AbuseIPDB. Inspect open ports and CVEs via Shodan InternetDB.`,
+      },
+      {
+        id:'flight-tracker', icon:'✈️', live:true,
+        name:'Live Flight Tracker',
+        desc:'Auto-loads · Multi-search · Charts',
+        url:`${BASE}/flight-tracker.html`,
+        datasets: 1,
+        seo:`Live flight tracker powered by OpenSky Network. Track aircraft positions worldwide. Filter by country, search by callsign. Used by journalists tracking private jets.`,
+      },
+    ],
+  },
+
+  {
     id: 'identity',
     label: 'Identity & People',
     tools: [
@@ -714,6 +745,83 @@ const CATEGORIES = [
         url:`${BASE}/domain-intel.html`,
         datasets: 4,
         seo:`Aggregate domain intelligence from certificate transparency logs, Wayback Machine, Common Crawl and DNS. Discover every subdomain ever issued a certificate, all archived URLs, backlinks and DNS records.`,
+      },
+    ],
+  },
+
+  // ── Live Dashboards ─────────────────────────────────────────────────────────
+  {
+    id:'dashboards', label:'Live Dashboards',
+    tools: [
+      {
+        id:'conflict-monitor', icon:'🌍', live:true,
+        name:'Conflict & Protest Monitor',
+        desc:'Live global events · GDELT · 15min updates',
+        url:`${BASE}/conflict-monitor.html`,
+        datasets: 2,
+        seo:`Real-time global conflict and protest events from GDELT updated every 15 minutes. Interactive world map with filtering by event type and region.`,
+      },
+      {
+        id:'hazard-dashboard', icon:'🌋', live:true,
+        name:'Global Hazard Dashboard',
+        desc:'Earthquakes · Wildfires · Live USGS & NASA',
+        url:`${BASE}/hazard-dashboard.html`,
+        datasets: 2,
+        seo:`Live earthquakes from USGS and active wildfires from NASA FIRMS. Real-time global hazard map updated every 5 minutes.`,
+      },
+      {
+        id:'cyber-threat-feed', icon:'🔴', live:true,
+        name:'Cyber Threat Feed',
+        desc:'C2 servers · Malicious IPs · Feodo · Shodan',
+        url:`${BASE}/cyber-threat-feed.html`,
+        datasets: 2,
+        seo:`Live cyber threat intelligence. Active C2 botnet servers from Feodo Tracker and IP enrichment from Shodan InternetDB. Updated hourly.`,
+      },
+      {
+        id:'aviation-tracker', icon:'✈️', live:true,
+        name:'Aviation Tracker',
+        desc:'Live flight positions · OpenSky Network',
+        url:`${BASE}/aviation-tracker.html`,
+        datasets: 1,
+        seo:`Live aircraft positions from OpenSky Network. Track any flight worldwide by callsign, ICAO24, or country. Updated every 30 seconds.`,
+      },
+    ],
+  },
+  {
+    id: 'dashboards',
+    label: 'Live Dashboards',
+    tools: [
+      {
+        id:'conflict-monitor', icon:'🌍', live:true,
+        name:'Conflict & Protest Monitor',
+        desc:'Live global conflict events · GDELT + ReliefWeb',
+        url:`${BASE}/conflict-monitor.html`,
+        datasets: 2,
+        seo:`Real-time global conflict and protest monitor. Live event data from GDELT (updates every 15 minutes) and ReliefWeb humanitarian alerts. Track protests, armed conflicts, elections and crises worldwide on an interactive map.`,
+      },
+      {
+        id:'hazard-dashboard', icon:'⚠️', live:true,
+        name:'Global Hazard Dashboard',
+        desc:'Earthquakes · Wildfires · Humanitarian alerts',
+        url:`${BASE}/hazard-dashboard.html`,
+        datasets: 3,
+        seo:`Real-time global hazard dashboard. Live earthquake data from USGS updated continuously, active wildfire hotspots from NASA FIRMS, and humanitarian crisis alerts from ReliefWeb. Interactive world map with magnitude filters.`,
+      },
+      {
+        id:'cyber-threat-feed', icon:'🛡️', live:true,
+        name:'Cyber Threat Feed',
+        desc:'Live C2 servers · Malware URLs · IP lookup',
+        url:`${BASE}/cyber-threat-feed.html`,
+        datasets: 3,
+        seo:`Live cyber threat intelligence feed. Active botnet C2 servers from Feodo Tracker, malware distribution URLs from URLhaus, IP threat lookup via Shodan InternetDB. Updated hourly.`,
+      },
+      {
+        id:'aviation-maritime', icon:'✈️', live:true,
+        name:'Aviation & Maritime Tracker',
+        desc:'Live flights · Ship positions · Callsign search',
+        url:`${BASE}/aviation-maritime.html`,
+        datasets: 2,
+        seo:`Live aviation tracker using OpenSky Network. Track aircraft positions, callsigns, altitude, speed and heading. Search by callsign or ICAO24 hex code. Maritime tracking available with API key.`,
       },
     ],
   },
