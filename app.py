@@ -659,133 +659,116 @@ def url_inspect():
 
 # ── FLIGHT DATA PROXY ────────────────────────────────────────────────────────
 import time as _time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
 _flight_cache = {"data": None, "ts": 0}
-FLIGHT_CACHE_TTL = 10
+FLIGHT_CACHE_TTL = 12
+
+def _fetch_source(name, url, timeout=9):
+    """Fetch one ADS-B source, return (name, list_of_aircraft)."""
+    hdrs = {"User-Agent": "IntelDesk/1.0"}
+    try:
+        r = requests.get(url, timeout=timeout, headers=hdrs)
+        if not r.ok:
+            return name, []
+        d = r.json()
+        return name, d.get("ac") or d.get("aircraft") or d.get("states") or []
+    except Exception as e:
+        log.warning(f"{name} failed: {e}")
+        return name, []
+
+def _norm(a, src):
+    """Normalize any aircraft dict to our format."""
+    # Handle OpenSky array format [icao, callsign, country, ...]
+    if isinstance(a, list):
+        if len(a) < 7 or a[5] is None or a[6] is None:
+            return None
+        icao = (a[0] or "").lower().strip()
+        try:
+            lat, lon = float(a[6]), float(a[5])
+        except:
+            return None
+        alt_m = a[7]
+        return {
+            "icao": icao,
+            "cs":   (a[1] or "").strip(),
+            "reg":  "", "type": "",
+            "country": a[2] or "",
+            "lat": round(lat, 4), "lon": round(lon, 4),
+            "alt": round(alt_m * 3.28084) if alt_m else None,
+            "gnd": bool(a[8]),
+            "spd": round(float(a[9]) * 1.94384) if a[9] else None,
+            "hdg": round(float(a[10] or 0)),
+            "vrt": round(float(a[11] or 0)),
+            "sq":  str(a[14] or "") if len(a) > 14 else "",
+            "src": src,
+        }
+    # Handle dict format (adsb.fi / adsb.lol)
+    icao = (a.get("hex") or a.get("icao24") or "").lower().strip()
+    if not icao:
+        return None
+    try:
+        lat = float(a.get("lat") or 0)
+        lon = float(a.get("lon") or 0)
+    except:
+        return None
+    if lat == 0 and lon == 0:
+        return None
+    alt_raw = a.get("alt_baro") or a.get("alt_geom")
+    alt_ft  = 0 if alt_raw == "ground" else (round(float(alt_raw)) if alt_raw else None)
+    spd_raw = a.get("gs") or a.get("velocity")
+    # gs is already knots from adsb sources; velocity from OpenSky is m/s
+    spd_kts = round(float(spd_raw)) if spd_raw else None
+    return {
+        "icao": icao,
+        "cs":   (a.get("flight") or a.get("callsign") or "").strip(),
+        "reg":  a.get("r") or "",
+        "type": a.get("t") or "",
+        "country": a.get("country") or a.get("origin_country") or "",
+        "lat": round(lat, 4), "lon": round(lon, 4),
+        "alt": alt_ft,
+        "gnd": alt_raw == "ground" or bool(a.get("on_ground")),
+        "spd": spd_kts,
+        "hdg": round(float(a.get("track") or a.get("true_track") or 0)),
+        "vrt": round(float(a.get("baro_rate") or a.get("geom_rate") or 0)),
+        "sq":  str(a.get("squawk") or ""),
+        "src": src,
+    }
 
 @app.route("/flights", methods=["GET","OPTIONS"])
 @corsify
 def flights_proxy():
-    """
-    Fetches live ADS-B data from multiple sources and merges by ICAO24.
-    Primary: OpenSky (global), Secondary: adsb.lol (ADSBExchange-compatible)
-    """
+    """Fetch live ADS-B from multiple sources concurrently, merge by ICAO24."""
     global _flight_cache
     now = _time.time()
     if _flight_cache["data"] and (now - _flight_cache["ts"]) < FLIGHT_CACHE_TTL:
         return jsonify(_flight_cache["data"])
 
-    hdrs = {"User-Agent": "IntelDesk/1.0 (+https://inteldesk.io)"}
+    sources = [
+        ("opensky", "https://opensky-network.org/api/states/all"),
+        ("adsblo",  "https://api.adsb.lol/v2/lat/0/lon/0/dist/99999"),
+        ("adsbfi",  "https://opendata.adsb.fi/api/v2/lat/20/lon/0/dist/250"),
+        ("adsbfi2", "https://opendata.adsb.fi/api/v2/lat/20/lon/100/dist/250"),
+        ("adsbfi3", "https://opendata.adsb.fi/api/v2/lat/-20/lon/-60/dist/250"),
+    ]
+
     merged = {}
     source_counts = {}
 
-    def norm_ac(a, src):
-        """Normalize aircraft dict from adsb.fi/adsb.lol format."""
-        icao = (a.get("hex") or a.get("icao24") or "").lower().strip()
-        if not icao: return None
-        try:
-            lat = float(a.get("lat") or 0)
-            lon = float(a.get("lon") or 0)
-        except: return None
-        if lat == 0 and lon == 0: return None
-        alt_raw = a.get("alt_baro") or a.get("alt_geom")
-        alt_ft  = 0 if alt_raw == "ground" else (round(float(alt_raw)) if alt_raw else None)
-        spd_raw = a.get("gs") or a.get("velocity")
-        spd_kts = round(float(spd_raw)) if spd_raw else None
-        return {
-            "icao": icao,
-            "cs":   (a.get("flight") or a.get("callsign") or "").strip(),
-            "reg":  a.get("r") or "",
-            "type": a.get("t") or "",
-            "country": a.get("country") or a.get("origin_country") or "",
-            "lat":  round(lat, 5), "lon": round(lon, 5),
-            "alt":  alt_ft,
-            "gnd":  alt_raw == "ground" or bool(a.get("on_ground")),
-            "spd":  spd_kts,
-            "hdg":  round(float(a.get("track") or a.get("true_track") or 0)),
-            "vrt":  round(float(a.get("baro_rate") or a.get("geom_rate") or 0)),
-            "sq":   str(a.get("squawk") or ""),
-            "src":  src,
-        }
-
-    # ── SOURCE 1: OpenSky (primary global, no key needed) ────────────────────
-    try:
-        r = requests.get(
-            "https://opensky-network.org/api/states/all",
-            timeout=12, headers=hdrs
-        )
-        if r.ok:
-            states = r.json().get("states") or []
-            count = 0
-            for s in states:
-                if len(s) < 7 or s[5] is None or s[6] is None: continue
-                icao = (s[0] or "").lower().strip()
-                if not icao: continue
-                try:
-                    lat, lon = float(s[6]), float(s[5])
-                except: continue
-                alt_m = s[7]
-                alt_ft = round(alt_m * 3.28084) if alt_m else None
-                spd_ms = s[9]
-                spd_kts = round(spd_ms * 1.94384) if spd_ms else None
-                merged[icao] = {
-                    "icao": icao,
-                    "cs":   (s[1] or "").strip(),
-                    "reg":  "", "type": "",
-                    "country": s[2] or "",
-                    "lat":  round(lat, 5), "lon": round(lon, 5),
-                    "alt":  alt_ft,
-                    "gnd":  bool(s[8]),
-                    "spd":  spd_kts,
-                    "hdg":  round(float(s[10] or 0)),
-                    "vrt":  round(float(s[11] or 0)),
-                    "sq":   str(s[14] or ""),
-                    "src":  "opensky",
-                }
-                count += 1
-            source_counts["opensky"] = count
-            log.info(f"OpenSky: {count} aircraft")
-    except Exception as e:
-        log.warning(f"OpenSky error: {e}")
-
-    # ── SOURCE 2: adsb.lol (ADSBExchange-compatible, global) ─────────────────
-    try:
-        r = requests.get(
-            "https://api.adsb.lol/v2/lat/0/lon/0/dist/99999",
-            timeout=10, headers=hdrs
-        )
-        if r.ok:
-            aircraft = r.json().get("ac") or []
+    # Run all fetches concurrently with 10s timeout each
+    with ThreadPoolExecutor(max_workers=5) as ex:
+        futures = {ex.submit(_fetch_source, name, url): name for name, url in sources}
+        for future in as_completed(futures, timeout=18):
+            name, aircraft = future.result()
+            src_base = name.rstrip("23")
             count = 0
             for a in aircraft:
-                ac = norm_ac(a, "adsblo")
-                if ac and ac["icao"] not in merged:
+                ac = _norm(a, src_base)
+                if ac and ac["icao"] and ac["icao"] not in merged:
                     merged[ac["icao"]] = ac
                     count += 1
-            source_counts["adsblo"] = count
-            log.info(f"adsb.lol: {count} new aircraft")
-    except Exception as e:
-        log.warning(f"adsb.lol error: {e}")
-
-    # ── SOURCE 3: adsb.fi (sample 5 regions for coverage) ────────────────────
-    regions = [(20,0),(20,100),(20,-100),(-20,30),(50,10)]
-    adsbfi_count = 0
-    for lat0, lon0 in regions:
-        try:
-            r = requests.get(
-                f"https://opendata.adsb.fi/api/v2/lat/{lat0}/lon/{lon0}/dist/250",
-                timeout=8, headers=hdrs
-            )
-            if r.ok:
-                aircraft = r.json().get("ac") or []
-                for a in aircraft:
-                    ac = norm_ac(a, "adsbfi")
-                    if ac and ac["icao"] not in merged:
-                        merged[ac["icao"]] = ac
-                        adsbfi_count += 1
-        except: pass
-    if adsbfi_count:
-        source_counts["adsbfi"] = adsbfi_count
-        log.info(f"adsb.fi regions: {adsbfi_count} new aircraft")
+            if count:
+                source_counts[src_base] = source_counts.get(src_base, 0) + count
 
     aircraft_list = list(merged.values())
     result = {
@@ -796,7 +779,7 @@ def flights_proxy():
     }
     _flight_cache["data"] = result
     _flight_cache["ts"]   = now
-    log.info(f"Flights merged: {len(aircraft_list)} total")
+    log.info(f"/flights: {len(aircraft_list)} aircraft from {source_counts}")
     return jsonify(result)
 
 
