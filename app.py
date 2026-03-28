@@ -656,6 +656,155 @@ def url_inspect():
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
+
+# ── FLIGHT DATA PROXY — merges adsb.fi + adsb.lol + airplanes.live ───────────
+import time as _time
+_flight_cache = {"data": None, "ts": 0}
+FLIGHT_CACHE_TTL = 8  # seconds
+
+@app.route("/flights", methods=["GET","OPTIONS"])
+@corsify
+def flights_proxy():
+    """
+    Fetches and merges live ADS-B data from multiple free sources.
+    Returns merged unique aircraft by ICAO24.
+    Query params: ?callsign=&country=&min_alt=&max_alt=&squawk=
+    """
+    global _flight_cache
+    now = _time.time()
+
+    # Return cached data if fresh enough
+    if _flight_cache["data"] and (now - _flight_cache["ts"]) < FLIGHT_CACHE_TTL:
+        return jsonify(_flight_cache["data"])
+
+    headers = {"User-Agent": "IntelDesk/1.0 (+https://inteldesk.io)"}
+    merged = {}  # icao24 -> aircraft dict
+    source_counts = {}
+
+    # Try each source, merge by ICAO24
+    sources = [
+        ("adsbfi",  "https://opendata.adsb.fi/api/v2/lat/0/lon/0/dist/99999"),
+        ("adsbfi2", "https://api.adsb.fi/v1/flights"),
+        ("adsblo",  "https://api.adsb.lol/v2/all"),
+        ("aplive",  "https://api.airplanes.live/v2/all"),
+    ]
+
+    for src_id, url in sources:
+        try:
+            r = requests.get(url, timeout=8, headers=headers)
+            if not r.ok:
+                continue
+            data = r.json()
+            aircraft = data.get("ac") or data.get("aircraft") or []
+            count = 0
+            for a in aircraft:
+                icao = (a.get("hex") or a.get("icao24") or "").lower().strip()
+                if not icao:
+                    continue
+                lat = a.get("lat")
+                lon = a.get("lon")
+                if lat is None or lon is None:
+                    continue
+                try:
+                    lat, lon = float(lat), float(lon)
+                except:
+                    continue
+                if not (-90 <= lat <= 90) or not (-180 <= lon <= 180):
+                    continue
+                if icao not in merged:
+                    alt_raw = a.get("alt_baro") or a.get("alt_geom") or a.get("baro_altitude")
+                    alt_ft = None
+                    if alt_raw == "ground":
+                        alt_ft = 0
+                    elif alt_raw is not None:
+                        try:
+                            alt_ft = round(float(alt_raw))
+                        except:
+                            pass
+
+                    spd_raw = a.get("gs") or a.get("velocity")
+                    spd_kts = None
+                    if spd_raw is not None:
+                        try:
+                            spd_kts = round(float(spd_raw) * 1.94384) if a.get("velocity") else round(float(spd_raw))
+                        except:
+                            pass
+
+                    merged[icao] = {
+                        "icao":     icao,
+                        "cs":       (a.get("flight") or a.get("callsign") or "").strip(),
+                        "reg":      a.get("r") or a.get("registration") or "",
+                        "type":     a.get("t") or a.get("aircraft_type") or "",
+                        "country":  a.get("country") or a.get("origin_country") or "",
+                        "lat":      round(lat, 5),
+                        "lon":      round(lon, 5),
+                        "alt":      alt_ft,
+                        "gnd":      alt_raw == "ground" or bool(a.get("on_ground")),
+                        "spd":      spd_kts,
+                        "hdg":      round(float(a.get("track") or a.get("true_track") or 0)),
+                        "vrt":      round(float(a.get("baro_rate") or a.get("vertical_rate") or 0)),
+                        "sq":       a.get("squawk") or "",
+                        "src":      src_id.replace("2",""),
+                    }
+                    count += 1
+            src_base = src_id.replace("2","")
+            source_counts[src_base] = source_counts.get(src_base, 0) + count
+        except Exception as e:
+            log.warning(f"Flight source {src_id} error: {e}")
+            continue
+
+    # OpenSky as fallback/supplement
+    try:
+        r = requests.get("https://opensky-network.org/api/states/all",
+                         timeout=10, headers=headers)
+        if r.ok:
+            states = r.json().get("states") or []
+            count = 0
+            for s in states:
+                if len(s) < 7 or s[5] is None or s[6] is None:
+                    continue
+                icao = (s[0] or "").lower().strip()
+                if not icao or icao in merged:
+                    continue
+                try:
+                    lat, lon = float(s[6]), float(s[5])
+                except:
+                    continue
+                merged[icao] = {
+                    "icao":  icao,
+                    "cs":    (s[1] or "").strip(),
+                    "reg":   "", "type": "",
+                    "country": s[2] or "",
+                    "lat":   round(lat, 5),
+                    "lon":   round(lon, 5),
+                    "alt":   round(s[7] * 3.28084) if s[7] else None,
+                    "gnd":   bool(s[8]),
+                    "spd":   round(s[9] * 1.94384) if s[9] else None,
+                    "hdg":   round(float(s[10] or 0)),
+                    "vrt":   round(float(s[11] or 0)),
+                    "sq":    s[14] or "",
+                    "src":   "opensky",
+                }
+                count += 1
+            source_counts["opensky"] = count
+    except Exception as e:
+        log.warning(f"OpenSky error: {e}")
+
+    aircraft_list = list(merged.values())
+
+    result = {
+        "count":   len(aircraft_list),
+        "sources": source_counts,
+        "ts":      int(now),
+        "aircraft": aircraft_list,
+    }
+
+    _flight_cache["data"] = result
+    _flight_cache["ts"]   = now
+
+    return jsonify(result)
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
