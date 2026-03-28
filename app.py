@@ -659,116 +659,115 @@ def url_inspect():
 
 # ── FLIGHT DATA PROXY ────────────────────────────────────────────────────────
 import time as _time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed as _as_completed
 
 _flight_cache = {"data": None, "ts": 0}
 FLIGHT_CACHE_TTL = 12
 
-def _fetch_source(name, url, timeout=9):
-    """Fetch one ADS-B source, return (name, list_of_aircraft)."""
-    hdrs = {"User-Agent": "IntelDesk/1.0"}
-    try:
-        r = requests.get(url, timeout=timeout, headers=hdrs)
-        if not r.ok:
-            return name, []
-        d = r.json()
-        return name, d.get("ac") or d.get("aircraft") or d.get("states") or []
-    except Exception as e:
-        log.warning(f"{name} failed: {e}")
-        return name, []
+def _get(url, timeout=10):
+    hdrs = {"User-Agent": "IntelDesk/1.0", "Accept": "application/json"}
+    r = requests.get(url, timeout=timeout, headers=hdrs)
+    r.raise_for_status()
+    return r.json()
 
 def _norm(a, src):
-    """Normalize any aircraft dict to our format."""
-    # Handle OpenSky array format [icao, callsign, country, ...]
-    if isinstance(a, list):
-        if len(a) < 7 or a[5] is None or a[6] is None:
-            return None
-        icao = (a[0] or "").lower().strip()
-        try:
-            lat, lon = float(a[6]), float(a[5])
-        except:
-            return None
-        alt_m = a[7]
-        return {
-            "icao": icao,
-            "cs":   (a[1] or "").strip(),
-            "reg":  "", "type": "",
-            "country": a[2] or "",
-            "lat": round(lat, 4), "lon": round(lon, 4),
-            "alt": round(alt_m * 3.28084) if alt_m else None,
-            "gnd": bool(a[8]),
-            "spd": round(float(a[9]) * 1.94384) if a[9] else None,
-            "hdg": round(float(a[10] or 0)),
-            "vrt": round(float(a[11] or 0)),
-            "sq":  str(a[14] or "") if len(a) > 14 else "",
-            "src": src,
-        }
-    # Handle dict format (adsb.fi / adsb.lol)
-    icao = (a.get("hex") or a.get("icao24") or "").lower().strip()
-    if not icao:
-        return None
+    icao = (a.get("hex") or "").lower().strip()
+    if not icao: return None
     try:
         lat = float(a.get("lat") or 0)
         lon = float(a.get("lon") or 0)
-    except:
-        return None
-    if lat == 0 and lon == 0:
-        return None
+    except: return None
+    if lat == 0 and lon == 0: return None
     alt_raw = a.get("alt_baro") or a.get("alt_geom")
     alt_ft  = 0 if alt_raw == "ground" else (round(float(alt_raw)) if alt_raw else None)
-    spd_raw = a.get("gs") or a.get("velocity")
-    # gs is already knots from adsb sources; velocity from OpenSky is m/s
-    spd_kts = round(float(spd_raw)) if spd_raw else None
+    spd = a.get("gs")
     return {
         "icao": icao,
-        "cs":   (a.get("flight") or a.get("callsign") or "").strip(),
+        "cs":   (a.get("flight") or "").strip(),
         "reg":  a.get("r") or "",
         "type": a.get("t") or "",
-        "country": a.get("country") or a.get("origin_country") or "",
-        "lat": round(lat, 4), "lon": round(lon, 4),
-        "alt": alt_ft,
-        "gnd": alt_raw == "ground" or bool(a.get("on_ground")),
-        "spd": spd_kts,
-        "hdg": round(float(a.get("track") or a.get("true_track") or 0)),
-        "vrt": round(float(a.get("baro_rate") or a.get("geom_rate") or 0)),
-        "sq":  str(a.get("squawk") or ""),
-        "src": src,
+        "country": a.get("country") or "",
+        "lat":  round(lat, 4), "lon": round(lon, 4),
+        "alt":  alt_ft,
+        "gnd":  alt_raw == "ground",
+        "spd":  round(float(spd)) if spd else None,
+        "hdg":  round(float(a.get("track") or 0)),
+        "vrt":  round(float(a.get("baro_rate") or 0)),
+        "sq":   str(a.get("squawk") or ""),
+        "src":  src,
     }
 
 @app.route("/flights", methods=["GET","OPTIONS"])
 @corsify
 def flights_proxy():
-    """Fetch live ADS-B from multiple sources concurrently, merge by ICAO24."""
+    """Fetch live ADS-B from adsb.lol (global) + adsb.fi (regional grids)."""
     global _flight_cache
     now = _time.time()
     if _flight_cache["data"] and (now - _flight_cache["ts"]) < FLIGHT_CACHE_TTL:
         return jsonify(_flight_cache["data"])
 
-    sources = [
-        ("opensky", "https://opensky-network.org/api/states/all"),
-        ("adsblo",  "https://api.adsb.lol/v2/lat/0/lon/0/dist/99999"),
-        ("adsbfi",  "https://opendata.adsb.fi/api/v2/lat/20/lon/0/dist/250"),
-        ("adsbfi2", "https://opendata.adsb.fi/api/v2/lat/20/lon/100/dist/250"),
-        ("adsbfi3", "https://opendata.adsb.fi/api/v2/lat/-20/lon/-60/dist/250"),
-    ]
-
     merged = {}
     source_counts = {}
 
-    # Run all fetches concurrently with 10s timeout each
-    with ThreadPoolExecutor(max_workers=5) as ex:
-        futures = {ex.submit(_fetch_source, name, url): name for name, url in sources}
-        for future in as_completed(futures, timeout=18):
-            name, aircraft = future.result()
-            src_base = name.rstrip("23")
-            count = 0
-            for a in aircraft:
-                ac = _norm(a, src_base)
-                if ac and ac["icao"] and ac["icao"] not in merged:
-                    merged[ac["icao"]] = ac
-                    count += 1
-            if count:
-                source_counts[src_base] = source_counts.get(src_base, 0) + count
+    # ── adsb.lol global endpoint ─────────────────────────────────────────────
+    # Uses ADSBExchange-compatible API — no AWS block, true global
+    lol_urls = [
+        "https://api.adsb.lol/v2/lat/0/lon/0/dist/99999",
+        "https://api.adsb.lol/v2/all",
+    ]
+    for url in lol_urls:
+        try:
+            d = _get(url, timeout=10)
+            aircraft = d.get("ac") or d.get("aircraft") or []
+            if aircraft:
+                for a in aircraft:
+                    ac = _norm(a, "adsblo")
+                    if ac and ac["icao"] not in merged:
+                        merged[ac["icao"]] = ac
+                source_counts["adsblo"] = len([v for v in merged.values() if v["src"]=="adsblo"])
+                log.info(f"adsb.lol ({url}): {source_counts.get('adsblo',0)} aircraft")
+                break
+        except Exception as e:
+            log.warning(f"adsb.lol {url}: {e}")
+
+    # ── adsb.fi regional grid — 8 regions covering the globe ────────────────
+    # Each query covers 250nm radius; 8 points cover most populated airspace
+    regions = [
+        (51, 10),   # Europe
+        (40, -95),  # North America
+        (-15, -50), # South America
+        (20, 80),   # South Asia
+        (35, 115),  # East Asia
+        (-25, 135), # Australia
+        (20, 40),   # Middle East / Africa
+        (60, 30),   # Russia / North
+    ]
+
+    def fetch_adsbfi(lat, lon):
+        url = f"https://opendata.adsb.fi/api/v2/lat/{lat}/lon/{lon}/dist/250"
+        try:
+            d = _get(url, timeout=8)
+            return d.get("ac") or []
+        except Exception as e:
+            log.warning(f"adsb.fi ({lat},{lon}): {e}")
+            return []
+
+    fi_count = 0
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        futures = {ex.submit(fetch_adsbfi, lat, lon): (lat,lon) for lat,lon in regions}
+        for future in _as_completed(futures, timeout=12):
+            try:
+                aircraft = future.result()
+                for a in aircraft:
+                    ac = _norm(a, "adsbfi")
+                    if ac and ac["icao"] not in merged:
+                        merged[ac["icao"]] = ac
+                        fi_count += 1
+            except: pass
+
+    if fi_count:
+        source_counts["adsbfi"] = fi_count
+        log.info(f"adsb.fi regions: {fi_count} additional aircraft")
 
     aircraft_list = list(merged.values())
     result = {
@@ -779,7 +778,7 @@ def flights_proxy():
     }
     _flight_cache["data"] = result
     _flight_cache["ts"]   = now
-    log.info(f"/flights: {len(aircraft_list)} aircraft from {source_counts}")
+    log.info(f"/flights total: {len(aircraft_list)} from {source_counts}")
     return jsonify(result)
 
 
