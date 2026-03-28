@@ -120,32 +120,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 .nav-cat{
   font-family:var(--mono);font-size:9px;font-weight:500;
   text-transform:uppercase;letter-spacing:0.22em;
-  color:rgba(240,236,228,0.35)!important;
-  padding:12px 18px 8px;
-  display:flex;align-items:center;gap:10px;
-  cursor:pointer;
-  user-select:none;
-  transition:color 0.15s;
-  border-bottom:1px solid var(--border);
-  margin-top:1px;
-  position:relative;
+  color:rgba(240,236,228,0.28)!important;
+  padding:14px 18px 7px;display:flex;align-items:center;gap:10px;
 }
-.nav-cat:hover{color:rgba(240,236,228,0.60)!important;}
-.nav-cat.open{color:#c8a96e!important;border-bottom-color:rgba(200,169,110,0.15);}
-.nav-cat-arrow{
-  margin-left:auto;
-  font-size:10px;
-  color:rgba(240,236,228,0.20)!important;
-  transition:transform 0.2s;
-  line-height:1;
-}
-.nav-cat.open .nav-cat-arrow{transform:rotate(90deg);color:rgba(200,169,110,0.50)!important;}
-.nav-cat-tools{
-  overflow:hidden;
-  max-height:0;
-  transition:max-height 0.3s cubic-bezier(0.4,0,0.2,1);
-}
-.nav-cat-tools.open{max-height:600px;}
+.nav-cat::after{content:'';flex:1;height:1px;background:var(--border);}
+.nav-cat-tools{display:block!important;max-height:none!important;}
 /* Tool count badge on category */
 .nav-cat-count{
   font-size:8px;
@@ -733,44 +712,6 @@ const CATEGORIES = [
     ],
   },
 
-  // ── Live Dashboards ─────────────────────────────────────────────────────────
-  {
-    id:'dashboards', label:'Live Dashboards',
-    tools: [
-      {
-        id:'conflict-monitor', icon:'🌍', live:true,
-        name:'Conflict & Protest Monitor',
-        desc:'Live global events · GDELT · 15min updates',
-        url:`${BASE}/conflict-monitor.html`,
-        datasets: 2,
-        seo:`Real-time global conflict and protest events from GDELT updated every 15 minutes. Interactive world map with filtering by event type and region.`,
-      },
-      {
-        id:'hazard-dashboard', icon:'🌋', live:true,
-        name:'Global Hazard Dashboard',
-        desc:'Earthquakes · Wildfires · Live USGS & NASA',
-        url:`${BASE}/hazard-dashboard.html`,
-        datasets: 2,
-        seo:`Live earthquakes from USGS and active wildfires from NASA FIRMS. Real-time global hazard map updated every 5 minutes.`,
-      },
-      {
-        id:'cyber-threat-feed', icon:'🔴', live:true,
-        name:'Cyber Threat Feed',
-        desc:'C2 servers · Malicious IPs · Feodo · Shodan',
-        url:`${BASE}/cyber-threat-feed.html`,
-        datasets: 2,
-        seo:`Live cyber threat intelligence. Active C2 botnet servers from Feodo Tracker and IP enrichment from Shodan InternetDB. Updated hourly.`,
-      },
-      {
-        id:'aviation-tracker', icon:'✈️', live:true,
-        name:'Aviation Tracker',
-        desc:'Live flight positions · OpenSky Network',
-        url:`${BASE}/aviation-tracker.html`,
-        datasets: 1,
-        seo:`Live aircraft positions from OpenSky Network. Track any flight worldwide by callsign, ICAO24, or country. Updated every 30 seconds.`,
-      },
-    ],
-  },
 ];
 
 // Flatten live tools for search
@@ -786,57 +727,268 @@ const openCats = new Set();
 
 function buildSidebar() {
   const scroll = document.getElementById('sidebarScroll');
-
-  // Auto-open the category containing the active tool (or first cat by default)
-  if(openCats.size === 0) {
-    openCats.add(CATEGORIES[0].id);
-  }
-
-  scroll.innerHTML = CATEGORIES.map((cat, ci) => {
-    const isOpen = openCats.has(cat.id);
-    const liveCount = cat.tools.filter(t => t.live).length;
-    return `
-    <div class="nav-cat${isOpen?' open':''}" onclick="toggleCat('${cat.id}')">
-      ${cat.label}
-      <span class="nav-cat-count">${cat.tools.length}</span>
-      <span class="nav-cat-arrow">›</span>
-    </div>
-    <div class="nav-cat-tools${isOpen?' open':''}" id="cat-${cat.id}">
-      ${cat.tools.map((t, ti) => `
-        <button
-          class="tool-btn${t.live ? '' : ' soon'}"
-          id="btn-${t.id}"
-          onclick="${t.live ? `loadTool('${t.id}')` : ''}"
-          style="animation:fadeUp 0.25s ${ti*0.04}s ease both;opacity:0"
-        >
-          <div class="tool-btn-inner">
-            <div class="tool-icon">${t.icon}</div>
-            <div class="tool-info">
-              <div class="tool-name">${t.name}</div>
-              <div class="tool-desc">${t.desc}</div>
-            </div>
-            ${!t.live ? '<span class="soon-badge">Soon</span>' : ''}
-          </div>
-        </button>`).join('')}
-    </div>`;
-  }).join('');
+  if(!scroll) return;
+  let html = '';
+  CATEGORIES.forEach(function(cat) {
+    html += '<div class="nav-cat">' + cat.label + '</div>';
+    cat.tools.forEach(function(t) {
+      const cls = 'tool-btn' + (t.live ? '' : ' soon');
+      const click = t.live ? 'loadTool(\'' + t.id + '\')' : '';
+      html += '<button class="' + cls + '" id="btn-' + t.id + '" onclick="' + click + '">';
+      html += '<div class="tool-btn-inner">';
+      html += '<div class="tool-icon">' + t.icon + '</div>';
+      html += '<div class="tool-info">';
+      html += '<div class="tool-name">' + t.name + '</div>';
+      html += '<div class="tool-desc">' + t.desc + '</div>';
+      html += '</div>';
+      if(!t.live) html += '<span class="soon-badge">Soon</span>';
+      html += '</div></button>';
+    });
+  });
+  scroll.innerHTML = html;
 }
 
-function toggleCat(id) {
-  const toolsEl = document.getElementById(`cat-${id}`);
-  const catEl   = toolsEl ? toolsEl.previousElementSibling : null;
-  if(!toolsEl || !catEl) return;
 
-  if(openCats.has(id)){
-    openCats.delete(id);
-    toolsEl.classList.remove('open');
-    catEl.classList.remove('open');
-  } else {
-    openCats.add(id);
-    toolsEl.classList.add('open');
-    catEl.classList.add('open');
-  }
+function openCatForTool(id){}
+
+
+function buildWelcome() {
+  // Stats
+  document.getElementById('welcomeStats').innerHTML = `
+    <div class="welcome-stat"><div class="ws-num">${LIVE_TOOLS.length}</div><div class="ws-lbl">Live Tools</div></div>
+    <div class="welcome-stat"><div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div><div class="ws-lbl">Data Sources</div></div>
+    <div class="welcome-stat"><div class="ws-num">4</div><div class="ws-lbl">Sanctions Lists</div></div>
+    <div class="welcome-stat"><div class="ws-num">24k+</div><div class="ws-lbl">Sanctioned Entities</div></div>
+  `;
+
+  // Category chips
+  document.getElementById('welcomeCats').innerHTML = CATEGORIES
+    .map(c => `<div class="welcome-cat">${c.label}</div>`).join('');
 }
+
+// ── BUILD TICKER ──────────────────────────────────────────────────────────────
+function buildTicker() {
+  document.getElementById('tickerTools').textContent = LIVE_TOOLS.length;
+  document.getElementById('tickerDatasets').textContent = TOTAL_DATASETS + '+';
+
+  // Scroll items — duplicate for seamless loop
+  const items = [
+    { label: 'OFAC SDN List',            value: '~13,000 entries' },
+    { label: 'UN Security Council',       value: '~900 entries' },
+    { label: 'EU Consolidated Sanctions', value: '~5,800 entries' },
+    { label: 'UK FCDO Sanctions List',    value: '~4,200 entries' },
+    { label: 'Email Header Parsing',      value: 'SPF · DKIM · DMARC' },
+    { label: 'EXIF Extraction',           value: 'GPS · Camera · Timestamp' },
+    { label: 'PDF/DOCX Forensics',        value: 'Author · Revision history' },
+    { label: 'Coordinate Conversion',     value: '7 formats · W3W' },
+    { label: 'Sun & Shadow Calculator',     value: 'Photo timestamp forensics' },
+    { label: 'World Timezone Converter',      value: '90+ cities · Overlap view' },
+    { label: 'Email Intelligence',        value: 'Holehe · 120+ platforms' },
+    { label: 'Username Search',           value: 'Sherlock · WhatsMyName · 500+ sites' },
+    { label: 'Phone Intelligence',        value: 'Carrier · Type · Platform scan' },
+    { label: 'IP Intelligence',           value: 'Geolocation · ASN · Threat score' },
+    { label: 'WHOIS & DNS',               value: 'Registration · MX · TXT · NS' },
+    { label: 'URL Intelligence',              value: 'Redirect chain · SSL · Preview' },
+    { label: 'Sanctions Screening',       value: '4 lists · Real-time' },
+    { label: 'what3words API',            value: 'Bidirectional lookup' },
+    { label: 'Match Confidence Scoring',  value: '0–100 scale' },
+  ];
+
+  const html = [...items, ...items].map(item => `
+    <div class="ticker-item">
+      <div class="ti-dot"></div>
+      <strong>${item.label}</strong>
+      <span style="color:rgba(240,236,228,0.28)!important">—</span>
+      ${item.value}
+    </div>`).join('');
+
+  document.getElementById('tickerScroll').innerHTML = html;
+}
+
+// ── LOAD TOOL ─────────────────────────────────────────────────────────────────
+function loadTool(id) {
+  const t = ALL_TOOLS.find(t => t.id === id);
+  if (!t || !t.live || current === id) return;
+  current = id;
+
+  // Sidebar — open the right category and mark active
+  openCatForTool(id);
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(`btn-${id}`)?.classList.add('active');
+
+  // Hide welcome, show tool UI
+  document.getElementById('welcome').classList.add('hidden');
+  document.getElementById('seoAcc').style.display = '';
+  // seoLbl no longer used
+  document.getElementById('seoBody').innerHTML = t.seo || '';
+  document.getElementById('seoBody').classList.remove('expanded');
+  document.getElementById('seoToggle').textContent='Read more';
+
+  // Loader
+  const loader = document.getElementById('loader');
+  const frame  = document.getElementById('toolFrame');
+  loader.style.display = 'flex';
+  loader.classList.remove('hide');
+  document.getElementById('loaderName').textContent = t.name;
+
+  frame.classList.remove('visible');
+  frame.src = '';
+  frame.onload = () => {
+    loader.classList.add('hide');
+    frame.classList.add('visible');
+    setTimeout(() => { loader.style.display = 'none'; }, 280);
+  };
+  setTimeout(() => { frame.src = t.url; }, 30);
+
+  closeSidebar();
+  history.replaceState(null, '', `#${id}`);
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+let searchFocus = -1;
+let filtered = [...LIVE_TOOLS];
+
+function onSearch(val) {
+  const q = val.trim().toLowerCase();
+  searchFocus = -1;
+  filtered = q ? LIVE_TOOLS.filter(t =>
+    t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)
+  ) : [...LIVE_TOOLS];
+  renderDropdown();
+  document.getElementById('searchDropdown').classList.add('open');
+}
+
+function renderDropdown() {
+  const dd = document.getElementById('searchDropdown');
+  if (!filtered.length) {
+    dd.innerHTML = `<div class="search-empty">No tools match your search</div>`;
+    return;
+  }
+  dd.innerHTML = filtered.map((t,i) => `
+    <div class="search-result-item" data-idx="${i}"
+      onclick="loadTool('${t.id}')"
+      onmouseenter="searchFocus=${i};highlightItem()">
+      <span class="sr-icon">${t.icon}</span>
+      <div>
+        <div class="sr-name">${t.name}</div>
+        <div class="sr-desc">${t.desc}</div>
+      </div>
+    </div>`).join('');
+}
+
+function highlightItem() {
+  document.querySelectorAll('.search-result-item').forEach((el,i) => el.classList.toggle('focused', i === searchFocus));
+}
+
+function searchKey(e) {
+  const items = document.querySelectorAll('.search-result-item');
+  if (e.key==='ArrowDown'){e.preventDefault();searchFocus=Math.min(searchFocus+1,items.length-1);highlightItem();}
+  else if(e.key==='ArrowUp'){e.preventDefault();searchFocus=Math.max(searchFocus-1,0);highlightItem();}
+  else if(e.key==='Enter'){if(searchFocus>=0&&filtered[searchFocus]){loadTool(filtered[searchFocus].id);document.getElementById('searchInput').value='';}}
+  else if(e.key==='Escape'){closeSearch();}
+}
+
+function openSearch(){filtered=[...LIVE_TOOLS];renderDropdown();document.getElementById('searchDropdown').classList.add('open');}
+function closeSearch(){document.getElementById('searchDropdown').classList.remove('open');searchFocus=-1;}
+document.addEventListener('click',e=>{if(!document.getElementById('searchWrap').contains(e.target))closeSearch();});
+
+// ── MOBILE ────────────────────────────────────────────────────────────────────
+function toggleSidebar(){
+  const open = document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('sidebarOverlay').classList.toggle('visible', open);
+}
+function closeSidebar(){
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('sidebarOverlay').classList.remove('visible');
+}
+
+// ── LOAD PAGE (FAQ / Terms / Contact) ────────────────────────────────────────
+function loadPage(id) {
+  const names = { faq:'FAQ', terms:'Terms & Privacy', contact:'Contact Us' };
+  const seo   = {
+    faq:     'Frequently asked questions about The Intel Desk — account registration, rate limits, bug reporting, API access, and response times.',
+    terms:   'Privacy Policy and Terms of Service for inteldesk.io. Information on data collection, cookies, intellectual property, and your rights.',
+    contact: 'Get in touch with The Intel Desk team. Report bugs, suggest tools, or ask questions.',
+  };
+
+  // Clear sidebar active state
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  current = null;
+
+  // Update SEO accordion
+  document.getElementById('seoAcc').style.display = '';
+  // seoLbl no longer used (pages)
+  document.getElementById('seoBody').innerHTML   = seo[id];
+  document.getElementById('seoBody').classList.remove('expanded');
+  document.getElementById('seoToggle').textContent='Read more';
+
+  // Hide welcome
+  document.getElementById('welcome').classList.add('hidden');
+
+  // Loader
+  const loader = document.getElementById('loader');
+  const frame  = document.getElementById('toolFrame');
+  loader.style.display = 'flex';
+  loader.classList.remove('hide');
+  document.getElementById('loaderName').textContent = names[id];
+
+  frame.classList.remove('visible');
+  frame.src = '';
+  frame.onload = () => { loader.classList.add('hide'); frame.classList.add('visible'); setTimeout(()=>loader.style.display='none',280); };
+  setTimeout(() => { frame.src = `${PAGES_BASE}/${id}.html`; }, 30);
+
+  closeSidebar();
+  history.replaceState(null, '', `#${id}`);
+}
+
+// ── SEO TOGGLE ───────────────────────────────────────────────────────────────
+function toggleSEO() {
+  const body = document.getElementById('seoBody');
+  const btn  = document.getElementById('seoToggle');
+  const expanded = body.classList.toggle('expanded');
+  btn.textContent = expanded ? 'Show less' : 'Read more';
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function() {
+  buildSidebar();
+  buildWelcome();
+  buildTicker();
+
+  const hash = location.hash.slice(1);
+  if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
+    openCatForTool(hash);
+    loadTool(hash);
+  }
+});
+</script>
+</body>
+</html>function toggleCat(id){}
+
+
+function buildSidebar() {
+  const scroll = document.getElementById('sidebarScroll');
+  if(!scroll) return;
+  let html = '';
+  CATEGORIES.forEach(function(cat) {
+    html += '<div class="nav-cat">' + cat.label + '</div>';
+    cat.tools.forEach(function(t) {
+      const cls = 'tool-btn' + (t.live ? '' : ' soon');
+      const click = t.live ? 'loadTool(\'' + t.id + '\')' : '';
+      html += '<button class="' + cls + '" id="btn-' + t.id + '" onclick="' + click + '">';
+      html += '<div class="tool-btn-inner">';
+      html += '<div class="tool-icon">' + t.icon + '</div>';
+      html += '<div class="tool-info">';
+      html += '<div class="tool-name">' + t.name + '</div>';
+      html += '<div class="tool-desc">' + t.desc + '</div>';
+      html += '</div>';
+      if(!t.live) html += '<span class="soon-badge">Soon</span>';
+      html += '</div></button>';
+    });
+  });
+  scroll.innerHTML = html;
+}
+
 
 function openCatForTool(toolId) {
   for(const cat of CATEGORIES){
@@ -1050,15 +1202,17 @@ function toggleSEO() {
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────
-buildSidebar();
-buildWelcome();
-buildTicker();
+document.addEventListener('DOMContentLoaded', function() {
+  buildSidebar();
+  buildWelcome();
+  buildTicker();
 
-const hash = location.hash.slice(1);
-if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
-  openCatForTool(hash);
-  loadTool(hash);
-}
+  const hash = location.hash.slice(1);
+  if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
+    openCatForTool(hash);
+    loadTool(hash);
+  }
+});
 </script>
 </body>
 </html>
