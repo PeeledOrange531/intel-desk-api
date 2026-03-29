@@ -7,3 +7,4 @@ python-whois==0.9.4
 holehe==1.61
 sherlock-project==0.15.0
 ignorant==1.2
+websocket-client==1.8.0
