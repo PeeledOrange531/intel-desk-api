@@ -633,6 +633,14 @@ const CATEGORIES = [
     label: 'Live Intelligence',
     tools: [
       {
+        id:'cti-dashboard', icon:'🔴', live:true,
+        name:'CTI Dashboard',
+        desc:'CVEs · IOCs · OTX · ATT&CK · KEV',
+        url:`${BASE}/cti-dashboard.html`,
+        datasets: 6,
+        seo:`Real-time cyber threat intelligence. NVD CVEs, CISA KEV catalog, AlienVault OTX pulses, URLhaus malware URLs, IOC table, MITRE ATT&CK heatmap and global threat origin map.`,
+      },
+      {
         id:'flight-tracker', icon:'✈️', live:true,
         name:'Live Flight Tracker',
         desc:'Auto-loads · Multi-search · Charts',
