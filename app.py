@@ -782,6 +782,131 @@ def flights_proxy():
     return jsonify(result)
 
 
+
+# ── AIS STREAM — vessel positions cache ───────────────────────────────────────
+import threading
+import json
+import time
+
+AIS_KEY = os.environ.get("AISSTREAM_KEY", "f192af54ec4e47a4e1dc7c2f7d2c86edd6e81cf4")
+_ais_vessels = {}   # mmsi -> vessel dict
+_ais_lock    = threading.Lock()
+_ais_running = False
+
+def _ais_worker():
+    """Background thread: connect to AISstream WebSocket, fill vessel cache."""
+    global _ais_running
+    try:
+        import websocket as ws_lib
+    except ImportError:
+        log.warning("websocket-client not installed — AIS worker disabled")
+        _ais_running = False
+        return
+
+    _ais_running = True
+    log.info("AIS worker starting...")
+
+    def on_message(ws, raw):
+        try:
+            msg  = json.loads(raw)
+            mtype = msg.get("MessageType","")
+            meta  = msg.get("Metadata", {})
+            lat   = meta.get("latitude") or meta.get("Latitude")
+            lon   = meta.get("longitude") or meta.get("Longitude")
+            mmsi  = str(meta.get("MMSI") or meta.get("mmsi") or "")
+            if not mmsi or lat is None or lon is None:
+                return
+            vessel = _ais_vessels.get(mmsi, {"mmsi": mmsi})
+            vessel["lat"]     = lat
+            vessel["lon"]     = lon
+            vessel["ts"]      = int(time.time())
+            vessel["name"]    = meta.get("ShipName") or vessel.get("name","")
+            if mtype == "PositionReport":
+                pr = msg.get("Message",{}).get("PositionReport",{})
+                vessel["heading"] = pr.get("TrueHeading") or pr.get("Cog", 0)
+                vessel["speed"]   = pr.get("Sog", 0)
+                vessel["status"]  = pr.get("NavigationalStatus", 0)
+            elif mtype == "ShipStaticData":
+                sd = msg.get("Message",{}).get("ShipStaticData",{})
+                vessel["name"]      = sd.get("Name","").strip() or vessel.get("name","")
+                vessel["callsign"]  = sd.get("CallSign","").strip()
+                vessel["ship_type"] = sd.get("Type", 0)
+                vessel["imo"]       = sd.get("ImoNumber", "")
+                vessel["dest"]      = sd.get("Destination","").strip()
+                vessel["draught"]   = sd.get("Draught", 0)
+                vessel["dim_a"]     = sd.get("DimensionA", 0)
+                vessel["dim_b"]     = sd.get("DimensionB", 0)
+                vessel["flag"]      = meta.get("flag", "")
+            with _ais_lock:
+                _ais_vessels[mmsi] = vessel
+        except Exception as e:
+            pass
+
+    def on_error(ws, err):
+        log.error(f"AIS WS error: {err}")
+
+    def on_close(ws, *args):
+        log.info("AIS WS closed — reconnecting in 10s")
+        _ais_running = False
+
+    def on_open(ws):
+        log.info("AIS WS connected — subscribing world")
+        sub = {
+            "APIKey": AIS_KEY,
+            "BoundingBoxes": [[[-90, -180], [90, 180]]],
+            "FilterMessageTypes": ["PositionReport","ShipStaticData"],
+        }
+        ws.send(json.dumps(sub))
+
+    while True:
+        try:
+            wsapp = ws_lib.WebSocketApp(
+                "wss://stream.aisstream.io/v0/stream",
+                on_open=on_open,
+                on_message=on_message,
+                on_error=on_error,
+                on_close=on_close,
+            )
+            wsapp.run_forever(ping_interval=30, ping_timeout=10)
+        except Exception as e:
+            log.error(f"AIS worker crash: {e}")
+        time.sleep(10)
+
+# Start AIS worker thread on import
+def _start_ais():
+    t = threading.Thread(target=_ais_worker, daemon=True)
+    t.start()
+
+try:
+    _start_ais()
+except Exception as e:
+    log.warning(f"Could not start AIS worker: {e}")
+
+@app.route("/ais/vessels", methods=["GET","OPTIONS"])
+@corsify
+def ais_vessels():
+    """Return current vessel snapshot from AIS cache."""
+    with _ais_lock:
+        vessels = list(_ais_vessels.values())
+    # Return only vessels updated in last 10 minutes
+    cutoff = time.time() - 600
+    fresh  = [v for v in vessels if v.get("ts",0) > cutoff]
+    return jsonify({
+        "count": len(fresh),
+        "ts":    int(time.time()),
+        "vessels": fresh,
+    })
+
+@app.route("/ais/status", methods=["GET","OPTIONS"])
+@corsify
+def ais_status():
+    return jsonify({
+        "running": _ais_running,
+        "vessel_count": len(_ais_vessels),
+        "ts": int(time.time()),
+    })
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
