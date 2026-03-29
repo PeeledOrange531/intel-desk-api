@@ -1,0 +1,1113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CTI Dashboard — Live Cyber Threat Intelligence | The Intel Desk</title>
+<meta name="description" content="Real-time cyber threat intelligence dashboard. Live CVE feed, CISA KEV catalog, AlienVault OTX pulses, URLhaus malware URLs, IOC table, MITRE ATT&CK heatmap and global threat origin map.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;--bg4:#161b22;
+  --border:rgba(255,255,255,0.07);--border-b:rgba(99,178,255,0.08);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.12);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--purple:#9b59b6;
+  --crit:#f85149;--high:#d29922;--med:#58a6ff;--low:#3fb950;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+html{scrollbar-width:thin;scrollbar-color:rgba(200,169,110,0.15) transparent;}
+body{
+  background:#050505!important;color:#f5f2ec!important;
+  font-family:var(--mono);min-height:100vh;overflow-x:hidden;
+}
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,0.03) 2px,rgba(0,0,0,0.03) 4px);
+}
+.page{position:relative;z-index:1;padding:0 clamp(12px,3vw,32px);max-width:1600px;margin:0 auto;}
+
+/* ── TOPBAR ── */
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 0;border-bottom:1px solid var(--border);margin-bottom:2px;flex-wrap:wrap;gap:10px;}
+.topbar-left{display:flex;align-items:center;gap:16px;}
+.topbar-title{font-family:var(--serif);font-size:clamp(20px,3vw,28px);font-weight:300;color:#f5f2ec!important;}
+.topbar-title em{font-style:italic;color:#e8d5a3!important;}
+.topbar-badge{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;background:rgba(200,169,110,0.12);color:#c8a96e!important;padding:3px 10px;border:1px solid rgba(200,169,110,0.22);}
+.topbar-right{display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
+.sync-row{display:flex;align-items:center;gap:7px;font-size:10px;color:rgba(240,236,228,0.35)!important;}
+.sync-dot{width:6px;height:6px;border-radius:50%;background:var(--green);box-shadow:0 0 5px var(--green);animation:pulse-dot 2s ease-in-out infinite;flex-shrink:0;}
+@keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.btn-refresh-all{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.40)!important;padding:5px 14px;cursor:pointer;transition:all 0.15s;}
+.btn-refresh-all:hover{border-color:rgba(200,169,110,0.30);color:#c8a96e!important;}
+
+/* ── STAT STRIP ── */
+.stat-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);margin-bottom:2px;}
+.stat-card{background:var(--bg2);padding:14px 18px;position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;}
+.stat-card.red::before{background:var(--crit);}
+.stat-card.amber::before{background:var(--high);}
+.stat-card.blue::before{background:var(--med);}
+.stat-card.green::before{background:var(--low);}
+.stat-card.purple::before{background:var(--purple);}
+.stat-label{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.35)!important;margin-bottom:6px;}
+.stat-num{font-family:var(--serif);font-size:clamp(24px,3vw,36px);font-weight:300;line-height:1;margin-bottom:3px;}
+.stat-sub{font-size:9px;color:rgba(240,236,228,0.28)!important;}
+.stat-loading{animation:shimmer 1.5s infinite;}
+@keyframes shimmer{0%,100%{opacity:0.3;}50%{opacity:0.7;}}
+
+/* ── GRID ── */
+.main-grid{display:grid;grid-template-columns:1fr 1fr 300px;gap:2px;}
+.col-left{display:flex;flex-direction:column;gap:2px;}
+.col-mid{display:flex;flex-direction:column;gap:2px;}
+.col-right{display:flex;flex-direction:column;gap:2px;}
+.span2{grid-column:span 2;}
+
+/* ── PANEL ── */
+.panel{background:var(--bg2);border:1px solid var(--border-b);}
+.panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.panel-title{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.40)!important;display:flex;align-items:center;gap:8px;}
+.panel-title-accent{color:#c8a96e!important;}
+.panel-meta{font-size:9px;color:rgba(240,236,228,0.22)!important;}
+.panel-badge{font-size:9px;background:rgba(200,169,110,0.10);color:#c8a96e!important;border:1px solid rgba(200,169,110,0.20);padding:1px 8px;}
+.panel-body{overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,0.10) transparent;}
+
+/* ── FEED ITEMS ── */
+.feed-item{display:flex;align-items:flex-start;gap:10px;padding:11px 16px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.1s;position:relative;}
+.feed-item:hover{background:rgba(200,169,110,0.03);}
+.feed-item.new-item{animation:flash-in 0.6s ease;}
+@keyframes flash-in{0%{background:rgba(200,169,110,0.12);}100%{background:transparent;}}
+.feed-sev{width:2px;flex-shrink:0;align-self:stretch;border-radius:1px;margin-top:2px;}
+.feed-body{flex:1;min-width:0;}
+.feed-title{font-size:12px;color:rgba(240,236,228,0.80)!important;line-height:1.4;margin-bottom:4px;word-break:break-word;}
+.feed-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.feed-tag{font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:1px 6px;border:1px solid;}
+.feed-tag.crit{color:var(--crit)!important;border-color:rgba(248,81,73,0.25);}
+.feed-tag.high{color:var(--high)!important;border-color:rgba(210,153,34,0.25);}
+.feed-tag.med{color:var(--med)!important;border-color:rgba(88,166,255,0.25);}
+.feed-tag.low{color:var(--low)!important;border-color:rgba(63,185,80,0.25);}
+.feed-tag.purple{color:var(--purple)!important;border-color:rgba(155,89,182,0.25);}
+.feed-time{font-size:9px;color:rgba(240,236,228,0.25)!important;}
+.feed-ioc-count{font-size:9px;color:rgba(240,236,228,0.35)!important;}
+.feed-conf{font-size:9px;color:rgba(240,236,228,0.35)!important;}
+
+/* ── CVE ITEMS ── */
+.cve-item{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.1s;}
+.cve-item:hover{background:rgba(200,169,110,0.03);}
+.cve-row1{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.cve-id{font-size:11px;font-weight:500;color:#e8d5a3!important;}
+.cve-score{font-size:10px;font-weight:500;padding:1px 7px;border:1px solid;}
+.cve-score.crit{color:var(--crit)!important;border-color:rgba(248,81,73,0.30);}
+.cve-score.high{color:var(--high)!important;border-color:rgba(210,153,34,0.30);}
+.cve-score.med{color:var(--med)!important;border-color:rgba(88,166,255,0.30);}
+.cve-score.low{color:var(--low)!important;border-color:rgba(63,185,80,0.30);}
+.kev-badge{font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;background:rgba(248,81,73,0.10);color:var(--crit)!important;border:1px solid rgba(248,81,73,0.30);padding:1px 6px;}
+.cve-bar-wrap{height:3px;background:rgba(255,255,255,0.06);margin-bottom:5px;border-radius:1px;overflow:hidden;}
+.cve-bar{height:100%;border-radius:1px;}
+.cve-desc{font-size:10px;color:rgba(240,236,228,0.45)!important;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cve-time{font-size:9px;color:rgba(240,236,228,0.22)!important;margin-top:3px;}
+
+/* ── KEV ITEMS ── */
+.kev-item{padding:10px 14px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.kev-id{font-size:11px;font-weight:500;color:var(--crit)!important;margin-bottom:3px;}
+.kev-name{font-size:10px;color:rgba(240,236,228,0.65)!important;margin-bottom:4px;line-height:1.4;}
+.kev-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.kev-vendor{font-size:9px;color:rgba(240,236,228,0.35)!important;}
+.kev-due{font-size:9px;color:var(--high)!important;}
+.kev-ransomware{font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;background:rgba(210,153,34,0.10);color:var(--high)!important;border:1px solid rgba(210,153,34,0.25);padding:1px 6px;}
+
+/* ── IOC TABLE ── */
+.ioc-toolbar{display:flex;align-items:center;gap:6px;padding:8px 12px;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.ioc-filter{flex:1;min-width:120px;background:var(--bg3);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:11px;padding:5px 10px;outline:none;}
+.ioc-filter::placeholder{color:rgba(240,236,228,0.20)!important;}
+.btn-export{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;background:transparent;border:1px solid rgba(200,169,110,0.20);color:rgba(200,169,110,0.50)!important;padding:4px 10px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.btn-export:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.ioc-row{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid rgba(255,255,255,0.03);cursor:pointer;transition:background 0.1s;font-size:11px;}
+.ioc-row:hover{background:rgba(200,169,110,0.04);}
+.ioc-row.filtered-out{display:none;}
+.ioc-type{font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:2px 6px;border:1px solid;width:52px;text-align:center;flex-shrink:0;}
+.ioc-type.ip{color:var(--crit)!important;border-color:rgba(248,81,73,0.25);}
+.ioc-type.domain{color:var(--high)!important;border-color:rgba(210,153,34,0.25);}
+.ioc-type.hash{color:var(--purple)!important;border-color:rgba(155,89,182,0.25);}
+.ioc-type.url{color:var(--low)!important;border-color:rgba(63,185,80,0.25);}
+.ioc-type.email{color:var(--med)!important;border-color:rgba(88,166,255,0.25);}
+.ioc-value{flex:1;color:rgba(240,236,228,0.65)!important;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-family:var(--mono);}
+.ioc-source{font-size:9px;color:rgba(240,236,228,0.25)!important;flex-shrink:0;}
+.ioc-action{font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:rgba(126,184,228,0.50)!important;border:1px solid rgba(126,184,228,0.15);padding:1px 7px;flex-shrink:0;text-decoration:none;transition:all 0.15s;}
+.ioc-action:hover{color:#7eb8e4!important;border-color:rgba(126,184,228,0.35);}
+
+/* ── URLhaus ── */
+.url-item{padding:9px 14px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.url-row1{display:flex;align-items:center;gap:8px;margin-bottom:3px;}
+.url-status{font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:1px 6px;border:1px solid;flex-shrink:0;}
+.url-status.online{color:var(--crit)!important;border-color:rgba(248,81,73,0.30);}
+.url-status.offline{color:rgba(240,236,228,0.30)!important;border-color:rgba(255,255,255,0.10);}
+.url-value{font-size:10px;color:rgba(200,169,110,0.70)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;font-family:var(--mono);}
+.url-meta{display:flex;gap:8px;flex-wrap:wrap;}
+.url-tag{font-size:8px;color:rgba(155,89,182,0.70)!important;border:1px solid rgba(155,89,182,0.20);padding:1px 5px;}
+.url-date{font-size:9px;color:rgba(240,236,228,0.22)!important;}
+
+/* ── THREAT MAP ── */
+.map-container{position:relative;background:var(--bg2);}
+.map-container svg{display:block;width:100%;}
+.threat-dot{cursor:pointer;}
+.threat-dot circle{transition:r 0.3s ease;}
+.pulse-ring{animation:pulse-ring 2s ease-out infinite;}
+@keyframes pulse-ring{0%{r:6;opacity:0.8;}100%{r:18;opacity:0;}}
+.arc-line{stroke-dasharray:4 3;animation:dash-flow 3s linear infinite;}
+@keyframes dash-flow{to{stroke-dashoffset:-28;}}
+
+/* ── ATT&CK HEATMAP ── */
+.attack-grid{display:grid;grid-template-columns:repeat(11,1fr);gap:1px;padding:12px;background:var(--border);}
+.attack-tactic{background:var(--bg3);padding:6px 4px;}
+.attack-tactic-name{font-size:7px;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;color:rgba(240,236,228,0.30)!important;text-align:center;margin-bottom:4px;line-height:1.3;}
+.attack-cell{height:22px;margin-bottom:1px;cursor:pointer;transition:opacity 0.2s;border:1px solid transparent;}
+.attack-cell:hover{border-color:rgba(200,169,110,0.40);}
+
+/* ── SIGNAL BARS ── */
+.signal-row{display:flex;align-items:center;gap:8px;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,0.04);}
+.signal-label{font-size:10px;color:rgba(240,236,228,0.45)!important;width:90px;flex-shrink:0;}
+.signal-bar-track{flex:1;height:6px;background:rgba(255,255,255,0.06);border-radius:1px;overflow:hidden;}
+.signal-bar-fill{height:100%;border-radius:1px;transition:width 0.8s ease;}
+.signal-count{font-size:10px;color:rgba(240,236,228,0.35)!important;width:40px;text-align:right;flex-shrink:0;}
+
+/* ── FEED STATUS ── */
+.feed-status-row{display:flex;align-items:center;gap:8px;padding:6px 14px;border-bottom:1px solid rgba(255,255,255,0.03);}
+.feed-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.feed-status-dot.live{background:var(--green);}
+.feed-status-dot.loading{background:var(--high);animation:pulse-dot 1.5s infinite;}
+.feed-status-dot.error{background:var(--crit);}
+.feed-status-dot.nokey{background:rgba(240,236,228,0.20);}
+.feed-status-name{font-size:10px;color:rgba(240,236,228,0.50)!important;flex:1;}
+.feed-status-info{font-size:9px;color:rgba(240,236,228,0.22)!important;}
+
+/* ── ENRICHMENT DRAWER ── */
+.drawer{position:fixed;right:0;top:0;bottom:0;width:360px;background:var(--bg2);border-left:1px solid var(--border);z-index:100;transform:translateX(100%);transition:transform 0.25s cubic-bezier(0.4,0,0.2,1);overflow-y:auto;scrollbar-width:thin;}
+.drawer.open{transform:translateX(0);}
+.drawer-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.drawer-title{font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#e8d5a3!important;}
+.drawer-close{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.40)!important;font-size:14px;width:28px;height:28px;cursor:pointer;display:flex;align-items:center;justify-content:center;}
+.drawer-close:hover{color:#f5f2ec!important;border-color:var(--border-hover);}
+.drawer-section{padding:14px 18px;border-bottom:1px solid var(--border);}
+.drawer-section-title{font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(200,169,110,0.45)!important;margin-bottom:10px;}
+.drawer-field{display:flex;gap:8px;margin-bottom:7px;font-size:11px;}
+.drawer-field-label{color:rgba(240,236,228,0.30)!important;width:90px;flex-shrink:0;}
+.drawer-field-value{color:rgba(240,236,228,0.75)!important;flex:1;word-break:break-all;}
+.btn-run-inteldesk{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:10px;background:var(--accent-dim);border:1px solid rgba(200,169,110,0.25);color:#c8a96e!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;cursor:pointer;transition:all 0.2s;text-decoration:none;margin-top:10px;}
+.btn-run-inteldesk:hover{background:rgba(200,169,110,0.20);color:#e8d5a3!important;}
+.drawer-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.40);z-index:99;display:none;}
+.drawer-overlay.open{display:block;}
+
+.empty-state{padding:24px;text-align:center;font-size:11px;color:rgba(240,236,228,0.22)!important;line-height:1.8;}
+.no-key-msg{padding:16px;font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.7;border:1px solid rgba(200,169,110,0.12);margin:12px;background:rgba(200,169,110,0.04);}
+.no-key-msg a{color:#c8a96e!important;}
+
+.footer{margin-top:clamp(32px,5vw,48px);padding:20px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-size:11px;color:rgba(240,236,228,0.40)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-size:10px;color:rgba(240,236,228,0.22)!important;text-align:right;line-height:1.7;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:1100px){.main-grid{grid-template-columns:1fr 1fr;}.col-right{grid-column:span 2;display:grid;grid-template-columns:1fr 1fr;gap:2px;}}
+@media(max-width:720px){
+  .main-grid{grid-template-columns:1fr;}
+  .col-right{grid-column:1;display:flex;flex-direction:column;}
+  .stat-strip{grid-template-columns:1fr 1fr;}.stat-strip .stat-card:last-child{grid-column:span 2;}
+  .attack-grid{grid-template-columns:repeat(6,1fr);}
+  .drawer{width:100%;}
+  .footer-right{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- TOPBAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <div class="topbar-title">Cyber Threat <em>Intelligence</em></div>
+    <div class="topbar-badge">Live Dashboard</div>
+  </div>
+  <div class="topbar-right">
+    <div class="sync-row">
+      <div class="sync-dot" id="syncDot"></div>
+      <span id="syncLabel">Initializing…</span>
+    </div>
+    <button class="btn-refresh-all" onclick="refreshAll()">Refresh All ↺</button>
+  </div>
+</div>
+
+<!-- STAT STRIP -->
+<div class="stat-strip">
+  <div class="stat-card red">
+    <div class="stat-label">Active IOCs</div>
+    <div class="stat-num" id="stat-iocs" style="color:var(--crit)"><span class="stat-loading">—</span></div>
+    <div class="stat-sub" id="stat-iocs-sub">OTX + URLhaus</div>
+  </div>
+  <div class="stat-card amber">
+    <div class="stat-label">New CVEs 24h</div>
+    <div class="stat-num" id="stat-cves" style="color:var(--high)"><span class="stat-loading">—</span></div>
+    <div class="stat-sub" id="stat-cves-sub">Loading NVD…</div>
+  </div>
+  <div class="stat-card blue">
+    <div class="stat-label">CISA KEV Total</div>
+    <div class="stat-num" id="stat-kev" style="color:var(--med)"><span class="stat-loading">—</span></div>
+    <div class="stat-sub" id="stat-kev-sub">Known exploited</div>
+  </div>
+  <div class="stat-card green">
+    <div class="stat-label">OTX Pulses 24h</div>
+    <div class="stat-num" id="stat-pulses" style="color:var(--low)"><span class="stat-loading">—</span></div>
+    <div class="stat-sub">AlienVault OTX</div>
+  </div>
+  <div class="stat-card purple">
+    <div class="stat-label">Malware URLs</div>
+    <div class="stat-num" id="stat-urls" style="color:var(--purple)"><span class="stat-loading">—</span></div>
+    <div class="stat-sub" id="stat-urls-sub">URLhaus live</div>
+  </div>
+</div>
+
+<!-- MAIN GRID -->
+<div class="main-grid">
+
+<!-- LEFT COL -->
+<div class="col-left">
+
+  <!-- THREAT MAP -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">Global Threat Origin Map</span></div>
+      <div class="panel-meta" id="map-meta">OTX pulse origins</div>
+    </div>
+    <div class="map-container" id="mapContainer">
+      <svg id="threatMap" viewBox="0 0 800 400" xmlns="http://www.w3.org/2000/svg" style="background:#0a0a0a;">
+        <!-- World map paths (simplified) -->
+        <g id="worldPaths" fill="#161b22" stroke="rgba(99,178,255,0.08)" stroke-width="0.5">
+          <!-- North America -->
+          <path d="M80,60 L180,55 L200,80 L210,120 L190,150 L170,160 L150,170 L130,165 L110,180 L90,170 L70,140 L60,110 L70,80 Z"/>
+          <path d="M120,170 L140,175 L150,200 L140,220 L125,215 L115,195 Z"/>
+          <!-- South America -->
+          <path d="M160,230 L195,220 L210,240 L215,280 L200,320 L180,350 L165,345 L155,320 L150,280 L155,250 Z"/>
+          <!-- Europe -->
+          <path d="M340,55 L400,50 L420,65 L415,90 L395,95 L375,100 L355,90 L340,75 Z"/>
+          <!-- Africa -->
+          <path d="M350,110 L400,105 L420,120 L430,160 L425,210 L410,250 L390,270 L370,265 L355,240 L345,200 L340,160 L345,130 Z"/>
+          <!-- Asia (simplified) -->
+          <path d="M430,50 L550,45 L600,55 L620,80 L610,110 L580,130 L550,135 L510,125 L480,110 L450,90 L430,70 Z"/>
+          <path d="M480,130 L530,135 L560,155 L555,185 L530,195 L500,190 L475,175 L470,155 Z"/>
+          <!-- Middle East -->
+          <path d="M415,100 L455,95 L470,110 L465,135 L445,145 L420,140 L410,125 Z"/>
+          <!-- Australia -->
+          <path d="M560,250 L620,245 L645,265 L640,300 L615,315 L580,310 L560,290 L555,265 Z"/>
+          <!-- Russia -->
+          <path d="M430,30 L620,25 L680,40 L690,60 L660,70 L600,65 L540,55 L480,50 L440,45 Z"/>
+          <!-- UK/Ireland -->
+          <path d="M325,55 L340,52 L342,65 L330,68 Z"/>
+          <!-- Japan -->
+          <path d="M620,75 L635,70 L640,85 L628,90 Z"/>
+          <!-- Indonesia -->
+          <path d="M535,210 L580,205 L600,215 L595,230 L565,232 L540,225 Z"/>
+        </g>
+        <!-- Graticule lines -->
+        <line x1="0" y1="200" x2="800" y2="200" stroke="rgba(99,178,255,0.04)" stroke-width="0.5"/>
+        <line x1="400" y1="0" x2="400" y2="400" stroke="rgba(99,178,255,0.04)" stroke-width="0.5"/>
+        <!-- Threat dots added dynamically -->
+        <g id="threatDots"></g>
+        <!-- Arc lines -->
+        <g id="arcLines"></g>
+        <!-- Target pulse (default: US) -->
+        <g id="targetPulse">
+          <circle cx="150" cy="130" r="6" fill="none" stroke="#58a6ff" stroke-width="1" class="pulse-ring"/>
+          <circle cx="150" cy="130" r="4" fill="rgba(88,166,255,0.3)" stroke="#58a6ff" stroke-width="1"/>
+        </g>
+      </svg>
+      <div id="mapNoKey" class="no-key-msg" style="display:none;">IPInfo key required for IP geolocation. <a href="https://ipinfo.io/signup" target="_blank">Get free key ↗</a></div>
+    </div>
+  </div>
+
+  <!-- OTX LIVE FEED -->
+  <div class="panel" style="flex:1;">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">Live Intel Feed</span> — OTX Pulses</div>
+      <div class="panel-meta" id="feed-meta">Auto-refresh 5min</div>
+    </div>
+    <div class="panel-body" id="otxFeed" style="max-height:420px;">
+      <div class="empty-state">Loading OTX threat pulses…</div>
+    </div>
+  </div>
+
+</div><!-- /col-left -->
+
+<!-- MID COL -->
+<div class="col-mid">
+
+  <!-- ATT&CK HEATMAP -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">MITRE ATT&CK</span> — Activity Heatmap</div>
+      <div class="panel-meta">OTX keyword analysis</div>
+    </div>
+    <div id="attackHeatmap" style="padding:2px;"></div>
+  </div>
+
+  <!-- IOC TABLE -->
+  <div class="panel" style="flex:1;">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">IOC Table</span></div>
+      <div style="display:flex;gap:6px;align-items:center;">
+        <span class="panel-badge" id="ioc-count">0</span>
+        <button class="btn-export" onclick="exportIOCs()">Export JSON</button>
+      </div>
+    </div>
+    <div class="ioc-toolbar">
+      <input type="text" class="ioc-filter" placeholder="Filter by type, value, source…" oninput="filterIOCs(this.value)" id="iocFilter">
+      <select style="background:var(--bg3);border:1px solid var(--border);color:rgba(240,236,228,0.55);font-family:var(--mono);font-size:10px;padding:5px 8px;outline:none;cursor:pointer;" onchange="filterIOCsByType(this.value)">
+        <option value="">All types</option>
+        <option value="ip">IP</option>
+        <option value="domain">Domain</option>
+        <option value="hash">Hash</option>
+        <option value="url">URL</option>
+        <option value="email">Email</option>
+      </select>
+    </div>
+    <div class="panel-body" id="iocTable" style="max-height:360px;">
+      <div class="empty-state">Loading IOCs…</div>
+    </div>
+  </div>
+
+</div><!-- /col-mid -->
+
+<!-- RIGHT COL -->
+<div class="col-right">
+
+  <!-- NVD CVE FEED -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">NVD CVE Feed</span></div>
+      <div class="panel-meta">Last 24h · No key needed</div>
+    </div>
+    <div class="panel-body" id="cveFeed" style="max-height:320px;">
+      <div class="empty-state">Loading NVD data…</div>
+    </div>
+  </div>
+
+  <!-- CISA KEV -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">CISA KEV</span> — Latest Added</div>
+      <span class="panel-badge" id="kev-badge">—</span>
+    </div>
+    <div class="panel-body" id="kevFeed" style="max-height:280px;">
+      <div class="empty-state">Loading KEV catalog…</div>
+    </div>
+  </div>
+
+  <!-- URLhaus -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">URLhaus</span> — Malware URLs</div>
+      <div class="panel-meta" id="urlhaus-meta">Recent</div>
+    </div>
+    <div class="panel-body" id="urlhausFeed" style="max-height:240px;">
+      <div class="empty-state">Loading URLhaus feed…</div>
+    </div>
+  </div>
+
+  <!-- SIGNAL BARS -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">IOC Signal Distribution</span></div>
+    </div>
+    <div id="signalBars" style="padding:8px 0;">
+      <div class="empty-state" style="padding:12px;">Awaiting OTX data…</div>
+    </div>
+  </div>
+
+  <!-- FEED STATUS -->
+  <div class="panel">
+    <div class="panel-hdr">
+      <div class="panel-title"><span class="panel-title-accent">Feed Status</span></div>
+    </div>
+    <div id="feedStatus" style="padding:4px 0;">
+      <div class="feed-status-row"><div class="feed-status-dot loading" id="fs-nvd"></div><div class="feed-status-name">NVD CVE</div><div class="feed-status-info" id="fsi-nvd">Loading…</div></div>
+      <div class="feed-status-row"><div class="feed-status-dot loading" id="fs-kev"></div><div class="feed-status-name">CISA KEV</div><div class="feed-status-info" id="fsi-kev">Loading…</div></div>
+      <div class="feed-status-row"><div class="feed-status-dot loading" id="fs-otx"></div><div class="feed-status-name">AlienVault OTX</div><div class="feed-status-info" id="fsi-otx">Loading…</div></div>
+      <div class="feed-status-row"><div class="feed-status-dot loading" id="fs-urlhaus"></div><div class="feed-status-name">URLhaus</div><div class="feed-status-info" id="fsi-urlhaus">Loading…</div></div>
+      <div class="feed-status-row"><div class="feed-status-dot loading" id="fs-abuseipdb"></div><div class="feed-status-name">AbuseIPDB</div><div class="feed-status-info" id="fsi-abuseipdb">Ready</div></div>
+    </div>
+  </div>
+
+</div><!-- /col-right -->
+</div><!-- /main-grid -->
+
+<footer class="footer">
+  <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+  <div class="footer-right">NVD · CISA KEV · AlienVault OTX · URLhaus · AbuseIPDB · IPInfo · All data TLP:WHITE unless marked otherwise in OTX pulse metadata · IOCs defanged for safe display · Not for safety-of-life use</div>
+</footer>
+</div><!-- /page -->
+
+<!-- ENRICHMENT DRAWER -->
+<div class="drawer-overlay" id="drawerOverlay" onclick="closeDrawer()"></div>
+<div class="drawer" id="enrichDrawer">
+  <div class="drawer-hdr">
+    <div class="drawer-title" id="drawerTitle">IOC Details</div>
+    <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  </div>
+  <div id="drawerContent"></div>
+</div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+const CFG = {
+  OTX_KEY:      '3bf7a8773dc63f9fcf39639bd356792a0b69f77a78f92b9250dde522f291537d',
+  ABUSEIPDB_KEY:'c4c73e95174413d4eeae06dad2e9ad0496208c9baee5d04886dad7b1e2b23042433c6fc907dc6761',
+  IPINFO_KEY:   '2773fd95cb1740',
+  INTELDESK_BASE: window.parent !== window ? '' : 'https://inteldesk.io',
+};
+
+const TOOL_MAP = {
+  ip:     '#ip-intel',
+  domain: '#whois',
+  url:    '#url-intel',
+  email:  '#email-intel',
+  hash:   '#url-intel',
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let allIOCs     = [];
+let kevCatalog  = new Set();
+let attackScores = {};
+const CACHE_TTL = 5 * 60 * 1000;
+
+// ── UTILS ─────────────────────────────────────────────────────────────────────
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function defang(v) {
+  return String(v||'')
+    .replace(/\./g,'[.]')
+    .replace(/http/gi,'hxxp')
+    .replace(/:\/\//g,'[://]');
+}
+
+function timeAgo(dateStr) {
+  const d = new Date(dateStr);
+  if(isNaN(d)) return '—';
+  const s = Math.floor((Date.now() - d) / 1000);
+  if(s < 60)  return `${s}s ago`;
+  if(s < 3600) return `${Math.floor(s/60)}m ago`;
+  if(s < 86400) return `${Math.floor(s/3600)}h ago`;
+  return `${Math.floor(s/86400)}d ago`;
+}
+
+function cvssClass(score) {
+  const n = parseFloat(score);
+  if(n >= 9.0) return 'crit';
+  if(n >= 7.0) return 'high';
+  if(n >= 4.0) return 'med';
+  return 'low';
+}
+
+function cvssColor(score) {
+  const c = cvssClass(score);
+  return { crit:'var(--crit)', high:'var(--high)', med:'var(--med)', low:'var(--low)' }[c];
+}
+
+function setFeedStatus(id, state, info) {
+  const dot = document.getElementById(`fs-${id}`);
+  const inf = document.getElementById(`fsi-${id}`);
+  if(dot) dot.className = `feed-status-dot ${state}`;
+  if(inf) inf.textContent = info;
+}
+
+function saveCache(key, data) {
+  try { localStorage.setItem(key, JSON.stringify({ ts: Date.now(), data })); } catch(e){}
+}
+function loadCache(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    if(!raw) return null;
+    const { ts, data } = JSON.parse(raw);
+    if(Date.now() - ts < CACHE_TTL) return data;
+  } catch(e){}
+  return null;
+}
+
+// ── MITRE ATT&CK TACTICS & KEYWORDS ──────────────────────────────────────────
+const ATTACK_TACTICS = [
+  { id:'recon',      name:'Recon',         keywords:['recon','scanning','osint','scraping'] },
+  { id:'resource',   name:'Resource Dev',  keywords:['infrastructure','domain','account','c2'] },
+  { id:'initial',    name:'Initial Access',keywords:['phishing','exploit','vulnerability','cve','rce','sqli','lfi'] },
+  { id:'execution',  name:'Execution',     keywords:['powershell','macro','script','shellcode','payload','dropper'] },
+  { id:'persist',    name:'Persistence',   keywords:['persistence','backdoor','rootkit','registry','startup'] },
+  { id:'privesc',    name:'Priv Esc',      keywords:['privilege','escalation','bypass','uac','sudo'] },
+  { id:'evasion',    name:'Defense Evasion',keywords:['obfuscation','encode','pack','stealth','evasion','antivirus'] },
+  { id:'credential', name:'Cred Access',   keywords:['credential','password','dump','mimikatz','lsass','hash'] },
+  { id:'discovery',  name:'Discovery',     keywords:['discovery','enumeration','nmap','recon','scan','lateral'] },
+  { id:'lateral',    name:'Lateral Move',  keywords:['lateral','movement','rdp','smb','wmi','pass-the-hash'] },
+  { id:'exfil',      name:'Exfiltration',  keywords:['exfil','data','leak','steal','upload','c2','command'] },
+];
+
+function scoreAttack(pulses) {
+  const scores = {};
+  ATTACK_TACTICS.forEach(t => scores[t.id] = 0);
+  pulses.forEach(p => {
+    const text = ((p.name||'')+(p.description||'')+(p.tags||[]).join(' ')).toLowerCase();
+    ATTACK_TACTICS.forEach(t => {
+      t.keywords.forEach(kw => { if(text.includes(kw)) scores[t.id]++; });
+    });
+  });
+  return scores;
+}
+
+function renderAttackHeatmap(scores) {
+  const max = Math.max(1, ...Object.values(scores));
+  const grid = document.getElementById('attackHeatmap');
+
+  const cells = (tactic) => {
+    const score = scores[tactic.id] || 0;
+    const intensity = score / max;
+    return [0.3, 0.6, 1.0].map(level => {
+      const active = intensity >= level;
+      const alpha = active ? Math.min(0.9, intensity * 0.8 + 0.2) : 0.05;
+      const color = active ? `rgba(248,81,73,${alpha})` : `rgba(255,255,255,0.04)`;
+      return `<div class="attack-cell" style="background:${color};" title="${tactic.name}: ${score} matches" onclick="filterFeedByTactic('${tactic.id}')"></div>`;
+    }).join('');
+  };
+
+  grid.innerHTML = `<div class="attack-grid">${
+    ATTACK_TACTICS.map(t => `
+      <div class="attack-tactic">
+        <div class="attack-tactic-name">${esc(t.name)}</div>
+        ${cells(t)}
+      </div>`).join('')
+  }</div>`;
+}
+
+// ── NVD CVE ───────────────────────────────────────────────────────────────────
+async function fetchNVD() {
+  setFeedStatus('nvd','loading','Fetching…');
+  const cached = loadCache('nvd');
+  if(cached) { renderCVEs(cached); return; }
+
+  try {
+    const since = new Date(Date.now() - 86400000).toISOString().replace(/\.\d+Z$/,'.000');
+    const url = `https://services.nvd.nist.gov/rest/json/cves/2.0/?pubStartDate=${since}&pubEndDate=${new Date().toISOString().replace(/\.\d+Z$/,'.000')}&resultsPerPage=20`;
+    const r = await fetch(url);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    saveCache('nvd', d);
+    renderCVEs(d);
+    setFeedStatus('nvd','live',`${d.totalResults} CVEs today`);
+  } catch(e) {
+    setFeedStatus('nvd','error',e.message.slice(0,30));
+    document.getElementById('cveFeed').innerHTML = `<div class="empty-state">NVD fetch failed: ${esc(e.message)}</div>`;
+  }
+}
+
+function renderCVEs(d) {
+  const vulns = d.vulnerabilities || [];
+  const cvssScores = vulns.map(v => {
+    const metrics = v.cve?.metrics;
+    const cvss = metrics?.cvssMetricV31?.[0]?.cvssData?.baseScore
+      || metrics?.cvssMetricV30?.[0]?.cvssData?.baseScore
+      || metrics?.cvssMetricV2?.[0]?.cvssData?.baseScore || 0;
+    return { ...v, _cvss: parseFloat(cvss) };
+  }).sort((a,b) => b._cvss - a._cvss);
+
+  const crit = cvssScores.filter(v => v._cvss >= 9.0).length;
+  document.getElementById('stat-cves').textContent = vulns.length;
+  document.getElementById('stat-cves-sub').textContent = `${crit} critical`;
+
+  document.getElementById('cveFeed').innerHTML = cvssScores.map(v => {
+    const id    = v.cve?.id || '—';
+    const desc  = v.cve?.descriptions?.find(d=>d.lang==='en')?.value || '—';
+    const score = v._cvss;
+    const cls   = cvssClass(score);
+    const color = cvssColor(score);
+    const isKEV = kevCatalog.has(id);
+    const pct   = Math.min(100, (score/10)*100).toFixed(0);
+    const published = v.cve?.published || '';
+
+    return `<div class="cve-item" onclick="window.open('https://nvd.nist.gov/vuln/detail/${esc(id)}','_blank')">
+      <div class="cve-row1">
+        <span class="cve-id">${esc(id)}</span>
+        <span class="cve-score ${cls}">${score.toFixed(1)}</span>
+        ${isKEV ? '<span class="kev-badge">KEV</span>' : ''}
+      </div>
+      <div class="cve-bar-wrap"><div class="cve-bar" style="width:${pct}%;background:${color};"></div></div>
+      <div class="cve-desc" title="${esc(desc)}">${esc(desc.slice(0,120))}…</div>
+      <div class="cve-time">${timeAgo(published)}</div>
+    </div>`;
+  }).join('') || '<div class="empty-state">No CVEs in last 24h</div>';
+}
+
+// ── CISA KEV ──────────────────────────────────────────────────────────────────
+async function fetchKEV() {
+  setFeedStatus('kev','loading','Fetching…');
+  const cached = loadCache('kev');
+  if(cached) { renderKEV(cached); return; }
+
+  try {
+    const r = await fetch('https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json');
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    saveCache('kev', d);
+    renderKEV(d);
+    setFeedStatus('kev','live',`${d.count} entries`);
+  } catch(e) {
+    setFeedStatus('kev','error',e.message.slice(0,30));
+  }
+}
+
+function renderKEV(d) {
+  const vulns = d.vulnerabilities || [];
+  // Build lookup set for cross-referencing CVEs
+  vulns.forEach(v => kevCatalog.add(v.cveID));
+
+  document.getElementById('stat-kev').textContent = d.count || vulns.length;
+  document.getElementById('kev-badge').textContent = `${d.count || vulns.length} total`;
+
+  // Show most recent 15
+  const recent = [...vulns].sort((a,b) =>
+    new Date(b.dateAdded) - new Date(a.dateAdded)
+  ).slice(0,15);
+
+  document.getElementById('kevFeed').innerHTML = recent.map(v => `
+    <div class="kev-item">
+      <div class="kev-id">${esc(v.cveID)}</div>
+      <div class="kev-name">${esc((v.vulnerabilityName||'').slice(0,80))}</div>
+      <div class="kev-meta">
+        <span class="kev-vendor">${esc(v.vendorProject)} · ${esc(v.product)}</span>
+        ${v.dueDate ? `<span class="kev-due">Due: ${esc(v.dueDate)}</span>` : ''}
+        ${v.knownRansomwareCampaignUse === 'Known' ? '<span class="kev-ransomware">Ransomware</span>' : ''}
+      </div>
+    </div>`).join('');
+}
+
+// ── ALIENVAULT OTX ────────────────────────────────────────────────────────────
+async function fetchOTX() {
+  if(!CFG.OTX_KEY) {
+    document.getElementById('otxFeed').innerHTML = `<div class="no-key-msg">Add your free OTX API key to unlock live threat pulses → <a href="https://otx.alienvault.com" target="_blank">otx.alienvault.com ↗</a></div>`;
+    setFeedStatus('otx','nokey','No key set');
+    return;
+  }
+  setFeedStatus('otx','loading','Fetching pulses…');
+  const cached = loadCache('otx_pulses');
+  if(cached) { renderOTX(cached); return; }
+
+  try {
+    const since = new Date(Date.now() - 86400000).toISOString();
+    const r = await fetch(
+      `https://otx.alienvault.com/api/v1/pulses/subscribed?limit=30&modified_since=${encodeURIComponent(since)}`,
+      { headers: { 'X-OTX-API-KEY': CFG.OTX_KEY } }
+    );
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    saveCache('otx_pulses', d);
+    renderOTX(d);
+    setFeedStatus('otx','live',`${d.count||0} pulses 24h`);
+  } catch(e) {
+    setFeedStatus('otx','error',e.message.slice(0,30));
+    document.getElementById('otxFeed').innerHTML = `<div class="empty-state">OTX fetch failed: ${esc(e.message)}</div>`;
+  }
+}
+
+function sevClass(pulse) {
+  const iocs = pulse.indicator_count || pulse.indicators?.length || 0;
+  const tags = ((pulse.tags||[]).join(' ')+(pulse.name||'')+(pulse.description||'')).toLowerCase();
+  if(iocs > 100 || tags.includes('critical') || tags.includes('ransomware')) return 'crit';
+  if(iocs > 30  || tags.includes('apt') || tags.includes('nation')) return 'high';
+  if(iocs > 5)  return 'med';
+  return 'low';
+}
+
+function renderOTX(d) {
+  const pulses = d.results || [];
+  document.getElementById('stat-pulses').textContent = pulses.length;
+  document.getElementById('feed-meta').textContent = `${pulses.length} pulses · auto-refresh 5min`;
+
+  // Score ATT&CK heatmap
+  const scores = scoreAttack(pulses);
+  renderAttackHeatmap(scores);
+
+  // Count IOC types
+  const typeCounts = { IPv4:0, Domain:0, URL:0, FileHash:0, Email:0 };
+  const newIOCs = [];
+
+  pulses.forEach(p => {
+    if(p.indicators) {
+      p.indicators.forEach(ind => {
+        const t = ind.type || '';
+        if(t === 'IPv4') typeCounts.IPv4++;
+        else if(t === 'domain' || t === 'hostname') typeCounts.Domain++;
+        else if(t === 'URL') typeCounts.URL++;
+        else if(t.startsWith('FileHash')) typeCounts.FileHash++;
+        else if(t === 'email') typeCounts.Email++;
+
+        newIOCs.push({
+          type: t === 'IPv4' ? 'ip' : t === 'domain' || t === 'hostname' ? 'domain' : t === 'URL' ? 'url' : t.startsWith('FileHash') ? 'hash' : t === 'email' ? 'email' : 'url',
+          value: ind.indicator,
+          source: 'OTX',
+          actor: p.author_name || '—',
+          pulse: p.name,
+          tlp: p.tlp || 'white',
+          ts: p.modified,
+        });
+      });
+    }
+  });
+
+  // Merge into global IOC list (dedupe by value)
+  const existing = new Set(allIOCs.map(i => i.value));
+  newIOCs.forEach(i => { if(!existing.has(i.value)) allIOCs.push(i); });
+  document.getElementById('stat-iocs').textContent = allIOCs.length;
+
+  renderSignalBars(typeCounts);
+  renderIOCTable();
+
+  // Plot threat map dots from pulse actor country/name
+  plotThreatMap(pulses);
+
+  // Render feed
+  document.getElementById('otxFeed').innerHTML = pulses.map(p => {
+    const cls    = sevClass(p);
+    const iocs   = p.indicator_count || 0;
+    const tags   = (p.tags||[]).slice(0,3);
+    const conf   = Math.min(100, 40 + iocs/2);
+    const sevColors = { crit:var_crit, high:var_high, med:var_med, low:var_low };
+    const colors = { crit:'#f85149', high:'#d29922', med:'#58a6ff', low:'#3fb950' };
+    return `<div class="feed-item" onclick="openPulseDrawer('${esc(p.id||'')}','${esc((p.name||'').replace(/'/g,"\\\'"))}')">
+      <div class="feed-sev" style="background:${colors[cls]||'#58a6ff'};"></div>
+      <div class="feed-body">
+        <div class="feed-title">${esc((p.name||'').slice(0,100))}</div>
+        <div class="feed-meta">
+          <span class="feed-tag ${cls}">${cls.toUpperCase()}</span>
+          ${tags.map(t=>`<span class="feed-tag med">${esc(t.slice(0,20))}</span>`).join('')}
+          <span class="feed-ioc-count">${iocs} IOCs</span>
+          <span class="feed-conf">${Math.round(conf)}% conf</span>
+          <span class="feed-time">${timeAgo(p.modified)}</span>
+        </div>
+      </div>
+    </div>`;
+  }).join('') || '<div class="empty-state">No pulses in last 24h</div>';
+}
+
+// ── URLHAUS ───────────────────────────────────────────────────────────────────
+async function fetchURLhaus() {
+  setFeedStatus('urlhaus','loading','Fetching…');
+  const cached = loadCache('urlhaus');
+  if(cached) { renderURLhaus(cached); return; }
+
+  try {
+    const r = await fetch('https://urlhaus-api.abuse.ch/v1/urls/recent/limit/30/', {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'limit=30'
+    });
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+    saveCache('urlhaus', d);
+    renderURLhaus(d);
+    setFeedStatus('urlhaus','live','No key needed');
+  } catch(e) {
+    setFeedStatus('urlhaus','error',e.message.slice(0,30));
+    document.getElementById('urlhausFeed').innerHTML = `<div class="empty-state">URLhaus fetch failed</div>`;
+  }
+}
+
+function renderURLhaus(d) {
+  const urls = d.urls || [];
+  const online  = urls.filter(u => u.url_status === 'online').length;
+  const offline = urls.filter(u => u.url_status === 'offline').length;
+
+  document.getElementById('stat-urls').textContent = urls.length;
+  document.getElementById('stat-urls-sub').textContent = `${online} online · ${offline} offline`;
+  document.getElementById('urlhaus-meta').textContent = `${online} active`;
+
+  // Add URL IOCs
+  const existing = new Set(allIOCs.map(i => i.value));
+  urls.forEach(u => {
+    if(!existing.has(u.url)) {
+      allIOCs.push({ type:'url', value:u.url, source:'URLhaus', ts:u.date_added, tags:(u.tags||[]) });
+      existing.add(u.url);
+    }
+  });
+  document.getElementById('stat-iocs').textContent = allIOCs.length;
+  renderIOCTable();
+
+  document.getElementById('urlhausFeed').innerHTML = urls.slice(0,20).map(u => `
+    <div class="url-item">
+      <div class="url-row1">
+        <span class="url-status ${u.url_status === 'online' ? 'online' : 'offline'}">${u.url_status||'unknown'}</span>
+        <span class="url-value" title="${esc(u.url)}">${esc(defang(u.url||'').slice(0,60))}…</span>
+      </div>
+      <div class="url-meta">
+        ${(u.tags||[]).slice(0,3).map(t=>`<span class="url-tag">${esc(t)}</span>`).join('')}
+        <span class="url-date">${timeAgo(u.date_added)}</span>
+      </div>
+    </div>`).join('') || '<div class="empty-state">No malware URLs loaded</div>';
+}
+
+// ── SIGNAL BARS ───────────────────────────────────────────────────────────────
+function renderSignalBars(counts) {
+  const total = Object.values(counts).reduce((a,b)=>a+b,0) || 1;
+  const colors = { IPv4:'var(--crit)', Domain:'var(--high)', URL:'var(--low)', FileHash:'var(--purple)', Email:'var(--med)' };
+
+  document.getElementById('signalBars').innerHTML = Object.entries(counts)
+    .sort((a,b)=>b[1]-a[1])
+    .map(([type,count]) => `
+      <div class="signal-row">
+        <div class="signal-label">${esc(type)}</div>
+        <div class="signal-bar-track">
+          <div class="signal-bar-fill" style="width:${(count/total*100).toFixed(1)}%;background:${colors[type]||'var(--med)'}"></div>
+        </div>
+        <div class="signal-count">${count.toLocaleString()}</div>
+      </div>`).join('');
+}
+
+// ── IOC TABLE ─────────────────────────────────────────────────────────────────
+let iocTypeFilter = '';
+
+function renderIOCTable() {
+  const list = allIOCs.slice(0,200);
+  document.getElementById('ioc-count').textContent = allIOCs.length;
+
+  if(!list.length){
+    document.getElementById('iocTable').innerHTML = '<div class="empty-state">No IOCs loaded yet</div>';
+    return;
+  }
+
+  document.getElementById('iocTable').innerHTML = list.map((ioc,i) => {
+    const typeClass = ioc.type || 'url';
+    const link = TOOL_MAP[typeClass] || '';
+    const defanged = ['ip','domain','url'].includes(typeClass) ? defang(ioc.value) : ioc.value;
+    const toolName = { ip:'IP Intel', domain:'WHOIS', url:'URL Intel', email:'Email Intel', hash:'Hash' }[typeClass] || 'Inspect';
+    return `<div class="ioc-row ${iocTypeFilter && ioc.type !== iocTypeFilter ? 'filtered-out' : ''}" data-text="${esc((ioc.type+' '+ioc.value+' '+ioc.source).toLowerCase())}" onclick="openIOCDrawer(${i})">
+      <span class="ioc-type ${typeClass}">${esc(typeClass.toUpperCase())}</span>
+      <span class="ioc-value" title="${esc(ioc.value)}">${esc(defanged.slice(0,50))}${defanged.length>50?'…':''}</span>
+      <span class="ioc-source">${esc(ioc.source||'—')}</span>
+      <a class="ioc-action" href="${esc(CFG.INTELDESK_BASE+link)}" target="${window.parent!==window?'_self':'_blank'}" onclick="event.stopPropagation()">→ ${esc(toolName)}</a>
+    </div>`;
+  }).join('');
+}
+
+function filterIOCs(q) {
+  q = q.toLowerCase();
+  document.querySelectorAll('.ioc-row').forEach(row => {
+    const text = row.dataset.text || '';
+    const typeMatch = !iocTypeFilter || text.startsWith(iocTypeFilter);
+    row.classList.toggle('filtered-out', q.length > 0 ? !text.includes(q) : !typeMatch);
+  });
+}
+
+function filterIOCsByType(t) {
+  iocTypeFilter = t;
+  const q = document.getElementById('iocFilter').value.toLowerCase();
+  document.querySelectorAll('.ioc-row').forEach(row => {
+    const text = row.dataset.text || '';
+    const typeMatch = !t || text.startsWith(t);
+    row.classList.toggle('filtered-out', !typeMatch || (q && !text.includes(q)));
+  });
+}
+
+function filterFeedByTactic(tacticId) {
+  const tactic = ATTACK_TACTICS.find(t => t.id === tacticId);
+  if(!tactic) return;
+  document.getElementById('iocFilter').value = tactic.keywords[0];
+  filterIOCs(tactic.keywords[0]);
+}
+
+function exportIOCs() {
+  const data = JSON.stringify({ generated: new Date().toISOString(), iocs: allIOCs }, null, 2);
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(data);
+  a.download = `inteldesk_iocs_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// ── THREAT MAP ────────────────────────────────────────────────────────────────
+const COUNTRY_COORDS = {
+  US:[150,130],RU:[500,70],CN:[580,120],IR:[460,130],KP:[610,100],
+  TR:[430,115],IN:[520,160],BR:[200,290],DE:[380,85],UA:[430,95],
+  GB:[335,80],FR:[360,92],IL:[430,130],PK:[510,140],SA:[455,150],
+  NG:[375,200],EG:[420,150],ZA:[400,300],AU:[590,290],JP:[625,110],
+  ID:[570,215],TH:[560,175],VN:[570,165],MY:[565,200],PH:[600,175],
+};
+
+function plotThreatMap(pulses) {
+  const originCounts = {};
+  pulses.forEach(p => {
+    const country = p.author_country || p.targeted_countries?.[0] || 'US';
+    originCounts[country] = (originCounts[country]||0)+1;
+  });
+
+  const dots = document.getElementById('threatDots');
+  const arcs = document.getElementById('arcLines');
+  dots.innerHTML = '';
+  arcs.innerHTML = '';
+
+  const max = Math.max(1, ...Object.values(originCounts));
+
+  Object.entries(originCounts).forEach(([cc, count]) => {
+    const coords = COUNTRY_COORDS[cc];
+    if(!coords) return;
+    const [cx, cy] = coords;
+    const r = Math.max(3, Math.min(12, 3 + (count/max)*9));
+    const intensity = count/max;
+    const color = intensity > 0.6 ? '#f85149' : intensity > 0.3 ? '#d29922' : '#58a6ff';
+
+    dots.innerHTML += `
+      <g class="threat-dot" title="${cc}: ${count} pulses">
+        <circle cx="${cx}" cy="${cy}" r="${r*1.8}" fill="${color}" opacity="0.08"/>
+        <circle cx="${cx}" cy="${cy}" r="${r}" fill="${color}" opacity="0.75"/>
+        <text x="${cx+r+3}" y="${cy+3}" fill="${color}" font-family="monospace" font-size="7" opacity="0.7">${cc}</text>
+      </g>`;
+
+    // Arc to US target
+    const [tx, ty] = [150, 130];
+    if(cx !== tx || cy !== ty) {
+      const mx = (cx+tx)/2;
+      const my = Math.min(cy,ty) - 40 - (count/max)*30;
+      arcs.innerHTML += `<path d="M${cx},${cy} Q${mx},${my} ${tx},${ty}" fill="none" stroke="${color}" stroke-width="0.6" opacity="0.25" class="arc-line"/>`;
+    }
+  });
+
+  document.getElementById('map-meta').textContent = `${Object.keys(originCounts).length} threat origins · ${pulses.length} pulses`;
+}
+
+// ── ENRICHMENT DRAWER ─────────────────────────────────────────────────────────
+function openIOCDrawer(idx) {
+  const ioc = allIOCs[idx];
+  if(!ioc) return;
+
+  document.getElementById('drawerTitle').textContent = ioc.type.toUpperCase() + ' — Details';
+  const link = CFG.INTELDESK_BASE + (TOOL_MAP[ioc.type] || '#');
+  const defanged = ['ip','domain','url'].includes(ioc.type) ? defang(ioc.value) : ioc.value;
+
+  document.getElementById('drawerContent').innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-section-title">Indicator</div>
+      <div class="drawer-field"><div class="drawer-field-label">Type</div><div class="drawer-field-value" style="color:var(--accent)">${esc(ioc.type.toUpperCase())}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Value</div><div class="drawer-field-value" style="font-family:var(--mono);font-size:10px;">${esc(defanged)}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Source</div><div class="drawer-field-value">${esc(ioc.source||'—')}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Actor</div><div class="drawer-field-value">${esc(ioc.actor||'—')}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Pulse</div><div class="drawer-field-value" style="font-size:10px;">${esc((ioc.pulse||'—').slice(0,80))}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">TLP</div><div class="drawer-field-value">${esc((ioc.tlp||'white').toUpperCase())}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">First seen</div><div class="drawer-field-value">${timeAgo(ioc.ts)}</div></div>
+    </div>
+    <div class="drawer-section">
+      <div class="drawer-section-title">Investigate in IntelDesk</div>
+      <a class="btn-run-inteldesk" href="${esc(link)}" target="${window.parent!==window?'_self':'_blank'}">
+        → Open in IntelDesk
+      </a>
+      ${ioc.type === 'ip' ? `
+        <div id="abuseResult" style="margin-top:10px;font-size:11px;color:rgba(240,236,228,0.35)">Loading AbuseIPDB…</div>
+      ` : ''}
+    </div>`;
+
+  if(ioc.type === 'ip' && CFG.ABUSEIPDB_KEY) {
+    enrichWithAbuseIPDB(ioc.value);
+  }
+
+  openDrawer();
+}
+
+function openPulseDrawer(id, name) {
+  document.getElementById('drawerTitle').textContent = 'OTX Pulse';
+  document.getElementById('drawerContent').innerHTML = `
+    <div class="drawer-section">
+      <div class="drawer-section-title">Pulse</div>
+      <div class="drawer-field"><div class="drawer-field-label">Name</div><div class="drawer-field-value">${esc(name)}</div></div>
+      <div class="drawer-field"><div class="drawer-field-label">Pulse ID</div><div class="drawer-field-value" style="font-size:10px;">${esc(id)}</div></div>
+    </div>
+    <div class="drawer-section">
+      <a class="btn-run-inteldesk" href="https://otx.alienvault.com/pulse/${esc(id)}" target="_blank">→ View on OTX ↗</a>
+    </div>`;
+  openDrawer();
+}
+
+async function enrichWithAbuseIPDB(ip) {
+  try {
+    const r = await fetch(
+      `https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(ip)}&maxAgeInDays=90`,
+      { headers: { 'Key': CFG.ABUSEIPDB_KEY, 'Accept': 'application/json' } }
+    );
+    const d = await r.json();
+    const data = d.data;
+    if(!data) return;
+
+    const score = data.abuseConfidenceScore;
+    const cls   = score >= 80 ? 'crit' : score >= 30 ? 'high' : 'low';
+    const colors = { crit:'var(--crit)', high:'var(--high)', low:'var(--low)' };
+
+    document.getElementById('abuseResult').innerHTML = `
+      <div style="margin-top:10px;">
+        <div style="font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(200,169,110,0.45);margin-bottom:8px;">AbuseIPDB Enrichment</div>
+        <div class="drawer-field"><div class="drawer-field-label">Abuse Score</div><div class="drawer-field-value" style="color:${colors[cls]}">${score}%</div></div>
+        <div class="drawer-field"><div class="drawer-field-label">Reports</div><div class="drawer-field-value">${data.totalReports}</div></div>
+        <div class="drawer-field"><div class="drawer-field-label">Country</div><div class="drawer-field-value">${esc(data.countryCode)}</div></div>
+        <div class="drawer-field"><div class="drawer-field-label">ISP</div><div class="drawer-field-value" style="font-size:10px;">${esc(data.isp||'—')}</div></div>
+        <div class="drawer-field"><div class="drawer-field-label">Usage Type</div><div class="drawer-field-value">${esc(data.usageType||'—')}</div></div>
+      </div>`;
+    setFeedStatus('abuseipdb','live','Active');
+  } catch(e) {
+    setFeedStatus('abuseipdb','error',e.message.slice(0,25));
+  }
+}
+
+function openDrawer() {
+  document.getElementById('enrichDrawer').classList.add('open');
+  document.getElementById('drawerOverlay').classList.add('open');
+}
+function closeDrawer() {
+  document.getElementById('enrichDrawer').classList.remove('open');
+  document.getElementById('drawerOverlay').classList.remove('open');
+}
+
+// ── REFRESH & INIT ────────────────────────────────────────────────────────────
+let refreshTimer = null;
+
+function refreshAll() {
+  localStorage.removeItem('nvd');
+  localStorage.removeItem('kev');
+  localStorage.removeItem('otx_pulses');
+  localStorage.removeItem('urlhaus');
+  allIOCs = [];
+  kevCatalog.clear();
+  init();
+}
+
+async function init() {
+  document.getElementById('syncLabel').textContent = 'Loading feeds…';
+
+  await Promise.all([
+    fetchNVD(),
+    fetchKEV(),
+    fetchOTX(),
+    fetchURLhaus(),
+  ]);
+
+  document.getElementById('syncLabel').textContent = `Last sync: ${new Date().toLocaleTimeString()}`;
+
+  // Auto-refresh every 5 minutes
+  if(refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    localStorage.removeItem('nvd');
+    localStorage.removeItem('kev');
+    localStorage.removeItem('otx_pulses');
+    localStorage.removeItem('urlhaus');
+    allIOCs = [];
+    kevCatalog.clear();
+    init();
+  }, 5 * 60 * 1000);
+}
+
+// Workaround for template literal in feed render
+const var_crit = '#f85149';
+const var_high  = '#d29922';
+const var_med   = '#58a6ff';
+const var_low   = '#3fb950';
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
