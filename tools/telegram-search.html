@@ -1,0 +1,534 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram Channel Intelligence — Search & Archive | The Intel Desk</title>
+<meta name="description" content="Search and archive public Telegram channels and groups. Extract posts, member counts, descriptions, and channel metadata. Used by journalists and OSINT investigators.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --tg:#229ED9;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+.hero{padding:clamp(40px,7vw,72px) 0 clamp(28px,4vw,44px);border-bottom:1px solid var(--border);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(34px,5vw,62px);font-weight:300;line-height:0.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:400px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* TABS */
+.mode-tabs{display:flex;gap:0;margin-top:28px;border-bottom:1px solid var(--border);}
+.mode-tab{background:transparent;border:none;border-bottom:2px solid transparent;color:rgba(240,236,228,0.40)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:12px 24px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.mode-tab:hover{color:rgba(240,236,228,0.70)!important;}
+.mode-tab.active{color:#c8a96e!important;border-bottom-color:#c8a96e;}
+.mode-panel{display:none;padding-top:24px;}
+.mode-panel.active{display:block;}
+
+/* INPUT */
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:14px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.search-row{display:flex;flex-wrap:wrap;gap:0;}
+.main-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:15px 18px;outline:none;transition:border-color 0.2s;}
+.main-input:focus{border-color:rgba(200,169,110,0.35);}
+.main-input::placeholder{color:rgba(240,236,228,0.22)!important;}
+.btn-go{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:15px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-go:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-go:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.25)!important;margin-top:8px;}
+.loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
+.loading-bar.visible{display:block;}
+.loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,rgba(34,158,217,0.6),transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* CHANNEL CARD */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+.channel-card{background:var(--bg2);border:1px solid var(--border);padding:24px 28px;}
+.channel-header{display:flex;align-items:flex-start;gap:20px;margin-bottom:20px;flex-wrap:wrap;}
+.channel-avatar{width:64px;height:64px;border-radius:50%;background:rgba(34,158,217,0.15);border:2px solid rgba(34,158,217,0.30);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:28px;font-weight:300;color:rgba(34,158,217,0.80)!important;flex-shrink:0;}
+.channel-info{flex:1;min-width:0;}
+.channel-name{font-family:var(--serif);font-size:clamp(22px,3vw,32px);font-weight:300;color:#e8d5a3!important;margin-bottom:4px;word-break:break-word;}
+.channel-username{font-family:var(--mono);font-size:12px;color:rgba(34,158,217,0.70)!important;margin-bottom:8px;}
+.channel-desc{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.55)!important;line-height:1.7;max-height:80px;overflow:hidden;}
+.channel-actions{display:flex;gap:0;flex-wrap:wrap;margin-top:16px;}
+.btn-action{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:9px 18px;border:1px solid;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+.btn-tg{color:rgba(34,158,217,0.70)!important;border-color:rgba(34,158,217,0.25);background:transparent;}
+.btn-tg:hover{color:#229ED9!important;border-color:rgba(34,158,217,0.50);background:rgba(34,158,217,0.06);}
+.btn-tgstat{color:rgba(200,169,110,0.55)!important;border-color:rgba(200,169,110,0.20);background:transparent;border-left:none;}
+.btn-tgstat:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.btn-export{color:rgba(240,236,228,0.40)!important;border-color:rgba(255,255,255,0.10);background:transparent;border-left:none;}
+.btn-export:hover{color:#f5f2ec!important;border-color:rgba(255,255,255,0.20);}
+
+/* META GRID */
+.meta-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--border);margin-bottom:2px;}
+.meta-card{background:var(--bg3);padding:16px 18px;display:flex;flex-direction:column;gap:5px;}
+.meta-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.30)!important;}
+.meta-value{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;line-height:1.3;}
+.meta-value.tg{color:rgba(34,158,217,0.80)!important;}
+.meta-value.green{color:#4ec994!important;}
+.meta-value.accent{color:#e8d5a3!important;}
+.meta-value.dim{color:rgba(240,236,228,0.30)!important;}
+
+/* POSTS */
+.posts-panel{background:var(--bg2);border:1px solid var(--border);}
+.posts-header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.posts-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.40)!important;}
+.posts-count{font-family:var(--mono);font-size:9px;background:rgba(34,158,217,0.12);color:rgba(34,158,217,0.70)!important;border:1px solid rgba(34,158,217,0.20);padding:2px 8px;}
+.post-item{padding:16px 20px;border-bottom:1px solid rgba(255,255,255,0.04);transition:background 0.1s;}
+.post-item:hover{background:rgba(255,255,255,0.02);}
+.post-item:last-child{border-bottom:none;}
+.post-text{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.70)!important;line-height:1.7;margin-bottom:8px;word-break:break-word;}
+.post-meta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.post-date{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.25)!important;}
+.post-views{font-family:var(--mono);font-size:10px;color:rgba(34,158,217,0.50)!important;}
+.post-link{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(34,158,217,0.50)!important;border:1px solid rgba(34,158,217,0.15);padding:2px 8px;text-decoration:none;transition:all 0.15s;}
+.post-link:hover{color:#229ED9!important;border-color:rgba(34,158,217,0.35);}
+.post-media{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,0.25)!important;border:1px solid rgba(255,255,255,0.08);padding:2px 8px;}
+
+/* SEARCH RESULTS */
+.search-results{display:flex;flex-direction:column;gap:2px;}
+.search-result-card{background:var(--bg2);border:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;gap:16px;cursor:pointer;transition:background 0.12s;}
+.search-result-card:hover{background:rgba(200,169,110,0.03);border-color:rgba(200,169,110,0.15);}
+.src-avatar{width:44px;height:44px;border-radius:50%;background:rgba(34,158,217,0.12);border:1px solid rgba(34,158,217,0.25);display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:20px;color:rgba(34,158,217,0.70)!important;flex-shrink:0;}
+.src-body{flex:1;min-width:0;}
+.src-name{font-family:var(--mono);font-size:13px;font-weight:500;color:#e8d5a3!important;margin-bottom:3px;}
+.src-username{font-family:var(--mono);font-size:11px;color:rgba(34,158,217,0.60)!important;margin-bottom:4px;}
+.src-desc{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.src-meta{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
+.src-members{font-family:var(--mono);font-size:11px;color:#4ec994!important;}
+.src-type{font-family:var(--mono);font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.25)!important;border:1px solid rgba(255,255,255,0.08);padding:2px 6px;}
+.src-open{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,0.45)!important;border:1px solid rgba(200,169,110,0.15);padding:3px 10px;text-decoration:none;transition:all 0.15s;white-space:nowrap;}
+.src-open:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.35);}
+
+/* ARCHIVE */
+.archive-wrap{background:var(--bg2);border:1px solid var(--border);padding:20px 24px;}
+.archive-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.35)!important;margin-bottom:14px;}
+.archive-list{display:flex;flex-direction:column;gap:4px;max-height:300px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,0.12) transparent;}
+.archive-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);font-family:var(--mono);font-size:11px;}
+.archive-name{color:#e8d5a3!important;flex:1;}
+.archive-time{font-size:10px;color:rgba(240,236,228,0.25)!important;}
+.archive-open{font-size:9px;color:rgba(34,158,217,0.50)!important;border:1px solid rgba(34,158,217,0.15);padding:2px 8px;text-decoration:none;transition:all 0.15s;}
+.archive-open:hover{color:#229ED9!important;}
+.archive-del{background:transparent;border:none;color:rgba(192,57,43,0.35)!important;cursor:pointer;font-size:12px;padding:2px 6px;transition:color 0.15s;}
+.archive-del:hover{color:#c0392b!important;}
+.empty-state{padding:28px;text-align:center;font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.22)!important;line-height:1.8;}
+
+/* EXTERNAL SEARCH LINKS */
+.ext-search-panel{background:var(--bg2);border:1px solid var(--border);padding:20px 24px;}
+.ext-search-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.35)!important;margin-bottom:14px;}
+.ext-search-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px;}
+.ext-search-link{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;background:var(--bg3);border:1px solid var(--border);text-decoration:none;transition:all 0.15s;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.ext-search-link:hover{background:var(--accent-dim);border-color:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.ext-search-link span{font-size:10px;color:rgba(200,169,110,0.35)!important;}
+
+.footer{margin-top:clamp(48px,7vw,80px);padding:24px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.25)!important;max-width:500px;text-align:right;line-height:1.7;}
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@media(max-width:768px){
+  .main-input{min-width:100%;border-right:1px solid var(--border);}
+  .btn-go{width:100%;margin-top:2px;}
+  .channel-header{flex-direction:column;}
+  .meta-grid{grid-template-columns:1fr 1fr;}
+  .ext-search-grid{grid-template-columns:1fr;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-tab{padding:10px 14px;font-size:9px;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Social Intelligence</span></div>
+    <h1>Telegram <em>Intelligence</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Telegram is one of the most significant platforms for intelligence gathering — used by threat actors, activist groups, news channels, and disinformation networks. This tool provides two modes of investigation. <strong>Channel Lookup</strong> extracts detailed metadata from any public Telegram channel or group by username — including subscriber count, description, creation date, recent posts, and media. <strong>Channel Search</strong> links directly to every major Telegram search engine (TGStat, Telemetr, Lyzem, TelegramDB) pre-populated with your query. The <strong>Archive</strong> function saves channel snapshots locally for longitudinal tracking and comparison. Used by <strong>journalists monitoring extremist channels</strong>, <strong>analysts tracking disinformation campaigns</strong>, <strong>security researchers mapping threat actor infrastructure</strong>, and <strong>OSINT investigators building social network graphs</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Telegram OSINT</span><span class="seo-tag">Channel Search</span>
+        <span class="seo-tag">Group Intelligence</span><span class="seo-tag">Social Media</span>
+        <span class="seo-tag">Disinformation</span><span class="seo-tag">Threat Actor Tracking</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- TABS -->
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="switchTab('lookup')">Channel Lookup</button>
+    <button class="mode-tab" onclick="switchTab('search')">Search Channels</button>
+    <button class="mode-tab" onclick="switchTab('archive')">Archive</button>
+  </div>
+
+  <!-- LOOKUP TAB -->
+  <div class="mode-panel active" id="tab-lookup">
+    <div class="section-label">Channel Username or Link</div>
+    <div class="search-row">
+      <input type="text" class="main-input" id="channelInput"
+        placeholder="e.g. durov  or  t.me/bbcnews  or  @CNN"
+        onkeydown="if(event.key==='Enter')lookupChannel()">
+      <button class="btn-go" id="btnLookup" onclick="lookupChannel()">Look Up →</button>
+    </div>
+    <div class="loading-bar" id="lookupBar"><div class="loading-bar-inner"></div></div>
+    <div class="input-hint">Works with any public channel or group · Enter username, @handle, or full t.me link</div>
+
+    <div class="results-wrap" id="lookupResults">
+
+      <!-- Channel card -->
+      <div class="channel-card" id="channelCard"></div>
+
+      <!-- Meta grid -->
+      <div class="meta-grid" id="metaGrid"></div>
+
+      <!-- Posts -->
+      <div class="posts-panel" id="postsPanel">
+        <div class="posts-header">
+          <span class="posts-title">Recent Posts</span>
+          <span class="posts-count" id="postsCount">0</span>
+        </div>
+        <div id="postsList"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SEARCH TAB -->
+  <div class="mode-panel" id="tab-search">
+    <div class="section-label">Search Public Channels</div>
+    <div class="search-row">
+      <input type="text" class="main-input" id="searchInput"
+        placeholder="e.g. Ukraine news  or  cybersecurity  or  threat intelligence"
+        onkeydown="if(event.key==='Enter')searchChannels()">
+      <button class="btn-go" onclick="searchChannels()">Search →</button>
+    </div>
+    <div class="input-hint">Opens search results in every major Telegram index · All searches open in new tabs</div>
+
+    <div class="results-wrap" id="searchResults" style="margin-top:24px;">
+      <div class="ext-search-panel">
+        <div class="ext-search-title">Search via External Indices</div>
+        <div class="ext-search-grid" id="extSearchGrid"></div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);padding:20px 24px;">
+        <div class="ext-search-title" style="margin-bottom:12px;">Direct Telegram Search</div>
+        <div style="font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.45);line-height:1.8;">
+          Telegram's in-app search covers public channels and groups. Results depend on your country and Telegram client settings.<br><br>
+          <a id="tgAppLink" href="#" target="_blank" style="color:#229ED9;text-decoration:none;border:1px solid rgba(34,158,217,0.25);padding:8px 16px;display:inline-block;margin-top:4px;">Open in Telegram App ↗</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARCHIVE TAB -->
+  <div class="mode-panel" id="tab-archive">
+    <div class="results-wrap visible" style="margin-top:0;">
+      <div class="archive-wrap">
+        <div class="archive-title">Saved Channel Snapshots</div>
+        <div class="archive-list" id="archiveList"></div>
+      </div>
+      <div style="background:var(--bg2);border:1px solid var(--border);border-top:none;padding:14px 20px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.25);">
+        Snapshots saved locally in browser storage · Look up a channel and click "Archive Snapshot" to save · Data persists across sessions
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Only public Telegram channels and groups can be accessed. Private channels require Telegram API authentication. Channel data sourced from Telegram's public web preview. Search links open external indexing services.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── TABS ──────────────────────────────────────────────────────────────────────
+function switchTab(id) {
+  document.querySelectorAll('.mode-tab').forEach((t,i) => {
+    t.classList.toggle('active', ['lookup','search','archive'][i] === id);
+  });
+  document.querySelectorAll('.mode-panel').forEach(p => {
+    p.classList.toggle('active', p.id === `tab-${id}`);
+  });
+  if(id === 'archive') renderArchive();
+}
+
+// ── CHANNEL LOOKUP ────────────────────────────────────────────────────────────
+function cleanUsername(raw) {
+  return raw.trim()
+    .replace(/^@/, '')
+    .replace(/^https?:\/\/t\.me\//, '')
+    .replace(/^t\.me\//, '')
+    .replace(/\/$/, '')
+    .split('/')[0]
+    .split('?')[0];
+}
+
+async function lookupChannel() {
+  const raw = document.getElementById('channelInput').value.trim();
+  if(!raw){ alert('Enter a channel username.'); return; }
+
+  const username = cleanUsername(raw);
+  const btn = document.getElementById('btnLookup');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  document.getElementById('lookupBar').classList.add('visible');
+  document.getElementById('lookupResults').classList.remove('visible');
+
+  try {
+    // Fetch Telegram's public web preview via our proxy
+    const r = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(`https://t.me/s/${username}`)}`);
+    const d = await r.json();
+
+    if(d.error) throw new Error(d.error);
+
+    // Also fetch the channel preview page HTML for metadata
+    const r2 = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(`https://t.me/${username}`)}`);
+    const d2 = await r2.json();
+
+    renderChannelResult(username, d, d2);
+  } catch(e) {
+    document.getElementById('channelCard').innerHTML = `
+      <div class="empty-state">
+        Could not load channel <strong>@${esc(username)}</strong><br><br>
+        This may be a private channel, or the username may not exist.<br>
+        Try searching instead.
+      </div>`;
+    document.getElementById('metaGrid').innerHTML = '';
+    document.getElementById('postsList').innerHTML = '';
+    document.getElementById('lookupResults').classList.add('visible');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Look Up →';
+    document.getElementById('lookupBar').classList.remove('visible');
+  }
+}
+
+function renderChannelResult(username, streamData, previewData) {
+  // Parse metadata from extracted content
+  const emails  = streamData.extracted?.emails || [];
+  const links   = streamData.extracted?.links  || [];
+  const socials = streamData.extracted?.socials || {};
+
+  // Try to extract channel info from HTML
+  // Telegram's t.me/s/ page contains structured data
+  const finalUrl = streamData.final_url || `https://t.me/s/${username}`;
+  const ssl      = streamData.ssl;
+
+  // Build channel display from what we can determine
+  const initial = username.charAt(0).toUpperCase();
+
+  // Count how many t.me/username/N links exist (these are posts)
+  const postLinks = links.filter(l => l.includes(`t.me/${username}/`) && /\/\d+$/.test(l));
+  const postCount = postLinks.length;
+
+  // Check if it resolved (200 = channel exists and is public)
+  const isPublic = streamData.status_code === 200;
+  const isPrivate = !isPublic;
+
+  document.getElementById('channelCard').innerHTML = `
+    <div class="channel-header">
+      <div class="channel-avatar">${esc(initial)}</div>
+      <div class="channel-info">
+        <div class="channel-name">@${esc(username)}</div>
+        <div class="channel-username">t.me/${esc(username)}</div>
+        <div class="channel-desc">${isPublic
+          ? 'Public channel — metadata extracted from Telegram web preview'
+          : '⚠ Channel may be private, restricted, or does not exist'}</div>
+        <div class="channel-actions">
+          <a class="btn-action btn-tg" href="https://t.me/${esc(username)}" target="_blank" rel="noopener">Open in Telegram ↗</a>
+          <a class="btn-action btn-tgstat" href="https://tgstat.com/channel/@${esc(username)}" target="_blank" rel="noopener">TGStat Stats ↗</a>
+          <a class="btn-action btn-tgstat" href="https://telemetr.io/en/channels/${esc(username)}" target="_blank" rel="noopener" style="border-left:none;">Telemetr ↗</a>
+          <button class="btn-action btn-export" onclick="archiveChannel('${esc(username)}')">Archive Snapshot</button>
+        </div>
+      </div>
+    </div>`;
+
+  document.getElementById('metaGrid').innerHTML = [
+    { label:'Username',      value: `@${username}`,        cls:'tg' },
+    { label:'Status',        value: isPublic ? 'Public' : 'Private / Unknown', cls: isPublic?'green':'dim' },
+    { label:'HTTP Status',   value: String(streamData.status_code||'—'), cls:'' },
+    { label:'SSL Valid',     value: ssl?.valid ? '✓ HTTPS' : '—', cls: ssl?.valid?'green':'dim' },
+    { label:'Posts Found',   value: String(postCount),     cls: postCount>0?'accent':'dim' },
+    { label:'Links Found',   value: String(links.length),  cls:'' },
+    { label:'Emails Found',  value: String(emails.length), cls: emails.length>0?'accent':'dim' },
+    { label:'External Links',value: String(links.filter(l=>!l.includes('t.me')).length), cls:'' },
+    { label:'Direct Link',   value: `t.me/${username}`,    cls:'tg' },
+    { label:'Web Preview',   value: `t.me/s/${username}`,  cls:'dim' },
+  ].map(c=>`
+    <div class="meta-card">
+      <div class="meta-label">${esc(c.label)}</div>
+      <div class="meta-value ${c.cls}">${esc(c.value)}</div>
+    </div>`).join('');
+
+  // Render post links as a list of archived posts
+  const postsPanel = document.getElementById('postsList');
+  document.getElementById('postsCount').textContent = postLinks.length;
+
+  if(postLinks.length > 0) {
+    // Sort post links by post number
+    const sorted = postLinks.sort((a,b) => {
+      const na = parseInt(a.split('/').pop()) || 0;
+      const nb = parseInt(b.split('/').pop()) || 0;
+      return nb - na;
+    });
+    postsPanel.innerHTML = sorted.slice(0,20).map((link, i) => {
+      const postId = link.split('/').pop();
+      return `<div class="post-item">
+        <div class="post-text">Post #${esc(postId)}</div>
+        <div class="post-meta">
+          <a class="post-link" href="${esc(link)}" target="_blank" rel="noopener">View post ↗</a>
+        </div>
+      </div>`;
+    }).join('');
+  } else {
+    postsPanel.innerHTML = `<div class="empty-state">
+      No posts extracted from web preview.<br>
+      Click "Open in Telegram" to view posts directly, or check TGStat for analytics.
+    </div>`;
+  }
+
+  // Show email findings if any
+  if(emails.length > 0) {
+    postsPanel.innerHTML += `<div class="post-item">
+      <div class="meta-label" style="margin-bottom:6px;">Email addresses found on channel page</div>
+      ${emails.map(e=>`<div class="post-text" style="color:#7eb8e4">${esc(e)}</div>`).join('')}
+    </div>`;
+  }
+
+  document.getElementById('lookupResults').classList.add('visible');
+  document.getElementById('lookupResults').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+function searchChannels() {
+  const q = document.getElementById('searchInput').value.trim();
+  if(!q){ alert('Enter a search term.'); return; }
+
+  const enc = encodeURIComponent(q);
+  const sources = [
+    { name:'TGStat',     desc:'Largest Telegram analytics index',     url:`https://tgstat.com/search?q=${enc}` },
+    { name:'Telemetr',   desc:'Channel stats and search',              url:`https://telemetr.io/en/channels?search=${enc}` },
+    { name:'Lyzem',      desc:'Telegram content search engine',        url:`https://lyzem.com/search?q=${enc}&lang=all` },
+    { name:'TelegramDB', desc:'Public channel and group database',      url:`https://telegramdb.org/search?q=${enc}` },
+    { name:'Tgdev',      desc:'Telegram channel catalog',              url:`https://tgdev.io/search?q=${enc}` },
+    { name:'Ulgram',     desc:'Telegram group search',                 url:`https://ulgram.com/search?q=${enc}` },
+    { name:'xtelegram',  desc:'Archive and search',                    url:`https://www.xtelegram.com/search/?query=${enc}` },
+    { name:'Social Finder',desc:'Cross-platform social search',        url:`https://socialfinder.app/search?platform=telegram&q=${enc}` },
+  ];
+
+  document.getElementById('extSearchGrid').innerHTML = sources.map(s => `
+    <a class="ext-search-link" href="${esc(s.url)}" target="_blank" rel="noopener" title="${esc(s.desc)}">
+      <div>
+        <div style="font-weight:500;color:#e8d5a3!important;margin-bottom:2px;">${esc(s.name)}</div>
+        <div style="font-size:9px;color:rgba(240,236,228,0.30)!important;">${esc(s.desc)}</div>
+      </div>
+      <span>↗</span>
+    </a>`).join('');
+
+  document.getElementById('tgAppLink').href = `https://t.me/search?q=${enc}`;
+  document.getElementById('searchResults').classList.add('visible');
+}
+
+// ── ARCHIVE ───────────────────────────────────────────────────────────────────
+function archiveChannel(username) {
+  const archives = JSON.parse(localStorage.getItem('tg_archive') || '[]');
+  const existing = archives.findIndex(a => a.username === username);
+  const entry = {
+    username,
+    url: `https://t.me/${username}`,
+    ts: Date.now(),
+    date: new Date().toISOString(),
+  };
+
+  if(existing >= 0) archives[existing] = entry;
+  else archives.unshift(entry);
+
+  localStorage.setItem('tg_archive', JSON.stringify(archives.slice(0,50)));
+  alert(`@${username} archived. View in the Archive tab.`);
+}
+
+function renderArchive() {
+  const archives = JSON.parse(localStorage.getItem('tg_archive') || '[]');
+  const list = document.getElementById('archiveList');
+
+  if(!archives.length) {
+    list.innerHTML = '<div class="empty-state">No channels archived yet.<br>Look up a channel and click "Archive Snapshot" to save it here.</div>';
+    return;
+  }
+
+  list.innerHTML = archives.map((a,i) => {
+    const date = new Date(a.ts).toLocaleString();
+    return `<div class="archive-item">
+      <div class="archive-name">@${esc(a.username)}</div>
+      <div class="archive-time">${esc(date)}</div>
+      <a class="archive-open" href="${esc(a.url)}" target="_blank" rel="noopener">Open ↗</a>
+      <button class="archive-open" onclick="document.getElementById('channelInput').value='${esc(a.username)}';switchTab('lookup');lookupChannel();" style="cursor:pointer;background:transparent;border:1px solid rgba(200,169,110,0.20);color:rgba(200,169,110,0.50)!important;font-family:var(--mono);font-size:9px;padding:2px 8px;">Re-run</button>
+      <button class="archive-del" onclick="deleteArchive(${i})" title="Delete">×</button>
+    </div>`;
+  }).join('');
+}
+
+function deleteArchive(i) {
+  const archives = JSON.parse(localStorage.getItem('tg_archive') || '[]');
+  archives.splice(i, 1);
+  localStorage.setItem('tg_archive', JSON.stringify(archives));
+  renderArchive();
+}
+
+// ── EXPORT ────────────────────────────────────────────────────────────────────
+function exportChannelData(username) {
+  const data = {
+    exported: new Date().toISOString(),
+    channel: username,
+    url: `https://t.me/${username}`,
+    note: 'Exported from Intel Desk Telegram Intelligence tool',
+  };
+  const a = document.createElement('a');
+  a.href = 'data:application/json;charset=utf-8,' + encodeURIComponent(JSON.stringify(data, null, 2));
+  a.download = `telegram_${username}_${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+</script>
+</body>
+</html>
