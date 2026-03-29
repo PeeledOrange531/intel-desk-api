@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Maritime Tracker — Global Vessel Intelligence | The Intel Desk</title>
+<meta name="description" content="Real-time maritime vessel tracker powered by AISstream. Track cargo ships, tankers, military vessels and more worldwide. Search by vessel name, MMSI, IMO, flag, type, destination. Live AIS data.">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--purple:#9b59b6;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 clamp(12px,3vw,32px);max-width:1600px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(28px,5vw,52px) 0 clamp(16px,3vw,24px);border-bottom:1px solid var(--border);display:flex;align-items:flex-end;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(26px,4vw,48px);font-weight:300;line-height:0.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+.status-cluster{display:flex;flex-direction:column;align-items:flex-end;gap:6px;}
+.live-row{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--blue);box-shadow:0 0 6px var(--blue);animation:pulse 2s ease-in-out infinite;flex-shrink:0;}
+.live-dot.connected{background:var(--green);box-shadow:0 0 6px var(--green);}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.3;}}
+.pill-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.stat-pill{font-family:var(--mono);font-size:11px;background:var(--bg2);border:1px solid var(--border);padding:4px 10px;white-space:nowrap;}
+.stat-pill strong{color:#c8a96e!important;}
+
+/* SEARCH PANEL */
+.search-panel{background:var(--bg2);border:1px solid var(--border);border-top:none;padding:16px 20px;}
+.search-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:0;}
+.sf{display:flex;flex-direction:column;}
+.sf-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.28)!important;padding:5px 11px 3px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;border-right:none;}
+.sf:last-child .sf-label,.sf:last-child .sf-input{border-right:1px solid var(--border);}
+.sf-input{background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:9px 11px;outline:none;transition:border-color 0.2s;width:100%;}
+.sf-input:focus{border-color:rgba(200,169,110,0.35);}
+.sf-input::placeholder{color:rgba(240,236,228,0.18)!important;}
+select.sf-input{cursor:pointer;}
+select.sf-input option{background:#0a0a0a;}
+.search-actions{display:flex;gap:0;margin-top:2px;flex-wrap:wrap;}
+.btn-apply{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:10px 28px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-apply:hover{background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-clear{background:transparent;border:1px solid var(--border);border-left:none;color:rgba(240,236,228,0.35)!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:10px 20px;cursor:pointer;transition:all 0.2s;}
+.btn-clear:hover{color:rgba(240,236,228,0.70)!important;}
+.btn-pause{background:transparent;border:1px solid rgba(192,57,43,0.25);border-left:none;color:rgba(192,57,43,0.60)!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:10px 20px;cursor:pointer;transition:all 0.2s;}
+.btn-pause:hover{border-color:rgba(192,57,43,0.50);color:#c0392b!important;}
+.search-hint{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.20)!important;align-self:center;padding:0 14px;}
+.refresh-progress{height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
+.refresh-fill{height:100%;background:rgba(126,184,228,0.35);transition:width 0.5s linear;}
+
+/* MAP */
+.map-wrap{height:clamp(380px,52vh,560px);border:1px solid var(--border);border-top:none;position:relative;}
+#shipMap{height:100%;width:100%;background:#050505;}
+.map-ctl{position:absolute;top:12px;left:12px;z-index:1000;display:flex;flex-direction:column;gap:4px;}
+.map-ctl-btn{background:var(--bg2);border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:6px 12px;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
+.map-ctl-btn:hover,.map-ctl-btn.active{color:#c8a96e!important;border-color:rgba(200,169,110,0.30);background:var(--accent-dim);}
+.map-zoom-ctl{position:absolute;top:12px;right:12px;z-index:1000;display:flex;flex-direction:column;gap:2px;}
+.map-zoom-btn{background:var(--bg2);border:1px solid var(--border);color:rgba(240,236,228,0.60)!important;font-family:var(--mono);font-size:16px;width:32px;height:32px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;line-height:1;}
+.map-zoom-btn:hover{color:#c8a96e!important;border-color:rgba(200,169,110,0.35);background:var(--accent-dim);}
+.map-info{position:absolute;bottom:10px;left:12px;z-index:1000;background:rgba(5,5,5,0.88);border:1px solid var(--border);padding:8px 12px;font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.40)!important;backdrop-filter:blur(3px);}
+.map-info strong{color:#c8a96e!important;}
+
+/* VESSEL DETAIL PANEL */
+.detail-panel{display:none;background:var(--bg2);border:1px solid var(--border);border-top:none;padding:16px 20px;animation:fadeUp 0.2s ease;}
+.detail-panel.visible{display:block;}
+.detail-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;}
+.detail-name{font-family:var(--serif);font-size:clamp(22px,3vw,32px);font-weight:300;color:#e8d5a3!important;line-height:1;}
+.detail-type{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;margin-top:4px;}
+.detail-close{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.30)!important;font-family:var(--mono);font-size:11px;padding:5px 14px;cursor:pointer;transition:all 0.15s;flex-shrink:0;}
+.detail-close:hover{color:#f5f2ec!important;border-color:var(--border-hover);}
+.detail-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:1px;background:var(--border);}
+.dc{background:var(--bg3);padding:12px 14px;}
+.dc-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.28)!important;margin-bottom:4px;}
+.dc-value{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.75)!important;word-break:break-all;line-height:1.4;}
+.dc-value.accent{color:#e8d5a3!important;}
+.dc-value.green{color:#4ec994!important;}
+.dc-value.warn{color:#e87b4a!important;}
+.dc-value.red{color:#c0392b!important;}
+
+/* STATS ROW */
+.stats-row{display:flex;gap:1px;background:var(--border);margin-top:2px;}
+.sc{flex:1;background:var(--bg2);padding:12px 16px;display:flex;flex-direction:column;gap:3px;min-width:0;}
+.sc-num{font-family:var(--serif);font-size:22px;font-weight:300;line-height:1;}
+.sc-lbl{font-family:var(--mono);font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.25)!important;}
+
+/* TABLE */
+.table-section{margin-top:2px;}
+.table-toolbar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;flex-wrap:wrap;}
+.t-info{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;flex:1;}
+.sort-sel{background:var(--bg2);border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;padding:4px 8px;outline:none;cursor:pointer;}
+.ship-table-wrap{border:1px solid var(--border);max-height:380px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,0.10) transparent;}
+table{width:100%;border-collapse:collapse;}
+thead{position:sticky;top:0;z-index:2;}
+th{background:var(--bg3);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.28)!important;padding:8px 12px;text-align:left;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;white-space:nowrap;}
+th:hover{color:#c8a96e!important;}
+tbody tr{border-bottom:1px solid rgba(255,255,255,0.04);cursor:pointer;transition:background 0.1s;}
+tbody tr:hover{background:rgba(200,169,110,0.04);}
+tbody tr.sel{background:rgba(200,169,110,0.08);}
+tbody tr.filtered-out{display:none;}
+td{font-family:var(--mono);font-size:11px;padding:7px 12px;color:rgba(240,236,228,0.55)!important;white-space:nowrap;overflow:hidden;max-width:160px;text-overflow:ellipsis;}
+td.name{color:#e8d5a3!important;font-size:12px;font-weight:500;}
+td.speed{color:#7eb8e4!important;}
+td.moving{color:#4ec994!important;}
+td.moored{color:rgba(240,236,228,0.30)!important;}
+td.type-badge{font-size:9px!important;padding:2px 6px;border:1px solid rgba(255,255,255,0.08);}
+.empty-state{padding:28px;text-align:center;font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.22)!important;}
+
+/* LEAFLET */
+.leaflet-container{background:#050505!important;}
+.leaflet-control-zoom a{background:var(--bg2)!important;color:rgba(240,236,228,0.60)!important;border-color:var(--border)!important;}
+.leaflet-control-zoom a:hover{background:var(--bg3)!important;color:#c8a96e!important;}
+.leaflet-control-attribution{background:rgba(5,5,5,0.75)!important;color:rgba(240,236,228,0.20)!important;font-size:9px!important;}
+.leaflet-control-attribution a{color:rgba(200,169,110,0.35)!important;}
+.leaflet-popup-content-wrapper{background:var(--bg2)!important;border:1px solid var(--border)!important;border-radius:0!important;box-shadow:0 4px 24px rgba(0,0,0,0.6)!important;}
+.leaflet-popup-tip{background:var(--bg2)!important;}
+.leaflet-popup-content{font-family:var(--mono)!important;font-size:12px!important;line-height:1.8!important;color:rgba(240,236,228,0.75)!important;margin:10px 14px!important;}
+.leaflet-popup-content strong{color:#e8d5a3!important;font-size:13px;}
+
+.footer{margin-top:clamp(32px,5vw,52px);padding:20px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.25)!important;max-width:560px;text-align:right;line-height:1.7;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+/* MOBILE */
+@media(max-width:900px){
+  .hero{flex-direction:column;align-items:flex-start;}
+  .pill-row{justify-content:flex-start;}
+  .search-grid{grid-template-columns:1fr 1fr;}
+  .sf:nth-child(even) .sf-label,.sf:nth-child(even) .sf-input{border-right:1px solid var(--border);}
+  .btn-apply,.btn-clear,.btn-pause{flex:1;}
+  table th:nth-child(n+5),table td:nth-child(n+5){display:none;}
+  .footer-right{text-align:left;max-width:100%;}
+}
+@media(max-width:520px){
+  .search-grid{grid-template-columns:1fr;}
+  .sf .sf-label,.sf .sf-input{border-right:1px solid var(--border)!important;}
+  .detail-grid{grid-template-columns:1fr 1fr;}
+  .stats-row{flex-wrap:wrap;}
+  .sc{flex:1 1 40%;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <div class="hero">
+    <div>
+      <div class="eyebrow"><span>Maritime Intelligence</span></div>
+      <h1>Live Maritime <em>Tracker</em></h1>
+    </div>
+    <div class="status-cluster">
+      <div class="live-row">
+        <div class="live-dot" id="liveDot"></div>
+        <span id="liveStatus">Connecting to AIS stream…</span>
+      </div>
+      <div class="pill-row">
+        <div class="stat-pill">Vessels: <strong id="pillTotal">0</strong></div>
+        <div class="stat-pill">Underway: <strong id="pillMoving">0</strong></div>
+        <div class="stat-pill">Updated: <strong id="pillUpdate">—</strong></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-panel">
+    <div class="search-grid" id="searchGrid">
+      <div class="sf">
+        <div class="sf-label">Vessel Name</div>
+        <input class="sf-input" id="s-name" placeholder="e.g. EVER GIVEN" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">MMSI</div>
+        <input class="sf-input" id="s-mmsi" placeholder="e.g. 123456789" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">Callsign</div>
+        <input class="sf-input" id="s-callsign" placeholder="e.g. VRDA5" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">IMO Number</div>
+        <input class="sf-input" id="s-imo" placeholder="e.g. 9811000" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">Flag / Country</div>
+        <input class="sf-input" id="s-flag" placeholder="e.g. Panama, US" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">Destination</div>
+        <input class="sf-input" id="s-dest" placeholder="e.g. ROTTERDAM" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">Vessel Type</div>
+        <select class="sf-input" id="s-type" onchange="applyFilters()">
+          <option value="">All types</option>
+          <option value="cargo">Cargo</option>
+          <option value="tanker">Tanker</option>
+          <option value="passenger">Passenger</option>
+          <option value="tug">Tug / Special</option>
+          <option value="fishing">Fishing</option>
+          <option value="military">Military</option>
+          <option value="sailing">Sailing / Pleasure</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div class="sf">
+        <div class="sf-label">Nav Status</div>
+        <select class="sf-input" id="s-status" onchange="applyFilters()">
+          <option value="">All statuses</option>
+          <option value="0">Underway (engine)</option>
+          <option value="1">At anchor</option>
+          <option value="3">Not under command</option>
+          <option value="5">Moored</option>
+          <option value="8">Fishing</option>
+        </select>
+      </div>
+      <div class="sf">
+        <div class="sf-label">Min Speed (kts)</div>
+        <input class="sf-input" id="s-spd-min" type="number" placeholder="e.g. 10" oninput="applyFilters()">
+      </div>
+      <div class="sf">
+        <div class="sf-label">Max Speed (kts)</div>
+        <input class="sf-input" id="s-spd-max" type="number" placeholder="e.g. 25" oninput="applyFilters()">
+      </div>
+    </div>
+    <div class="search-actions">
+      <button class="btn-apply" onclick="fetchVessels()">Refresh →</button>
+      <button class="btn-clear" onclick="clearFilters()">Clear Filters</button>
+      <button class="btn-pause" id="btnPause" onclick="togglePause()">⏸ Pause</button>
+      <div class="search-hint">Auto-refreshes every 15s · Click any vessel to inspect · AIS data via intel-desk-api.onrender.com</div>
+    </div>
+    <div class="refresh-progress"><div class="refresh-fill" id="refreshFill"></div></div>
+  </div>
+
+  <!-- MAP -->
+  <div class="map-wrap">
+    <div id="shipMap"></div>
+    <div class="map-ctl">
+      <button class="map-ctl-btn active" id="btn-all" onclick="setMapMode('all')">All Vessels</button>
+      <button class="map-ctl-btn" id="btn-moving" onclick="setMapMode('moving')">Underway Only</button>
+      <button class="map-ctl-btn" id="btn-tanker" onclick="setMapMode('tanker')">Tankers</button>
+      <button class="map-ctl-btn" id="btn-cargo" onclick="setMapMode('cargo')">Cargo</button>
+    </div>
+    <div class="map-zoom-ctl">
+      <button class="map-zoom-btn" onclick="shipMap.zoomIn()" title="Zoom in">+</button>
+      <button class="map-zoom-btn" onclick="shipMap.zoomOut()" title="Zoom out">−</button>
+      <button class="map-zoom-btn" onclick="shipMap.setView([20,0],2)" title="World view" style="font-size:12px;">⊙</button>
+    </div>
+    <div class="map-info">
+      <strong id="mapCount">0</strong> vessels · <span id="mapMode">All</span>
+    </div>
+  </div>
+
+  <!-- SELECTED VESSEL -->
+  <div class="detail-panel" id="detailPanel">
+    <div class="detail-hdr">
+      <div>
+        <div class="detail-name" id="detailName">—</div>
+        <div class="detail-type" id="detailType">—</div>
+      </div>
+      <button class="detail-close" onclick="closeDetail()">✕ Close</button>
+    </div>
+    <div class="detail-grid" id="detailGrid"></div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-row">
+    <div class="sc"><div class="sc-num" style="color:#c8a96e" id="sTotal">0</div><div class="sc-lbl">Total Vessels</div></div>
+    <div class="sc"><div class="sc-num" style="color:#4ec994" id="sMoving">0</div><div class="sc-lbl">Underway</div></div>
+    <div class="sc"><div class="sc-num" style="color:#7eb8e4" id="sAnchored">0</div><div class="sc-lbl">At Anchor</div></div>
+    <div class="sc"><div class="sc-num" style="color:#e87b4a" id="sCargo">0</div><div class="sc-lbl">Cargo Ships</div></div>
+    <div class="sc"><div class="sc-num" style="color:#c0392b" id="sTanker">0</div><div class="sc-lbl">Tankers</div></div>
+    <div class="sc"><div class="sc-num" style="color:#a87cc8" id="sFiltered">0</div><div class="sc-lbl">Matching Filters</div></div>
+  </div>
+
+  <!-- TABLE -->
+  <div class="table-section">
+    <div class="table-toolbar">
+      <span class="t-info" id="tableInfo">Loading vessels…</span>
+      <select class="sort-sel" id="sortSel" onchange="renderTable()">
+        <option value="name">Sort: Name</option>
+        <option value="speed">Sort: Speed ↓</option>
+        <option value="type">Sort: Type</option>
+        <option value="flag">Sort: Flag</option>
+        <option value="dest">Sort: Destination</option>
+      </select>
+    </div>
+    <div class="ship-table-wrap" id="tableWrap">
+      <div class="empty-state">Waiting for vessel data…</div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Live AIS data via AISstream.io (aisstream.io) · Proxied through Intel Desk API to protect key · Terrestrial coverage — coverage varies by region · Not for safety-of-life navigation use.</div>
+  </footer>
+</div>
+
+<script>
+const API = 'https://intel-desk-api.onrender.com';
+
+// ── SHIP TYPE DECODER ─────────────────────────────────────────────────────────
+function shipTypeLabel(t) {
+  t = parseInt(t) || 0;
+  if(t >= 70 && t <= 79) return 'Cargo';
+  if(t >= 80 && t <= 89) return 'Tanker';
+  if(t >= 60 && t <= 69) return 'Passenger';
+  if(t >= 30 && t <= 39) return 'Fishing';
+  if(t === 35 || t === 36) return 'Military';
+  if(t >= 20 && t <= 29) return 'WIG / Craft';
+  if(t >= 50 && t <= 59) return 'Special / Tug';
+  if(t >= 40 && t <= 49) return 'HSC';
+  if(t >= 36 && t <= 39) return 'Military';
+  if(t >= 90 && t <= 99) return 'Other';
+  return 'Unknown';
+}
+
+function shipTypeColor(t) {
+  const label = shipTypeLabel(t);
+  const map = {
+    Cargo:'#7eb8e4', Tanker:'#c0392b', Passenger:'#4ec994',
+    Fishing:'#e87b4a', Military:'#c0392b', Special:'#c8a96e',
+    Tug:'#c8a96e', HSC:'#9b59b6', Other:'rgba(240,236,228,0.35)',
+  };
+  return map[label] || 'rgba(240,236,228,0.35)';
+}
+
+function shipTypeCategory(t) {
+  const label = shipTypeLabel(t).toLowerCase();
+  if(label === 'cargo') return 'cargo';
+  if(label === 'tanker') return 'tanker';
+  if(label === 'passenger') return 'passenger';
+  if(label === 'fishing') return 'fishing';
+  if(label === 'military') return 'military';
+  if(label.includes('special') || label.includes('tug')) return 'tug';
+  if(label.includes('sail') || label.includes('pleasure')) return 'sailing';
+  return 'other';
+}
+
+function navStatus(n) {
+  const s = {
+    0:'Underway (engine)', 1:'At anchor', 2:'Not under command',
+    3:'Restricted maneuverability', 4:'Constrained by draught',
+    5:'Moored', 6:'Aground', 7:'Fishing', 8:'Underway (sailing)',
+    15:'Not defined',
+  };
+  return s[parseInt(n)] || `Status ${n}`;
+}
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let allVessels = [], filteredVessels = [];
+let selectedMmsi = null;
+let mapMode = 'all';
+let isPaused = false;
+let refreshInterval = null, progressTimer = null, refreshElapsed = 0;
+const REFRESH_SECS = 15;
+
+let shipMap, vesselLayer;
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+// init handled by window.onload after Leaflet loads
+
+function initMap() {
+  shipMap = L.map('shipMap', { center:[20,0], zoom:2, zoomControl:false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution:'© <a href="https://www.openstreetmap.org/copyright">OSM</a> © <a href="https://carto.com/attributions">CARTO</a>',
+    subdomains:'abcd', maxZoom:18,
+  }).addTo(shipMap);
+  vesselLayer = L.layerGroup().addTo(shipMap);
+}
+
+// ── AUTO REFRESH ──────────────────────────────────────────────────────────────
+function startAutoRefresh() {
+  if(refreshInterval) clearInterval(refreshInterval);
+  if(progressTimer)   clearInterval(progressTimer);
+  refreshElapsed = 0;
+
+  refreshInterval = setInterval(() => {
+    if(!isPaused) fetchVessels();
+  }, REFRESH_SECS * 1000);
+
+  progressTimer = setInterval(() => {
+    if(!isPaused) {
+      refreshElapsed = Math.min(refreshElapsed + 0.5, REFRESH_SECS);
+      document.getElementById('refreshFill').style.width =
+        (refreshElapsed / REFRESH_SECS * 100) + '%';
+    }
+  }, 500);
+}
+
+function togglePause() {
+  isPaused = !isPaused;
+  const btn = document.getElementById('btnPause');
+  btn.textContent = isPaused ? '▶ Resume' : '⏸ Pause';
+  btn.style.color  = isPaused ? '#c8a96e' : '';
+  btn.style.borderColor = isPaused ? 'rgba(200,169,110,0.3)' : '';
+  document.getElementById('liveStatus').textContent = isPaused ? 'Paused' : 'Live · AISstream';
+  document.getElementById('liveDot').className = isPaused ? 'live-dot' : 'live-dot connected';
+}
+
+// ── FETCH ─────────────────────────────────────────────────────────────────────
+async function fetchVessels() {
+  refreshElapsed = 0;
+  document.getElementById('refreshFill').style.width = '0%';
+  document.getElementById('liveStatus').textContent = 'Fetching vessels…';
+
+  try {
+    const r = await fetch(`${API}/ais/vessels`);
+    if(!r.ok) throw new Error(`HTTP ${r.status}`);
+    const d = await r.json();
+
+    allVessels = (d.vessels || []).filter(v => v.lat && v.lon);
+    document.getElementById('liveDot').className = 'live-dot connected';
+    document.getElementById('liveStatus').textContent = `Live · AISstream · ${allVessels.length.toLocaleString()} vessels`;
+    document.getElementById('pillUpdate').textContent = new Date().toLocaleTimeString();
+
+    applyFilters();
+  } catch(e) {
+    document.getElementById('liveStatus').textContent = `Error: ${e.message.slice(0,50)}`;
+    document.getElementById('liveDot').className = 'live-dot';
+
+    // If server hasn't accumulated vessels yet, show helpful message
+    if(allVessels.length === 0) {
+      document.getElementById('tableWrap').innerHTML = `
+        <div class="empty-state">
+          AIS stream is warming up — vessels accumulate over time as the Render server receives AIS messages.<br><br>
+          Try again in 30 seconds. If the server just deployed, it may take 1–2 minutes to populate.
+        </div>`;
+    }
+  }
+}
+
+// ── FILTERS ───────────────────────────────────────────────────────────────────
+function applyFilters() {
+  const name    = document.getElementById('s-name').value.trim().toUpperCase();
+  const mmsi    = document.getElementById('s-mmsi').value.trim();
+  const call    = document.getElementById('s-callsign').value.trim().toUpperCase();
+  const imo     = document.getElementById('s-imo').value.trim();
+  const flag    = document.getElementById('s-flag').value.trim().toLowerCase();
+  const dest    = document.getElementById('s-dest').value.trim().toUpperCase();
+  const type    = document.getElementById('s-type').value;
+  const status  = document.getElementById('s-status').value;
+  const spdMin  = parseFloat(document.getElementById('s-spd-min').value) || null;
+  const spdMax  = parseFloat(document.getElementById('s-spd-max').value) || null;
+
+  filteredVessels = allVessels.filter(v => {
+    if(name   && !(v.name||'').toUpperCase().includes(name)) return false;
+    if(mmsi   && !String(v.mmsi).includes(mmsi)) return false;
+    if(call   && !(v.callsign||'').toUpperCase().includes(call)) return false;
+    if(imo    && !String(v.imo||'').includes(imo)) return false;
+    if(flag   && !(v.flag||'').toLowerCase().includes(flag)) return false;
+    if(dest   && !(v.dest||'').toUpperCase().includes(dest)) return false;
+    if(type   && shipTypeCategory(v.ship_type) !== type) return false;
+    if(status && String(v.status) !== status) return false;
+    if(spdMin !== null && (v.speed||0) < spdMin) return false;
+    if(spdMax !== null && (v.speed||0) > spdMax) return false;
+    return true;
+  });
+
+  updateStats();
+  renderMap();
+  renderTable();
+}
+
+function clearFilters() {
+  ['s-name','s-mmsi','s-callsign','s-imo','s-flag','s-dest','s-spd-min','s-spd-max'].forEach(id =>
+    document.getElementById(id).value = '');
+  document.getElementById('s-type').value = '';
+  document.getElementById('s-status').value = '';
+  applyFilters();
+}
+
+// ── STATS ─────────────────────────────────────────────────────────────────────
+function updateStats() {
+  const all  = allVessels;
+  const moving   = all.filter(v => v.status === 0 || (v.speed||0) > 0.5);
+  const anchored = all.filter(v => v.status === 1);
+  const cargo    = all.filter(v => shipTypeCategory(v.ship_type) === 'cargo');
+  const tanker   = all.filter(v => shipTypeCategory(v.ship_type) === 'tanker');
+
+  document.getElementById('sTotal').textContent    = all.length.toLocaleString();
+  document.getElementById('sMoving').textContent   = moving.length.toLocaleString();
+  document.getElementById('sAnchored').textContent = anchored.length.toLocaleString();
+  document.getElementById('sCargo').textContent    = cargo.length.toLocaleString();
+  document.getElementById('sTanker').textContent   = tanker.length.toLocaleString();
+  document.getElementById('sFiltered').textContent = filteredVessels.length.toLocaleString();
+  document.getElementById('pillTotal').textContent  = all.length.toLocaleString();
+  document.getElementById('pillMoving').textContent = moving.length.toLocaleString();
+}
+
+// ── MAP ───────────────────────────────────────────────────────────────────────
+function setMapMode(mode) {
+  mapMode = mode;
+  document.querySelectorAll('.map-ctl-btn').forEach(b =>
+    b.classList.toggle('active', b.id === `btn-${mode}`));
+  const labels = { all:'All', moving:'Underway only', tanker:'Tankers only', cargo:'Cargo only' };
+  document.getElementById('mapMode').textContent = labels[mode] || 'All';
+  renderMap();
+}
+
+function vesselIcon(v) {
+  const color = shipTypeColor(v.ship_type);
+  const h     = parseFloat(v.heading) || parseFloat(v.speed > 0 ? 0 : 0);
+  const size  = v.speed > 5 ? 10 : 7;
+  return L.divIcon({
+    className: '',
+    html: `<div style="
+      width:0;height:0;
+      border-left:${size*0.6}px solid transparent;
+      border-right:${size*0.6}px solid transparent;
+      border-bottom:${size}px solid ${color};
+      transform:rotate(${h}deg);
+      filter:drop-shadow(0 0 2px ${color}44);
+    "></div>`,
+    iconSize:[size,size],
+    iconAnchor:[size*0.5, size*0.5],
+  });
+}
+
+function renderMap() {
+  vesselLayer.clearLayers();
+  let shown = 0;
+
+  const display = filteredVessels.length < allVessels.length ? filteredVessels : allVessels;
+
+  display.forEach(v => {
+    if(mapMode === 'moving' && (v.speed||0) < 0.5) return;
+    if(mapMode === 'tanker' && shipTypeCategory(v.ship_type) !== 'tanker') return;
+    if(mapMode === 'cargo'  && shipTypeCategory(v.ship_type) !== 'cargo')  return;
+
+    const isSelected = v.mmsi === selectedMmsi;
+    const name  = v.name || v.mmsi || '—';
+    const type  = shipTypeLabel(v.ship_type);
+    const speed = v.speed ? `${parseFloat(v.speed).toFixed(1)} kts` : '—';
+    const dest  = v.dest  ? `→ ${v.dest}` : '';
+
+    L.marker([v.lat, v.lon], { icon: vesselIcon(v), zIndexOffset: isSelected ? 1000 : 0 })
+      .bindPopup(`
+        <strong>${esc(name)}</strong>
+        ${v.flag ? ` · ${esc(v.flag)}` : ''}
+        <br>
+        ${esc(type)} · ${esc(navStatus(v.status))}
+        <br>
+        Speed: ${esc(speed)}
+        ${dest ? `<br>${esc(dest)}` : ''}
+        ${v.callsign ? `<br>Callsign: ${esc(v.callsign)}` : ''}
+        ${v.imo ? `<br>IMO: ${esc(v.imo)}` : ''}
+      `)
+      .on('click', () => selectVessel(v.mmsi))
+      .addTo(vesselLayer);
+
+    shown++;
+  });
+
+  document.getElementById('mapCount').textContent = shown.toLocaleString();
+}
+
+// ── VESSEL DETAIL ─────────────────────────────────────────────────────────────
+function selectVessel(mmsi) {
+  selectedMmsi = mmsi;
+  const v = allVessels.find(x => x.mmsi === mmsi);
+  if(!v) return;
+
+  const panel = document.getElementById('detailPanel');
+  panel.classList.add('visible');
+
+  document.getElementById('detailName').textContent = v.name || `MMSI ${v.mmsi}`;
+  document.getElementById('detailType').textContent = [
+    shipTypeLabel(v.ship_type),
+    v.flag ? `· Flag: ${v.flag}` : '',
+    v.callsign ? `· ${v.callsign}` : '',
+  ].filter(Boolean).join(' ');
+
+  const speed    = v.speed ? `${parseFloat(v.speed).toFixed(1)} kts` : '—';
+  const heading  = v.heading ? `${Math.round(v.heading)}°` : '—';
+  const draught  = v.draught ? `${v.draught}m` : '—';
+  const length   = (v.dim_a && v.dim_b) ? `${v.dim_a + v.dim_b}m` : '—';
+  const coords   = `${parseFloat(v.lat).toFixed(4)}, ${parseFloat(v.lon).toFixed(4)}`;
+
+  const isMoving = (v.speed||0) > 0.5;
+  const speedCls = isMoving ? 'green' : 'moored';
+
+  document.getElementById('detailGrid').innerHTML = [
+    { label:'MMSI',          value: String(v.mmsi),         cls:'accent' },
+    { label:'IMO',           value: v.imo||'—',             cls:'' },
+    { label:'Vessel Type',   value: shipTypeLabel(v.ship_type), cls:'' },
+    { label:'Flag',          value: v.flag||'—',            cls:'' },
+    { label:'Callsign',      value: v.callsign||'—',        cls:'' },
+    { label:'Destination',   value: v.dest||'—',            cls:'accent' },
+    { label:'Speed',         value: speed,                   cls: speedCls },
+    { label:'Heading',       value: heading,                 cls:'' },
+    { label:'Nav Status',    value: navStatus(v.status),    cls: isMoving?'green':'warn' },
+    { label:'Coordinates',   value: coords,                  cls:'dim' },
+    { label:'Draught',       value: draught,                 cls:'' },
+    { label:'Length',        value: length,                  cls:'' },
+  ].map(f => `
+    <div class="dc">
+      <div class="dc-label">${esc(f.label)}</div>
+      <div class="dc-value ${f.cls||''}">${esc(f.value)}</div>
+    </div>`).join('');
+
+  // Fly to vessel
+  if(v.lat && v.lon) shipMap.flyTo([v.lat, v.lon], 8, { duration:1 });
+
+  // Highlight row
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('sel'));
+  document.querySelector(`tr[data-mmsi="${mmsi}"]`)?.classList.add('sel');
+
+  renderMap();
+}
+
+function closeDetail() {
+  selectedMmsi = null;
+  document.getElementById('detailPanel').classList.remove('visible');
+  document.querySelectorAll('tbody tr').forEach(r => r.classList.remove('sel'));
+  renderMap();
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────────────
+function renderTable() {
+  const sortBy = document.getElementById('sortSel').value;
+  let sorted = [...filteredVessels];
+
+  if(sortBy === 'speed')  sorted.sort((a,b) => (b.speed||0) - (a.speed||0));
+  else if(sortBy === 'type') sorted.sort((a,b) => shipTypeLabel(a.ship_type).localeCompare(shipTypeLabel(b.ship_type)));
+  else if(sortBy === 'flag') sorted.sort((a,b) => (a.flag||'').localeCompare(b.flag||''));
+  else if(sortBy === 'dest') sorted.sort((a,b) => (a.dest||'').localeCompare(b.dest||''));
+  else sorted.sort((a,b) => (a.name||'zzz').localeCompare(b.name||'zzz'));
+
+  document.getElementById('tableInfo').textContent =
+    `${filteredVessels.length.toLocaleString()} vessels${filteredVessels.length < allVessels.length ? ` (filtered from ${allVessels.length.toLocaleString()})` : ''}`;
+
+  if(!sorted.length) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty-state">No vessels match filters</div>';
+    return;
+  }
+
+  const rows = sorted.slice(0,500).map(v => {
+    const speed = v.speed ? `${parseFloat(v.speed).toFixed(1)}` : '—';
+    const isMoving = (v.speed||0) > 0.5;
+    const type  = shipTypeLabel(v.ship_type);
+    const color = shipTypeColor(v.ship_type);
+    return `<tr data-mmsi="${v.mmsi}" onclick="selectVessel('${v.mmsi}')" ${v.mmsi===selectedMmsi?'class="sel"':''}>
+      <td class="name">${esc(v.name||'—')}</td>
+      <td>${esc(String(v.mmsi))}</td>
+      <td style="color:${color}!important;font-size:9px;">${esc(type)}</td>
+      <td>${esc(v.flag||'—')}</td>
+      <td class="${isMoving?'speed':''}">${speed} kts</td>
+      <td class="${isMoving?'moving':'moored'}">${isMoving?'Underway':'Stopped'}</td>
+      <td>${esc((v.dest||'—').slice(0,20))}</td>
+      <td>${esc(v.callsign||'—')}</td>
+    </tr>`;
+  }).join('');
+
+  document.getElementById('tableWrap').innerHTML = `
+    <table>
+      <thead><tr>
+        <th onclick="document.getElementById('sortSel').value='name';renderTable()">Name</th>
+        <th>MMSI</th>
+        <th onclick="document.getElementById('sortSel').value='type';renderTable()">Type</th>
+        <th onclick="document.getElementById('sortSel').value='flag';renderTable()">Flag</th>
+        <th onclick="document.getElementById('sortSel').value='speed';renderTable()">Speed</th>
+        <th>Status</th>
+        <th onclick="document.getElementById('sortSel').value='dest';renderTable()">Destination</th>
+        <th>Callsign</th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function esc(s){ return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+window.addEventListener('load', function() {
+  initMap();
+  fetchVessels();
+  startAutoRefresh();
+});
+</script>
+</body>
+</html>
