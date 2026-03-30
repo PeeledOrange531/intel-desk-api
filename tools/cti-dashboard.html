@@ -459,10 +459,8 @@ body::before{
 
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
+// All API calls route through intel-desk-api.onrender.com — no client keys needed.
 const CFG = {
-  OTX_KEY:      '3bf7a8773dc63f9fcf39639bd356792a0b69f77a78f92b9250dde522f291537d',
-  ABUSEIPDB_KEY:'c4c73e95174413d4eeae06dad2e9ad0496208c9baee5d04886dad7b1e2b23042433c6fc907dc6761',
-  IPINFO_KEY:   '2773fd95cb1740',
   INTELDESK_BASE: window.parent !== window ? '' : 'https://inteldesk.io',
 };
 
@@ -687,11 +685,7 @@ function renderKEV(d) {
 
 // ── ALIENVAULT OTX ────────────────────────────────────────────────────────────
 async function fetchOTX() {
-  if(!CFG.OTX_KEY) {
-    document.getElementById('otxFeed').innerHTML = `<div class="no-key-msg">Add your free OTX API key to unlock live threat pulses → <a href="https://otx.alienvault.com" target="_blank">otx.alienvault.com ↗</a></div>`;
-    setFeedStatus('otx','nokey','No key set');
-    return;
-  }
+  // OTX key is handled server-side — no client key needed
   setFeedStatus('otx','loading','Fetching pulses…');
   const cached = loadCache('otx_pulses');
   if(cached) { renderOTX(cached); return; }
@@ -699,8 +693,7 @@ async function fetchOTX() {
   try {
     const since = new Date(Date.now() - 86400000).toISOString();
     const r = await fetch(
-      `https://otx.alienvault.com/api/v1/pulses/subscribed?limit=30&modified_since=${encodeURIComponent(since)}`,
-      { headers: { 'X-OTX-API-KEY': CFG.OTX_KEY } }
+      `${API}/proxy/otx/pulses?limit=30&since=${encodeURIComponent(since)}`
     );
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
@@ -800,9 +793,7 @@ async function fetchURLhaus() {
   if(cached) { renderURLhaus(cached); return; }
 
   try {
-    const r = await fetch('https://urlhaus-api.abuse.ch/v1/urls/recent/limit/30/', {
-      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body:'limit=30'
-    });
+    const r = await fetch(`${API}/proxy/urlhaus`, { method:'POST' });
     if(!r.ok) throw new Error(`HTTP ${r.status}`);
     const d = await r.json();
     saveCache('urlhaus', d);
@@ -1028,8 +1019,7 @@ function openPulseDrawer(id, name) {
 async function enrichWithAbuseIPDB(ip) {
   try {
     const r = await fetch(
-      `https://api.abuseipdb.com/api/v2/check?ipAddress=${encodeURIComponent(ip)}&maxAgeInDays=90`,
-      { headers: { 'Key': CFG.ABUSEIPDB_KEY, 'Accept': 'application/json' } }
+      `${API}/proxy/abuseipdb?ip=${encodeURIComponent(ip)}`
     );
     const d = await r.json();
     const data = d.data;
