@@ -183,15 +183,19 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
   <section class="upload-section">
     <div class="section-label">Upload Image to Analyze</div>
 
-    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
-      <input type="file" id="fileInput" accept="image/*"
-        style="display:none;"
-        onchange="handleFile(this.files[0])">
+    <!-- label wraps input — works in all iframe contexts, no JS click() needed -->
+    <label for="fileInput" id="dropZone" class="drop-zone" style="display:block;cursor:pointer;">
+      <input type="file" id="fileInput" accept="image/*,video/*"
+        style="position:absolute;opacity:0;width:0;height:0;"
+        onchange="if(this.files[0]) showFileReady(this.files[0])">
       <div class="drop-icon">⬆</div>
-      <div class="drop-title">Click to choose image</div>
-      <div class="drop-sub">JPG · PNG · WEBP · GIF · Max 10MB<br>Or drag and drop below · Image is not stored</div>
+      <div class="drop-title" id="dropTitle">Click to choose image or video</div>
+      <div class="drop-sub" id="dropSub">JPG · PNG · WEBP · GIF · MP4 · Max 10MB · File is not stored</div>
+    </label>
+    <div id="selectedFileInfo" style="display:none;background:var(--bg3);border:1px solid var(--border);border-top:none;padding:10px 18px;font-family:var(--mono);font-size:12px;align-items:center;justify-content:space-between;gap:12px;">
+      <span id="selectedFileName" style="color:#c8a96e!important;flex:1;font-family:var(--mono);font-size:12px;"></span>
+      <button onclick="analyzeSelected()" id="btnGo" style="background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:7px 20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Analyze This File →</button>
     </div>
-    <div id="selectedFileInfo" style="display:none;background:var(--bg3);border:1px solid var(--border);border-top:none;padding:10px 18px;font-family:var(--mono);font-size:12px;color:#c8a96e!important;"></div>
 
     <div class="section-label" style="margin-top:16px;">Or Analyze by URL</div>
     <div class="url-row">
@@ -299,24 +303,43 @@ function toggleSEO(){
 function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 
 // ── DRAG & DROP ───────────────────────────────────────────────────────────────
-const dropZone = document.getElementById('dropZone');
-dropZone.addEventListener('dragover', e => { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag-over'); });
-dropZone.addEventListener('dragleave', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); });
-dropZone.addEventListener('drop', e => {
-  e.preventDefault();
-  e.stopPropagation();
-  dropZone.classList.remove('drag-over');
-  const file = e.dataTransfer.files[0];
-  if(file && file.type.startsWith('image/')) handleFile(file);
-  else if(e.dataTransfer.files[0]) alert('Please drop an image file (JPG, PNG, WEBP, GIF).');
-});
+// pending file — set by showFileReady, consumed by analyzeSelected / handleFile
+let pendingFile = null;
 
-// Also allow dropping anywhere on the page
-document.addEventListener('dragover', e => e.preventDefault());
-document.addEventListener('drop', e => {
+function showFileReady(file) {
+  pendingFile = file;
+  const info = document.getElementById('selectedFileInfo');
+  info.style.display = 'flex';
+  document.getElementById('selectedFileName').textContent =
+    file.name + '  ·  ' + (file.size/1024).toFixed(0) + ' KB  ·  ' + (file.type || 'unknown');
+  document.getElementById('dropTitle').textContent = file.name;
+  document.getElementById('dropSub').textContent = (file.size/1024).toFixed(0) + ' KB · Ready — click Analyze';
+  document.getElementById('dropZone').classList.add('drag-over');
+}
+
+function analyzeSelected() {
+  if(pendingFile) handleFile(pendingFile);
+}
+
+// Drag and drop support
+const dropZone = document.getElementById('dropZone');
+['dragenter','dragover'].forEach(function(evt) {
+  dropZone.addEventListener(evt, function(e) { e.preventDefault(); e.stopPropagation(); dropZone.classList.add('drag-over'); });
+});
+['dragleave','dragend'].forEach(function(evt) {
+  dropZone.addEventListener(evt, function(e) { e.preventDefault(); dropZone.classList.remove('drag-over'); });
+});
+dropZone.addEventListener('drop', function(e) {
+  e.preventDefault(); e.stopPropagation();
+  dropZone.classList.remove('drag-over');
+  var file = e.dataTransfer.files[0];
+  if(file) showFileReady(file);
+});
+document.addEventListener('dragover', function(e) { e.preventDefault(); });
+document.addEventListener('drop', function(e) {
   e.preventDefault();
-  const file = e.dataTransfer.files[0];
-  if(file && file.type.startsWith('image/')) handleFile(file);
+  var file = e.dataTransfer.files[0];
+  if(file) showFileReady(file);
 });
 
 // ── PROGRESS ──────────────────────────────────────────────────────────────────
@@ -360,17 +383,16 @@ async function analyzeFromURL() {
 async function handleFile(file) {
   if(!file) return;
   if(file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
-  if(!file.type.startsWith('image/')) { alert('Please upload an image file.'); return; }
+  var isImage = file.type.startsWith('image/');
+  var isVideo = file.type.startsWith('video/');
+  if(!isImage && !isVideo) { alert('Please upload an image or video file.'); return; }
 
-  // Show selected file name
-  const infoEl = document.getElementById('selectedFileInfo');
-  if(infoEl) {
-    infoEl.style.display = 'block';
-    infoEl.textContent = `Selected: ${file.name} (${(file.size/1024).toFixed(0)} KB) — Analyzing…`;
-  }
-  // Update drop zone text
-  document.querySelector('.drop-title').textContent = file.name;
-  document.querySelector('.drop-sub').textContent = `${(file.size/1024).toFixed(0)} KB · ${file.type} · Processing…`;
+  // Lock UI while analyzing
+  pendingFile = null;
+  var btn = document.getElementById('btnGo');
+  if(btn) { btn.textContent = 'Analyzing…'; btn.disabled = true; }
+  document.getElementById('dropTitle').textContent = 'Analyzing: ' + file.name;
+  document.getElementById('dropSub').textContent = 'Running all detection signals…';
 
   // Show progress
   document.getElementById('progressWrap').classList.add('visible');
@@ -788,6 +810,12 @@ function renderResults(server, ela, meta, file, imgURL) {
 
   document.getElementById('resultsWrap').classList.add('visible');
   document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+
+  // Reset upload UI
+  var btn = document.getElementById('btnGo');
+  if(btn) { btn.textContent = 'Analyze This File →'; btn.disabled = false; }
+  document.getElementById('dropTitle').textContent = 'Click to choose another file';
+  document.getElementById('dropSub').textContent = 'JPG · PNG · WEBP · GIF · MP4 · Max 10MB';
 }
 </script>
 </body>
