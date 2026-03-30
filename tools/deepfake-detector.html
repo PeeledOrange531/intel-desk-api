@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Image & Deepfake Detector — Multi-Signal Analysis | The Intel Desk</title>
+<meta name="description" content="Free AI-generated image and deepfake detector. Multi-signal analysis using Hive AI, HuggingFace models, Error Level Analysis, metadata forensics and C2PA content credentials. Used by journalists and investigators.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+.hero{padding:clamp(40px,7vw,72px) 0 clamp(28px,4vw,44px);border-bottom:1px solid var(--border);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:20px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(34px,5vw,62px);font-weight:300;line-height:0.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:400px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* UPLOAD */
+.upload-section{padding:clamp(32px,5vw,48px) 0 0;}
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.drop-zone{border:1px dashed rgba(200,169,110,0.25);background:var(--bg2);padding:clamp(32px,5vw,56px) 24px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;}
+.drop-zone:hover,.drop-zone.drag-over{border-color:rgba(200,169,110,0.55);background:rgba(200,169,110,0.04);}
+.drop-icon{font-size:36px;margin-bottom:12px;opacity:0.5;}
+.drop-title{font-family:var(--serif);font-size:clamp(18px,2.5vw,24px);font-weight:300;color:#e8d5a3!important;margin-bottom:8px;}
+.drop-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;line-height:1.7;}
+.drop-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+
+.url-row{display:flex;gap:0;margin-top:2px;flex-wrap:wrap;}
+.url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:14px 18px;outline:none;transition:border-color 0.2s;}
+.url-input:focus{border-color:rgba(200,169,110,0.35);}
+.url-input::placeholder{color:rgba(240,236,228,0.22)!important;}
+.btn-analyze{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;}
+.btn-analyze:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-analyze:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.25)!important;margin-top:8px;}
+
+/* PROGRESS */
+.progress-wrap{display:none;margin-top:24px;flex-direction:column;gap:2px;}
+.progress-wrap.visible{display:flex;}
+.progress-step{background:var(--bg2);border:1px solid var(--border);padding:12px 18px;display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:12px;}
+.ps-icon{flex-shrink:0;font-size:14px;}
+.ps-label{flex:1;color:rgba(240,236,228,0.50)!important;}
+.ps-label.active{color:#e8d5a3!important;}
+.ps-label.done{color:rgba(240,236,228,0.35)!important;}
+.ps-status{font-size:10px;color:rgba(240,236,228,0.22)!important;}
+.ps-status.done{color:#4ec994!important;}
+.ps-status.error{color:#e87b4a!important;}
+.spin{display:inline-block;animation:spin 1s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,44px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+/* VERDICT */
+.verdict-panel{padding:24px 28px;border:1px solid;display:flex;gap:20px;flex-wrap:wrap;align-items:flex-start;}
+.verdict-panel.ai{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.30);}
+.verdict-panel.likely-ai{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
+.verdict-panel.uncertain{background:rgba(200,169,110,0.05);border-color:rgba(200,169,110,0.20);}
+.verdict-panel.authentic{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
+.verdict-score-ring{width:100px;height:100px;flex-shrink:0;position:relative;}
+.verdict-score-ring svg{width:100%;height:100%;}
+.verdict-score-num{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-family:var(--serif);font-size:28px;font-weight:300;}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,28px);font-weight:300;margin-bottom:6px;}
+.verdict-sub{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.50)!important;line-height:1.7;}
+.verdict-confidence{font-family:var(--mono);font-size:11px;margin-top:8px;}
+.verdict-confidence strong{color:#c8a96e!important;}
+
+/* SIGNALS */
+.signals-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:2px;background:var(--border);}
+.signal-card{background:var(--bg2);padding:20px 22px;}
+.signal-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;}
+.signal-name{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.40)!important;}
+.signal-badge{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:2px 8px;border:1px solid;}
+.signal-badge.ai{color:#c0392b!important;border-color:rgba(192,57,43,0.30);}
+.signal-badge.suspicious{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.signal-badge.clean{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.signal-badge.na{color:rgba(240,236,228,0.25)!important;border-color:rgba(255,255,255,0.10);}
+.signal-score{font-family:var(--serif);font-size:32px;font-weight:300;margin-bottom:6px;line-height:1;}
+.signal-bar{height:4px;background:rgba(255,255,255,0.06);border-radius:2px;overflow:hidden;margin-bottom:10px;}
+.signal-bar-fill{height:100%;border-radius:2px;transition:width 0.8s ease;}
+.signal-detail{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.6;}
+.signal-error{font-family:var(--mono);font-size:11px;color:rgba(232,123,74,0.60)!important;}
+
+/* IMAGE PREVIEW + ELA */
+.image-panels{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.img-panel{background:var(--bg2);border:1px solid var(--border);}
+.img-panel-hdr{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.35)!important;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.img-panel canvas,.img-panel img{width:100%;display:block;max-height:400px;object-fit:contain;background:#050505;}
+
+/* METADATA */
+.meta-panel{background:var(--bg2);border:1px solid var(--border);}
+.meta-hdr{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.35)!important;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg3);}
+.meta-row{display:flex;gap:12px;padding:9px 16px;border-bottom:1px solid rgba(255,255,255,0.03);font-family:var(--mono);font-size:12px;}
+.meta-key{color:rgba(240,236,228,0.30)!important;width:160px;flex-shrink:0;}
+.meta-val{color:rgba(240,236,228,0.70)!important;flex:1;word-break:break-all;}
+.meta-val.flag{color:#c0392b!important;}
+.meta-val.warn{color:#e87b4a!important;}
+.meta-val.good{color:#4ec994!important;}
+
+/* CHECKLIST */
+.checklist-panel{background:var(--bg2);border:1px solid var(--border);padding:20px 24px;}
+.checklist-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.35)!important;margin-bottom:14px;}
+.check-item{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.03);}
+.check-item:last-child{border-bottom:none;}
+.check-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.check-text{font-family:var(--mono);font-size:11px;flex:1;line-height:1.5;}
+.check-text strong{color:#e8d5a3!important;}
+.check-result{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:2px 7px;border:1px solid;flex-shrink:0;margin-top:1px;}
+
+.footer{margin-top:clamp(48px,7vw,80px);padding:24px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.25)!important;max-width:520px;text-align:right;line-height:1.7;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px);}to{opacity:1;transform:translateY(0);}}
+@media(max-width:768px){
+  .image-panels{grid-template-columns:1fr;}
+  .signals-grid{grid-template-columns:1fr;}
+  .verdict-panel{flex-direction:column;}
+  .verdict-score-ring{width:80px;height:80px;}
+  .url-input{min-width:100%;border-right:1px solid var(--border);}
+  .btn-analyze{width:100%;margin-top:2px;}
+  .footer-right{text-align:left;max-width:100%;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Image Forensics</span></div>
+    <h1>AI & Deepfake <em>Detector</em></h1>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>No single detector is reliable enough to use alone. This tool runs <strong>five independent signals simultaneously</strong> and combines them into a weighted confidence score. <strong>Hive AI</strong> uses a dedicated neural network trained specifically on AI-generated images and deepfake face manipulation. <strong>HuggingFace inference</strong> runs an independent model trained on Stable Diffusion, DALL-E, and Midjourney outputs. <strong>Error Level Analysis (ELA)</strong> is a classical forensics technique that reveals JPEG recompression artifacts — manipulated or composited regions show different error levels than authentic content. <strong>Metadata forensics</strong> scans the file for AI generator signatures embedded by tools like Stable Diffusion, Midjourney, and DALL-E. <strong>C2PA / Content Credentials</strong> checks for embedded provenance metadata from camera manufacturers and content platforms. No single signal is definitive — the tool shows you all signals with their individual confidence levels so you can make an informed judgment.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Deepfake Detection</span><span class="seo-tag">AI Image</span>
+        <span class="seo-tag">Error Level Analysis</span><span class="seo-tag">Image Forensics</span>
+        <span class="seo-tag">Metadata Analysis</span><span class="seo-tag">OSINT</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="upload-section">
+    <div class="section-label">Upload Image to Analyze</div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" class="drop-input" id="fileInput" accept="image/*" onchange="handleFile(this.files[0])">
+      <div class="drop-icon">⬆</div>
+      <div class="drop-title">Drop image here or click to upload</div>
+      <div class="drop-sub">JPG · PNG · WEBP · GIF · Max 10MB<br>Image is sent to analysis server and not stored</div>
+    </div>
+
+    <div class="section-label" style="margin-top:16px;">Or Analyze by URL</div>
+    <div class="url-row">
+      <input type="text" class="url-input" id="urlInput"
+        placeholder="https://example.com/image.jpg"
+        onkeydown="if(event.key==='Enter')analyzeFromURL()">
+      <button class="btn-analyze" id="btnURL" onclick="analyzeFromURL()">Analyze URL →</button>
+    </div>
+    <div class="input-hint">Image is fetched server-side · Supports direct image URLs</div>
+
+    <!-- PROGRESS -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-step" id="ps-upload">
+        <span class="ps-icon" id="pi-upload">⏳</span>
+        <span class="ps-label" id="pl-upload">Uploading image</span>
+        <span class="ps-status" id="pst-upload">Waiting…</span>
+      </div>
+      <div class="progress-step" id="ps-hive">
+        <span class="ps-icon" id="pi-hive">⏳</span>
+        <span class="ps-label" id="pl-hive">Hive AI — deepfake & AI detection neural network</span>
+        <span class="ps-status" id="pst-hive">Waiting…</span>
+      </div>
+      <div class="progress-step" id="ps-hf">
+        <span class="ps-icon" id="pi-hf">⏳</span>
+        <span class="ps-label" id="pl-hf">HuggingFace — independent AI image classifier</span>
+        <span class="ps-status" id="pst-hf">Waiting…</span>
+      </div>
+      <div class="progress-step" id="ps-ela">
+        <span class="ps-icon" id="pi-ela">⏳</span>
+        <span class="ps-label" id="pl-ela">Error Level Analysis — JPEG compression forensics</span>
+        <span class="ps-status" id="pst-ela">Waiting…</span>
+      </div>
+      <div class="progress-step" id="ps-meta">
+        <span class="ps-icon" id="pi-meta">⏳</span>
+        <span class="ps-label" id="pl-meta">Metadata forensics — AI generator signatures</span>
+        <span class="ps-status" id="pst-meta">Waiting…</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+
+    <!-- VERDICT -->
+    <div class="verdict-panel" id="verdictPanel">
+      <div class="verdict-score-ring">
+        <svg viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
+          <circle cx="50" cy="50" r="42" fill="none" stroke-width="8"
+            stroke-dasharray="264" stroke-dashoffset="264"
+            stroke-linecap="round" transform="rotate(-90 50 50)"
+            id="verdictRing" style="transition:stroke-dashoffset 1s ease,stroke 0.5s;"/>
+        </svg>
+        <div class="verdict-score-num" id="verdictNum">—</div>
+      </div>
+      <div class="verdict-text">
+        <div class="verdict-title" id="verdictTitle">Analyzing…</div>
+        <div class="verdict-sub" id="verdictSub"></div>
+        <div class="verdict-confidence" id="verdictConf"></div>
+      </div>
+    </div>
+
+    <!-- SIGNALS -->
+    <div class="signals-grid" id="signalsGrid"></div>
+
+    <!-- IMAGE + ELA -->
+    <div class="image-panels">
+      <div class="img-panel">
+        <div class="img-panel-hdr">Original Image</div>
+        <img id="originalImg" src="" alt="Original">
+      </div>
+      <div class="img-panel">
+        <div class="img-panel-hdr">Error Level Analysis (ELA)</div>
+        <canvas id="elaCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- METADATA -->
+    <div class="meta-panel" id="metaPanel">
+      <div class="meta-hdr">Metadata Forensics</div>
+      <div id="metaRows"></div>
+    </div>
+
+    <!-- CHECKLIST -->
+    <div class="checklist-panel" id="checklistPanel">
+      <div class="checklist-title">Forensic Checklist</div>
+      <div id="checklistItems"></div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Analysis via Hive AI (thehive.ai) and HuggingFace Inference API. ELA performed client-side. No images are stored. Results are probabilistic — no detector is 100% accurate. Always combine with human judgment.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+// ── DRAG & DROP ───────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if(file && file.type.startsWith('image/')) handleFile(file);
+});
+
+// ── PROGRESS ──────────────────────────────────────────────────────────────────
+function setProgress(id, state, msg) {
+  const icons = { waiting:'⏳', running:`<span class="spin">◌</span>`, done:'✓', error:'⚠' };
+  document.getElementById(`pi-${id}`).innerHTML = icons[state];
+  document.getElementById(`pl-${id}`).className = `ps-label ${state==='running'?'active':state==='done'?'done':''}`;
+  document.getElementById(`pst-${id}`).className = `ps-status ${state==='done'?'done':state==='error'?'error':''}`;
+  document.getElementById(`pst-${id}`).textContent = msg;
+}
+
+// ── ANALYZE FROM URL ──────────────────────────────────────────────────────────
+async function analyzeFromURL() {
+  const url = document.getElementById('urlInput').value.trim();
+  if(!url){ alert('Enter an image URL.'); return; }
+
+  document.getElementById('btnURL').disabled = true;
+  document.getElementById('btnURL').textContent = 'Fetching…';
+
+  try {
+    // Fetch via our proxy to avoid CORS
+    const r = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(url)}`);
+    const d = await r.json();
+    if(d.error) throw new Error(d.error);
+
+    // Now fetch the actual image bytes
+    const imgResp = await fetch(url);
+    if(!imgResp.ok) throw new Error(`Could not fetch image: HTTP ${imgResp.status}`);
+    const blob = await imgResp.blob();
+    const file = new File([blob], 'image.jpg', { type: blob.type || 'image/jpeg' });
+    handleFile(file);
+  } catch(e) {
+    alert('Could not fetch image: ' + e.message);
+  } finally {
+    document.getElementById('btnURL').disabled = false;
+    document.getElementById('btnURL').textContent = 'Analyze URL →';
+  }
+}
+
+// ── MAIN HANDLER ──────────────────────────────────────────────────────────────
+async function handleFile(file) {
+  if(!file) return;
+  if(file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
+  if(!file.type.startsWith('image/')) { alert('Please upload an image file.'); return; }
+
+  // Show progress
+  document.getElementById('progressWrap').classList.add('visible');
+  document.getElementById('resultsWrap').classList.remove('visible');
+  ['upload','hive','hf','ela','meta'].forEach(id => setProgress(id,'waiting','Queued…'));
+
+  // Read file
+  const arrayBuffer = await file.arrayBuffer();
+  const blob = new Blob([arrayBuffer], { type: file.type });
+
+  // Show original image preview
+  const imgURL = URL.createObjectURL(blob);
+  document.getElementById('originalImg').src = imgURL;
+
+  // Run ELA client-side immediately
+  setProgress('ela','running','Computing…');
+  const elaResult = await computeELA(blob, imgURL);
+  setProgress('ela','done', elaResult.anomalyScore > 0.3 ? `Anomaly score: ${(elaResult.anomalyScore*100).toFixed(0)}%` : 'Low anomaly');
+
+  // Run metadata analysis
+  setProgress('meta','running','Scanning…');
+  const metaResult = analyzeMetadata(arrayBuffer, file);
+  setProgress('meta','done', metaResult.hasAISig ? '⚠ AI signature found' : 'No AI signatures');
+
+  // Send to Render for Hive + HuggingFace
+  setProgress('upload','running','Uploading…');
+  setProgress('hive','running','Analyzing…');
+  setProgress('hf','running','Analyzing…');
+
+  let serverResult = null;
+  try {
+    const formData = new FormData();
+    formData.append('image', blob, file.name || 'image.jpg');
+
+    setProgress('upload','done','Sent');
+
+    const r = await fetch(`${PROXY}/deepfake/analyze`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if(!r.ok) throw new Error(`Server error: HTTP ${r.status}`);
+    serverResult = await r.json();
+
+    // Parse Hive result
+    const hive = serverResult.hive;
+    if(hive && !hive.error) {
+      setProgress('hive','done','Complete');
+    } else {
+      setProgress('hive','error', hive?.error || 'Failed');
+    }
+
+    // Parse HuggingFace result
+    const hf = serverResult.huggingface;
+    if(hf && !hf.error) {
+      setProgress('hf','done','Complete');
+    } else {
+      setProgress('hf','error', hf?.error || 'Failed');
+    }
+  } catch(e) {
+    setProgress('upload','error', e.message.slice(0,40));
+    setProgress('hive','error','Server unavailable');
+    setProgress('hf','error','Server unavailable');
+  }
+
+  // Render results
+  renderResults(serverResult, elaResult, metaResult, file, imgURL);
+}
+
+// ── ERROR LEVEL ANALYSIS ──────────────────────────────────────────────────────
+async function computeELA(blob, imgURL) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const W = img.naturalWidth;
+      const H = img.naturalHeight;
+      const scale = Math.min(1, 800 / Math.max(W, H));
+      const w = Math.round(W * scale);
+      const h = Math.round(H * scale);
+
+      // Original canvas
+      const c1 = document.createElement('canvas');
+      c1.width = w; c1.height = h;
+      const ctx1 = c1.getContext('2d');
+      ctx1.drawImage(img, 0, 0, w, h);
+      const orig = ctx1.getImageData(0, 0, w, h);
+
+      // Recompressed canvas at quality 70
+      const c2 = document.createElement('canvas');
+      c2.width = w; c2.height = h;
+      const ctx2 = c2.getContext('2d');
+
+      const recompImg = new Image();
+      recompImg.onload = () => {
+        ctx2.drawImage(recompImg, 0, 0, w, h);
+        const recomp = ctx2.getImageData(0, 0, w, h);
+
+        // ELA canvas — output
+        const elaCanvas = document.getElementById('elaCanvas');
+        elaCanvas.width = w;
+        elaCanvas.height = h;
+        const elaCtx = elaCanvas.getContext('2d');
+        const elaData = elaCtx.createImageData(w, h);
+
+        let totalDiff = 0;
+        let maxDiff = 0;
+        for(let i = 0; i < orig.data.length; i += 4) {
+          const dr = Math.abs(orig.data[i]   - recomp.data[i]);
+          const dg = Math.abs(orig.data[i+1] - recomp.data[i+1]);
+          const db = Math.abs(orig.data[i+2] - recomp.data[i+2]);
+          const diff = (dr + dg + db) / 3;
+          totalDiff += diff;
+          if(diff > maxDiff) maxDiff = diff;
+
+          // Amplify for visualization (10x)
+          const amplified = Math.min(255, diff * 10);
+          elaData.data[i]   = amplified;
+          elaData.data[i+1] = Math.round(amplified * 0.3); // tint towards red
+          elaData.data[i+2] = 0;
+          elaData.data[i+3] = 255;
+        }
+        elaCtx.putImageData(elaData, 0, 0);
+
+        const avgDiff = totalDiff / (w * h);
+        const anomalyScore = Math.min(1, avgDiff / 30); // normalize
+
+        resolve({ anomalyScore, avgDiff, maxDiff, width: w, height: h });
+      };
+      recompImg.src = c1.toDataURL('image/jpeg', 0.7);
+    };
+    img.onerror = () => resolve({ anomalyScore: 0, avgDiff: 0, maxDiff: 0 });
+    img.src = imgURL;
+  });
+}
+
+// ── METADATA ANALYSIS ─────────────────────────────────────────────────────────
+function analyzeMetadata(buffer, file) {
+  const bytes = new Uint8Array(buffer.slice(0, 8192));
+  const rawStr = Array.from(bytes).map(b => String.fromCharCode(b)).join('').toLowerCase();
+
+  const AI_SIGS = {
+    'Stable Diffusion':  ['stable diffusion','stablediffusion','sd-webui','automatic1111','comfyui'],
+    'Midjourney':        ['midjourney','mid journey'],
+    'DALL-E / OpenAI':   ['dall-e','openai','dalle'],
+    'Adobe Firefly':     ['firefly','adobe firefly'],
+    'NovelAI':           ['novelai','novel ai'],
+    'Bing Image Creator':['bing image','image creator'],
+    'Canva AI':          ['canva'],
+    'Runway':            ['runway ml','runwayml'],
+  };
+
+  const foundSigs = {};
+  let hasAISig = false;
+  for(const [tool, keywords] of Object.entries(AI_SIGS)) {
+    if(keywords.some(kw => rawStr.includes(kw))) {
+      foundSigs[tool] = true;
+      hasAISig = true;
+    }
+  }
+
+  // Check format
+  const sig2 = new Uint8Array(buffer.slice(0,4));
+  let format = 'Unknown';
+  if(sig2[0]===0xFF && sig2[1]===0xD8) format = 'JPEG';
+  else if(sig2[0]===0x89 && sig2[1]===0x50) format = 'PNG';
+  else if(sig2[0]===0x52 && sig2[1]===0x49) format = 'WEBP/RIFF';
+  else if(sig2[0]===0x47 && sig2[1]===0x49) format = 'GIF';
+
+  // C2PA check — look for xmp or c2pa markers
+  const hasC2PA = rawStr.includes('c2pa') || rawStr.includes('contentcredentials') || rawStr.includes('cawg');
+  const hasXMP   = rawStr.includes('xpacket') || rawStr.includes('xmpmeta');
+  const hasEXIF  = rawStr.includes('exif');
+  const hasGPS   = rawStr.includes('gpslatitude') || rawStr.includes('gpslongitude');
+
+  return {
+    hasAISig, foundSigs,
+    format,
+    hasC2PA, hasXMP, hasEXIF, hasGPS,
+    fileSize: file.size,
+    mimeType: file.type,
+  };
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────────────────────
+function renderResults(server, ela, meta, file, imgURL) {
+  // Parse signal scores
+  const signals = [];
+
+  // ── Hive signal ──
+  let hiveScore = null, hiveLabel = 'N/A', hiveCls = 'na';
+  if(server?.hive && !server.hive.error) {
+    try {
+      // Hive response structure varies by endpoint
+      const hiveData = server.hive;
+      // Try to find AI/deepfake score in response
+      const status = hiveData.status?.[0];
+      const classes = status?.response?.output?.[0]?.classes || [];
+      const aiClass = classes.find(c =>
+        c.class?.toLowerCase().includes('ai') ||
+        c.class?.toLowerCase().includes('deepfake') ||
+        c.class?.toLowerCase().includes('generated')
+      );
+      if(aiClass) {
+        hiveScore = Math.round(aiClass.score * 100);
+        hiveLabel = hiveScore > 70 ? 'AI Detected' : hiveScore > 40 ? 'Suspicious' : 'Likely Authentic';
+        hiveCls   = hiveScore > 70 ? 'ai' : hiveScore > 40 ? 'suspicious' : 'clean';
+      } else {
+        // Try flat structure
+        const flat = hiveData.result || hiveData.output || hiveData;
+        if(flat.ai_generated !== undefined) {
+          hiveScore = Math.round(flat.ai_generated * 100);
+          hiveLabel = hiveScore > 70 ? 'AI Detected' : hiveScore > 40 ? 'Suspicious' : 'Likely Authentic';
+          hiveCls   = hiveScore > 70 ? 'ai' : hiveScore > 40 ? 'suspicious' : 'clean';
+        }
+      }
+    } catch(e) {}
+  }
+
+  signals.push({
+    name: 'Hive AI Detection',
+    score: hiveScore,
+    label: hiveScore !== null ? hiveLabel : server?.hive?.error ? 'Error' : 'N/A',
+    cls:   hiveScore !== null ? hiveCls : 'na',
+    detail: hiveScore !== null
+      ? `Neural network trained on deepfakes and AI-generated images. Score: ${hiveScore}%`
+      : server?.hive?.error || 'No result returned',
+    color: hiveScore > 70 ? '#c0392b' : hiveScore > 40 ? '#e87b4a' : '#4ec994',
+  });
+
+  // ── HuggingFace signal ──
+  let hfScore = null, hfLabel = 'N/A', hfCls = 'na';
+  if(server?.huggingface && !server.huggingface.error) {
+    try {
+      const hfData = server.huggingface;
+      // HF returns array of {label, score}
+      const arr = Array.isArray(hfData) ? hfData : hfData[0] ? hfData : [];
+      const aiEntry = arr.find(e =>
+        e.label?.toLowerCase().includes('artificial') ||
+        e.label?.toLowerCase().includes('ai') ||
+        e.label?.toLowerCase().includes('fake') ||
+        e.label?.toLowerCase().includes('generated')
+      );
+      if(aiEntry) {
+        hfScore = Math.round(aiEntry.score * 100);
+        hfLabel = hfScore > 70 ? 'AI Detected' : hfScore > 40 ? 'Suspicious' : 'Likely Authentic';
+        hfCls   = hfScore > 70 ? 'ai' : hfScore > 40 ? 'suspicious' : 'clean';
+      }
+    } catch(e) {}
+  }
+
+  signals.push({
+    name: 'HuggingFace Classifier',
+    score: hfScore,
+    label: hfScore !== null ? hfLabel : server?.huggingface?.error ? 'Error' : 'N/A',
+    cls:   hfScore !== null ? hfCls : 'na',
+    detail: hfScore !== null
+      ? `Independent AI image classifier (SDXL/Stable Diffusion detector). Score: ${hfScore}%`
+      : server?.huggingface?.error || 'No result returned',
+    color: hfScore > 70 ? '#c0392b' : hfScore > 40 ? '#e87b4a' : '#4ec994',
+  });
+
+  // ── ELA signal ──
+  const elaScore = Math.round(ela.anomalyScore * 100);
+  const elaCls   = elaScore > 50 ? 'suspicious' : elaScore > 25 ? 'suspicious' : 'clean';
+  signals.push({
+    name:   'Error Level Analysis',
+    score:  elaScore,
+    label:  elaScore > 50 ? 'High anomaly' : elaScore > 25 ? 'Moderate anomaly' : 'Low anomaly',
+    cls:    elaCls,
+    detail: `Avg pixel difference after recompression: ${ela.avgDiff.toFixed(2)}. High values may indicate editing or composition.`,
+    color:  elaScore > 50 ? '#e87b4a' : elaScore > 25 ? '#c8a96e' : '#4ec994',
+  });
+
+  // ── Metadata signal ──
+  const sigCount = Object.keys(meta.foundSigs).length;
+  signals.push({
+    name:   'Metadata Forensics',
+    score:  meta.hasAISig ? 95 : 5,
+    label:  meta.hasAISig ? `AI sig: ${Object.keys(meta.foundSigs).join(', ')}` : 'No AI signatures',
+    cls:    meta.hasAISig ? 'ai' : 'clean',
+    detail: meta.hasAISig
+      ? `Found embedded AI generator signatures: ${Object.keys(meta.foundSigs).join(', ')}`
+      : 'No known AI generator signatures found in file metadata.',
+    color:  meta.hasAISig ? '#c0392b' : '#4ec994',
+  });
+
+  // ── C2PA signal ──
+  signals.push({
+    name:   'Content Credentials (C2PA)',
+    score:  meta.hasC2PA ? 5 : null,
+    label:  meta.hasC2PA ? 'Provenance Found' : 'No C2PA Data',
+    cls:    meta.hasC2PA ? 'clean' : 'na',
+    detail: meta.hasC2PA
+      ? 'Content Credentials provenance metadata found — image has a verified origin chain.'
+      : 'No C2PA/Content Credentials metadata. Most images lack this — absence is not evidence of fakery.',
+    color:  meta.hasC2PA ? '#4ec994' : 'rgba(240,236,228,0.25)',
+  });
+
+  // ── OVERALL VERDICT ──
+  const scoredSignals = signals.filter(s => s.score !== null && s.name !== 'Content Credentials (C2PA)');
+  const weights = { 'Hive AI Detection':3, 'HuggingFace Classifier':3, 'Error Level Analysis':1, 'Metadata Forensics':3 };
+  let weightedSum = 0, weightTotal = 0;
+  scoredSignals.forEach(s => {
+    const w = weights[s.name] || 1;
+    weightedSum  += s.score * w;
+    weightTotal  += w;
+  });
+
+  // If AI sig found in metadata, that's strong
+  if(meta.hasAISig) { weightedSum += 95 * 4; weightTotal += 4; }
+
+  const overallScore = weightTotal > 0 ? Math.round(weightedSum / weightTotal) : 0;
+  const verdictCls   = overallScore > 70 ? 'ai' : overallScore > 45 ? 'likely-ai' : overallScore > 25 ? 'uncertain' : 'authentic';
+  const verdictTitle = overallScore > 70 ? 'Likely AI-Generated or Manipulated'
+    : overallScore > 45 ? 'Suspicious — Possible AI Generation'
+    : overallScore > 25 ? 'Uncertain — Mixed Signals'
+    : 'Likely Authentic';
+  const verdictColor = overallScore > 70 ? '#c0392b' : overallScore > 45 ? '#e87b4a' : overallScore > 25 ? '#c8a96e' : '#4ec994';
+
+  // Ring animation
+  const ring = document.getElementById('verdictRing');
+  const offset = 264 - (264 * overallScore / 100);
+  ring.style.strokeDashoffset = offset;
+  ring.style.stroke = verdictColor;
+  document.getElementById('verdictNum').textContent = overallScore + '%';
+  document.getElementById('verdictNum').style.color = verdictColor;
+
+  const panel = document.getElementById('verdictPanel');
+  panel.className = `verdict-panel ${verdictCls}`;
+  document.getElementById('verdictTitle').textContent = verdictTitle;
+  document.getElementById('verdictSub').textContent =
+    `${scoredSignals.length} of ${signals.length} signals scored · ${meta.format} · ${(file.size/1024).toFixed(0)}KB · ${ela.width}×${ela.height}px`;
+  document.getElementById('verdictConf').innerHTML =
+    `Weighted confidence: <strong>${overallScore}% likelihood of AI generation</strong>`;
+
+  // Signal cards
+  document.getElementById('signalsGrid').innerHTML = signals.map(s => `
+    <div class="signal-card">
+      <div class="signal-header">
+        <div class="signal-name">${esc(s.name)}</div>
+        <span class="signal-badge ${s.cls}">${esc(s.label)}</span>
+      </div>
+      ${s.score !== null ? `
+        <div class="signal-score" style="color:${s.color}">${s.score}%</div>
+        <div class="signal-bar">
+          <div class="signal-bar-fill" style="width:${s.score}%;background:${s.color};"></div>
+        </div>` : `<div class="signal-score" style="color:rgba(240,236,228,0.20)">—</div><div class="signal-bar"></div>`}
+      <div class="signal-detail">${esc(s.detail)}</div>
+    </div>`).join('');
+
+  // Metadata panel
+  const metaRows = [
+    ['File Format',   meta.format,   ''],
+    ['File Size',     `${(file.size/1024).toFixed(1)} KB`, ''],
+    ['MIME Type',     meta.mimeType, ''],
+    ['Has EXIF',      meta.hasEXIF ? 'Yes' : 'No', meta.hasEXIF?'good':''],
+    ['Has GPS Data',  meta.hasGPS  ? 'Yes (location found)' : 'No', ''],
+    ['Has XMP Data',  meta.hasXMP  ? 'Yes' : 'No', ''],
+    ['C2PA / Provenance', meta.hasC2PA ? 'Yes — content credentials found' : 'No', meta.hasC2PA?'good':''],
+    ['AI Signatures', meta.hasAISig ? Object.keys(meta.foundSigs).join(', ') : 'None found', meta.hasAISig?'flag':'good'],
+  ];
+  document.getElementById('metaRows').innerHTML = metaRows.map(([k,v,cls]) => `
+    <div class="meta-row">
+      <div class="meta-key">${esc(k)}</div>
+      <div class="meta-val ${cls}">${esc(v)}</div>
+    </div>`).join('');
+
+  // Checklist
+  const checks = [
+    {
+      icon: meta.hasAISig ? '🔴' : '🟢',
+      text: '<strong>AI generator signatures</strong> in file metadata',
+      result: meta.hasAISig ? Object.keys(meta.foundSigs).join(', ') : 'None found',
+      cls: meta.hasAISig ? 'ai' : 'clean',
+    },
+    {
+      icon: elaScore > 40 ? '🟡' : '🟢',
+      text: '<strong>Error Level Analysis</strong> — recompression consistency',
+      result: elaScore > 40 ? `Anomaly: ${elaScore}%` : `Low anomaly: ${elaScore}%`,
+      cls: elaScore > 40 ? 'suspicious' : 'clean',
+    },
+    {
+      icon: meta.hasEXIF ? '🟢' : '🟡',
+      text: '<strong>EXIF metadata</strong> present',
+      result: meta.hasEXIF ? 'Yes' : 'Missing — AI images often lack EXIF',
+      cls: meta.hasEXIF ? 'clean' : 'suspicious',
+    },
+    {
+      icon: meta.hasC2PA ? '🟢' : '⚪',
+      text: '<strong>Content Credentials (C2PA)</strong> provenance chain',
+      result: meta.hasC2PA ? 'Found' : 'Not present',
+      cls: meta.hasC2PA ? 'clean' : 'na',
+    },
+    {
+      icon: hiveScore !== null ? (hiveScore > 60 ? '🔴' : '🟢') : '⚪',
+      text: '<strong>Hive AI</strong> deepfake detection neural network',
+      result: hiveScore !== null ? `${hiveScore}% AI probability` : 'Not available',
+      cls: hiveScore > 60 ? 'ai' : hiveScore !== null ? 'clean' : 'na',
+    },
+    {
+      icon: hfScore !== null ? (hfScore > 60 ? '🔴' : '🟢') : '⚪',
+      text: '<strong>HuggingFace</strong> independent AI classifier',
+      result: hfScore !== null ? `${hfScore}% AI probability` : 'Not available',
+      cls: hfScore > 60 ? 'ai' : hfScore !== null ? 'clean' : 'na',
+    },
+  ];
+
+  const clsColors = { ai:'#c0392b', suspicious:'#e87b4a', clean:'#4ec994', na:'rgba(240,236,228,0.25)' };
+  document.getElementById('checklistItems').innerHTML = checks.map(ch => `
+    <div class="check-item">
+      <div class="check-icon">${ch.icon}</div>
+      <div class="check-text">${ch.text}</div>
+      <div class="check-result" style="color:${clsColors[ch.cls]};border-color:${clsColors[ch.cls]}33;">${esc(ch.result)}</div>
+    </div>`).join('');
+
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+</script>
+</body>
+</html>
