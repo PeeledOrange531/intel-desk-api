@@ -14,6 +14,21 @@ import requests
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
 
+# ── ENVIRONMENT VARIABLES REQUIRED ───────────────────────────────────────────
+# Set these in Render Dashboard → Environment (never hardcode in this file):
+#
+#   AISSTREAM_KEY   — aisstream.io WebSocket API key
+#   HIVE_KEY_ID     — Hive AI Access Key ID (thehive.ai)
+#   HIVE_SECRET     — Hive AI Secret Key
+#   HF_TOKEN        — HuggingFace API token (huggingface.co/settings/tokens)
+#   W3W_API_KEY     — what3words API key
+#
+# Optional (used by specific tools):
+#   IPINFO_KEY      — IPInfo token (ipinfo.io)
+#   ABUSEIPDB_KEY   — AbuseIPDB API key
+#
+# ─────────────────────────────────────────────────────────────────────────────
+
 app = Flask(__name__)
 CORS(app, origins='*', supports_credentials=False)
 
@@ -783,12 +798,103 @@ def flights_proxy():
 
 
 
+
+# ── CLIENT-SIDE API PROXIES ────────────────────────────────────────────────────
+# These keep API keys server-side so the CTI dashboard works for all users
+# without them needing their own keys.
+
+OTX_KEY       = os.environ.get("OTX_KEY", "")
+ABUSEIPDB_KEY = os.environ.get("ABUSEIPDB_KEY", "")
+IPINFO_KEY    = os.environ.get("IPINFO_KEY", "")
+
+@app.route("/proxy/otx/pulses", methods=["GET","OPTIONS"])
+@corsify
+def proxy_otx_pulses():
+    """Proxy AlienVault OTX subscribed pulses — keeps API key server-side."""
+    if not OTX_KEY:
+        return jsonify({"error": "OTX_KEY not configured on server"}), 503
+    try:
+        since = request.args.get("since", "")
+        limit = request.args.get("limit", "30")
+        url   = f"https://otx.alienvault.com/api/v1/pulses/subscribed?limit={limit}"
+        if since:
+            url += f"&modified_since={since}"
+        r = requests.get(url, headers={"X-OTX-API-KEY": OTX_KEY}, timeout=15)
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/proxy/otx/indicators/<pulse_id>", methods=["GET","OPTIONS"])
+@corsify
+def proxy_otx_indicators(pulse_id):
+    """Proxy OTX pulse indicators."""
+    if not OTX_KEY:
+        return jsonify({"error": "OTX_KEY not configured"}), 503
+    try:
+        r = requests.get(
+            f"https://otx.alienvault.com/api/v1/pulses/{pulse_id}/indicators?limit=50",
+            headers={"X-OTX-API-KEY": OTX_KEY}, timeout=15
+        )
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/proxy/abuseipdb", methods=["GET","OPTIONS"])
+@corsify
+def proxy_abuseipdb():
+    """Proxy AbuseIPDB IP reputation check — keeps API key server-side."""
+    if not ABUSEIPDB_KEY:
+        return jsonify({"error": "ABUSEIPDB_KEY not configured on server"}), 503
+    ip = request.args.get("ip", "")
+    if not ip:
+        return jsonify({"error": "ip parameter required"}), 400
+    try:
+        r = requests.get(
+            f"https://api.abuseipdb.com/api/v2/check?ipAddress={ip}&maxAgeInDays=90&verbose",
+            headers={"Key": ABUSEIPDB_KEY, "Accept": "application/json"},
+            timeout=10
+        )
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/proxy/ipinfo/<ip>", methods=["GET","OPTIONS"])
+@corsify
+def proxy_ipinfo(ip):
+    """Proxy IPInfo geolocation — keeps API key server-side."""
+    if not IPINFO_KEY:
+        return jsonify({"error": "IPINFO_KEY not configured on server"}), 503
+    try:
+        r = requests.get(
+            f"https://ipinfo.io/{ip}/json?token={IPINFO_KEY}",
+            timeout=10
+        )
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+@app.route("/proxy/urlhaus", methods=["POST","OPTIONS"])
+@corsify
+def proxy_urlhaus():
+    """Proxy URLhaus malware feed — handles CORS for browser clients."""
+    try:
+        r = requests.post(
+            "https://urlhaus-api.abuse.ch/v1/urls/recent/limit/30/",
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+            data="limit=30",
+            timeout=15
+        )
+        return jsonify(r.json()), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
 import time
 
-AIS_KEY = os.environ.get("AISSTREAM_KEY", "f192af54ec4e47a4e1dc7c2f7d2c86edd6e81cf4")
+AIS_KEY = os.environ.get("AISSTREAM_KEY", "")
 _ais_vessels = {}   # mmsi -> vessel dict
 _ais_lock    = threading.Lock()
 _ais_running = False
@@ -912,9 +1018,9 @@ def ais_status():
 import base64 as _b64
 import hashlib as _hashlib
 
-HIVE_KEY_ID  = os.environ.get("HIVE_KEY_ID",  "HaDgN8P57x8baTQr")
-HIVE_SECRET  = os.environ.get("HIVE_SECRET",  "UvliQHC6K+o0LapQyDeD1w==")
-HF_TOKEN     = os.environ.get("HF_TOKEN",     "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")
+HIVE_KEY_ID  = os.environ.get("HIVE_KEY_ID", "")
+HIVE_SECRET  = os.environ.get("HIVE_SECRET", "")
+HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 
 @app.route("/deepfake/analyze", methods=["POST","OPTIONS"])
 @corsify
