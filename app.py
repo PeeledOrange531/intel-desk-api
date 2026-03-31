@@ -30,6 +30,7 @@ log = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
+app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB upload limit
 CORS(app, origins='*', supports_credentials=False)
 
 # ── Configuration ─────────────────────────────────────────────────────────────
