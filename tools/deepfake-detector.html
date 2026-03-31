@@ -49,12 +49,12 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
 .section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border);}
 
-.drop-zone{border:1px dashed rgba(200,169,110,0.25);background:var(--bg2);padding:clamp(32px,5vw,56px) 24px;text-align:center;cursor:pointer;transition:all 0.2s;position:relative;}
+.drop-zone{border:1px dashed rgba(200,169,110,0.25);background:var(--bg2);padding:clamp(32px,5vw,56px) 24px;text-align:center;transition:all 0.2s;position:relative;overflow:hidden;}
 .drop-zone:hover,.drop-zone.drag-over{border-color:rgba(200,169,110,0.55);background:rgba(200,169,110,0.04);}
 .drop-icon{font-size:36px;margin-bottom:12px;opacity:0.5;}
 .drop-title{font-family:var(--serif);font-size:clamp(18px,2.5vw,24px);font-weight:300;color:#e8d5a3!important;margin-bottom:8px;}
 .drop-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;line-height:1.7;}
-/* file input is hidden, triggered via JS click */
+.real-file-input{position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:200px;}
 
 .url-row{display:flex;gap:0;margin-top:2px;flex-wrap:wrap;}
 .url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:14px 18px;outline:none;transition:border-color 0.2s;}
@@ -183,18 +183,18 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
   <section class="upload-section">
     <div class="section-label">Upload Image to Analyze</div>
 
-    <!-- label wraps input — works in all iframe contexts, no JS click() needed -->
-    <label for="fileInput" id="dropZone" class="drop-zone" style="display:block;cursor:pointer;">
+    <div id="dropZone" class="drop-zone">
+      <!-- Full-size transparent input sits on top of everything — most reliable cross-browser approach -->
       <input type="file" id="fileInput" accept="image/*,video/*"
-        style="position:absolute;opacity:0;width:0;height:0;"
+        class="real-file-input"
         onchange="if(this.files[0]) showFileReady(this.files[0])">
       <div class="drop-icon">⬆</div>
-      <div class="drop-title" id="dropTitle">Click to choose image or video</div>
-      <div class="drop-sub" id="dropSub">JPG · PNG · WEBP · GIF · MP4 · Max 10MB · File is not stored</div>
-    </label>
-    <div id="selectedFileInfo" style="display:none;background:var(--bg3);border:1px solid var(--border);border-top:none;padding:10px 18px;font-family:var(--mono);font-size:12px;align-items:center;justify-content:space-between;gap:12px;">
-      <span id="selectedFileName" style="color:#c8a96e!important;flex:1;font-family:var(--mono);font-size:12px;"></span>
-      <button onclick="analyzeSelected()" id="btnGo" style="background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:7px 20px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Analyze This File →</button>
+      <div class="drop-title" id="dropTitle">Click anywhere here to choose a file</div>
+      <div class="drop-sub" id="dropSub">JPG · PNG · WEBP · GIF · Max 10MB · File is not stored</div>
+    </div>
+    <div id="selectedFileInfo" style="display:none;background:var(--bg3);border:1px solid var(--border);border-top:none;padding:12px 18px;font-family:var(--mono);font-size:12px;flex-direction:row;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;">
+      <span id="selectedFileName" style="color:#c8a96e!important;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+      <button onclick="analyzeSelected()" id="btnGo" style="background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:10px 24px;cursor:pointer;white-space:nowrap;flex-shrink:0;">Analyze This File →</button>
     </div>
 
     <div class="section-label" style="margin-top:16px;">Or Analyze by URL</div>
