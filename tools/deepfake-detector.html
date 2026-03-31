@@ -166,7 +166,7 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
       >
       <span class="upload-icon">⬆</span>
       <div class="upload-title" id="uploadTitle">Click to choose an image</div>
-      <div class="upload-sub" id="uploadSub">JPG · PNG · WEBP · GIF · BMP · Max 10MB<br>Image is analyzed server-side and not stored</div>
+      <div class="upload-sub" id="uploadSub">JPG · PNG · WEBP · GIF · BMP · Max 50MB<br>Image is analyzed server-side and not stored</div>
     </div>
     <div class="file-ready-bar" id="fileReadyBar">
       <span class="file-name" id="fileName">—</span>
@@ -314,10 +314,39 @@ async function fetchFromURL() {
   }
 }
 
+// ── IMAGE COMPRESSION FOR UPLOAD ─────────────────────────────────────────────
+function compressForUpload(blob, imgURL) {
+  return new Promise(function(resolve, reject) {
+    var img = new Image();
+    img.onload = function() {
+      // Max dimension 2048px for server analysis
+      var MAX = 2048;
+      var w = img.naturalWidth;
+      var h = img.naturalHeight;
+      var scale = Math.min(1, MAX / Math.max(w, h));
+      var tw = Math.round(w * scale);
+      var th = Math.round(h * scale);
+
+      var canvas = document.createElement('canvas');
+      canvas.width  = tw;
+      canvas.height = th;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0, tw, th);
+
+      canvas.toBlob(function(b) {
+        if(b) resolve(b);
+        else reject(new Error('Canvas toBlob failed'));
+      }, 'image/jpeg', 0.88);
+    };
+    img.onerror = function() { reject(new Error('Image load failed')); };
+    img.src = imgURL;
+  });
+}
+
 // ── MAIN ANALYSIS ─────────────────────────────────────────────────────────────
 async function runAnalysis(file) {
   if(!file) return;
-  if(file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
+  if(file.size > 50 * 1024 * 1024) { alert('File too large. Max 50MB.'); return; }
 
   // Lock UI
   var btnA = document.getElementById('btnAnalyze');
@@ -334,6 +363,18 @@ async function runAnalysis(file) {
 
     // Show original
     document.getElementById('origImg').src = imgURL;
+
+    // If file is large, compress to JPEG for server upload (keeps original for ELA/display)
+    var uploadBlob = blob;
+    if(file.size > 4 * 1024 * 1024) {
+      try {
+        uploadBlob = await compressForUpload(blob, imgURL);
+        console.log('Compressed for upload: ' + (uploadBlob.size/1024).toFixed(0) + 'KB');
+      } catch(e) {
+        console.warn('Compression failed, using original', e);
+        uploadBlob = blob;
+      }
+    }
 
     // ELA
     setP('ela','run','Computing…');
@@ -353,7 +394,7 @@ async function runAnalysis(file) {
     var server = null;
     try {
       var fd = new FormData();
-      fd.append('image', blob, file.name || 'image.jpg');
+      fd.append('image', uploadBlob, file.name || 'image.jpg');
       setP('upload','done','Sent');
       var resp = await fetch(API + '/deepfake/analyze', { method:'POST', body:fd });
       if(!resp.ok) throw new Error('HTTP ' + resp.status);
