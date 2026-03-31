@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+<head><title>Upload Test</title></head>
+<body style="background:#050505;color:#fff;font-family:monospace;padding:20px;">
+
+<h2>Test 1: Basic file input</h2>
+<input type="file" id="t1" accept="image/*">
+<div id="r1" style="color:#4ec994;margin-top:8px;"></div>
+
+<h2 style="margin-top:20px;">Test 2: Styled file input</h2>
+<div style="position:relative;border:1px dashed gold;padding:40px;text-align:center;cursor:pointer;">
+  <input type="file" id="t2" accept="image/*" 
+    style="position:absolute;top:0;left:0;width:100%;height:100%;opacity:0;cursor:pointer;">
+  <span>Click here</span>
+</div>
+<div id="r2" style="color:#4ec994;margin-top:8px;"></div>
+
+<h2 style="margin-top:20px;">Test 3: Button triggers hidden input</h2>
+<input type="file" id="t3" accept="image/*" style="display:none;">
+<button onclick="document.getElementById('t3').click()" style="padding:10px 20px;background:gold;border:none;cursor:pointer;">Choose File</button>
+<div id="r3" style="color:#4ec994;margin-top:8px;"></div>
+
+<h2 style="margin-top:20px;">Test 4: Fetch</h2>
+<button onclick="testFetch()" style="padding:10px 20px;background:gold;border:none;cursor:pointer;">Test Fetch</button>
+<div id="r4" style="color:#4ec994;margin-top:8px;"></div>
+
+<script>
+document.getElementById('t1').onchange = function() {
+  document.getElementById('r1').textContent = 'WORKS: ' + this.files[0].name;
+};
+document.getElementById('t2').onchange = function() {
+  document.getElementById('r2').textContent = 'WORKS: ' + this.files[0].name;
+};
+document.getElementById('t3').onchange = function() {
+  document.getElementById('r3').textContent = 'WORKS: ' + this.files[0].name;
+};
+async function testFetch() {
+  try {
+    var r = await fetch('https://intel-desk-api.onrender.com/');
+    var d = await r.json();
+    document.getElementById('r4').textContent = 'WORKS: ' + JSON.stringify(d).slice(0,80);
+  } catch(e) {
+    document.getElementById('r4').style.color = '#c0392b';
+    document.getElementById('r4').textContent = 'FAILED: ' + e.message;
+  }
+}
+</script>
+</body>
+</html>
