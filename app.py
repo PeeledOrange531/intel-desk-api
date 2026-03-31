@@ -915,23 +915,28 @@ def debug_deepfake():
     )
 
     try:
-        auth_styles = [
-            ("Bearer_secret", "Bearer " + HIVE_SECRET),
-            ("Token_secret",  "Token "  + HIVE_SECRET),
-            ("Bearer_keyid",  "Bearer " + HIVE_KEY_ID),
-            ("Token_keyid",   "Token "  + HIVE_KEY_ID),
+        # Test V3 endpoint with Bearer secret key
+        endpoints = [
+            ("V3_bearer_secret_image",
+             "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+             "Bearer " + HIVE_SECRET, "image"),
+            ("V3_bearer_secret_media",
+             "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+             "Bearer " + HIVE_SECRET, "media"),
+            ("V2_token_secret_media",
+             "https://api.thehive.ai/api/v2/task/sync",
+             "Token " + HIVE_SECRET, "media"),
         ]
         hive_results = {}
-        for item in auth_styles:
-            style_name = item[0]
-            style_val  = item[1]
+        for item in endpoints:
+            name, url, auth, field = item[0], item[1], item[2], item[3]
             r = requests.post(
-                "https://api.thehive.ai/api/v2/task/sync",
-                headers={"Authorization": style_val},
-                files={"media": ("test.jpg", tiny_jpg, "image/jpeg")},
+                url,
+                headers={"Authorization": auth},
+                files={field: ("test.jpg", tiny_jpg, "image/jpeg")},
                 timeout=10,
             )
-            hive_results[style_name] = {"status": r.status_code, "body": r.text[:150]}
+            hive_results[name] = {"status": r.status_code, "body": r.text[:200]}
             if r.status_code == 200:
                 break
         out["hive_test"] = hive_results
@@ -1117,43 +1122,19 @@ def deepfake_analyze():
     # Endpoint: POST /api/v2/task/sync
     # Header:   Authorization: Token <SECRET_KEY>
     try:
-        # Try V3 Bearer auth with secret key first (Playground API keys)
+        # Hive V3 Playground endpoint — uses Bearer <SECRET_KEY>
+        # Model: hive/ai-generated-and-deepfake-content-detection
+        # Sends image as multipart form with field "image"
         hive_resp = requests.post(
-            "https://api.thehive.ai/api/v2/task/sync",
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
             headers={
                 "Authorization": f"Bearer {HIVE_SECRET}",
                 "Accept": "application/json",
             },
-            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+            files={"image": (img_file.filename or "image.jpg", img_bytes, mime_type)},
             timeout=30,
         )
-        log.info(f"Hive Bearer attempt: {hive_resp.status_code} — {hive_resp.text[:200]}")
-
-        if hive_resp.status_code in (401, 403):
-            # Try Token auth with secret key
-            hive_resp = requests.post(
-                "https://api.thehive.ai/api/v2/task/sync",
-                headers={
-                    "Authorization": f"Token {HIVE_SECRET}",
-                    "Accept": "application/json",
-                },
-                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
-                timeout=30,
-            )
-            log.info(f"Hive Token(secret) attempt: {hive_resp.status_code} — {hive_resp.text[:200]}")
-
-        if hive_resp.status_code in (401, 403):
-            # Try Token auth with key ID
-            hive_resp = requests.post(
-                "https://api.thehive.ai/api/v2/task/sync",
-                headers={
-                    "Authorization": f"Token {HIVE_KEY_ID}",
-                    "Accept": "application/json",
-                },
-                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
-                timeout=30,
-            )
-            log.info(f"Hive Token(keyid) attempt: {hive_resp.status_code} — {hive_resp.text[:200]}")
+        log.info(f"Hive V3 response: {hive_resp.status_code} — {hive_resp.text[:300]}")
 
         if hive_resp.status_code == 200:
             result["hive"] = hive_resp.json()
