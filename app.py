@@ -890,6 +890,67 @@ def proxy_urlhaus():
         return jsonify({"error": str(e)}), 500
 
 
+
+@app.route("/debug-deepfake", methods=["GET","OPTIONS"])
+@corsify
+def debug_deepfake():
+    """Test Hive and HuggingFace connectivity without needing an image."""
+    out = {
+        "hive_key_id":    HIVE_KEY_ID[:6] + "..." if HIVE_KEY_ID else "NOT SET",
+        "hive_secret":    HIVE_SECRET[:6] + "..." if HIVE_SECRET else "NOT SET",
+        "hf_token":       HF_TOKEN[:8]    + "..." if HF_TOKEN    else "NOT SET",
+        "hive_test":      None,
+        "hf_test":        None,
+    }
+
+    # Test Hive with a tiny 1x1 white JPEG
+    tiny_jpg = (
+        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
+        b"\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t"
+        b"\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a"
+        b"\x1f\x1e\x1d\x1a\x1c\x1c $.' ",#\x1c\x1c(7),01444\x1f'9=82<.342\x1e"
+        b"\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00"
+        b"\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00"
+        b"\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08"
+        b"\t\n\x0b\xff\xc4\x00\xb5\x10\x00\x02\x01\x03\x03\x02\x04\x03"
+        b"\x05\x05\x04\x04\x00\x00\x01}\x01\x02\x03\x00\x04\x11\x05\x12"
+        b"!1A\x06\x13Qa\x07\"q\x142\x81\x91\xa1\x08#B\xb1\xc1\x15R\xd1"
+        b"\xf0$3br\x82\t\n\x16\x17\x18\x19\x1a%&\'()*456789:CDEFGHIJ"
+        b"STUVWXYZ\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xf5\xfe\xff\xd9"
+    )
+
+    try:
+        r = requests.post(
+            "https://api.thehive.ai/api/v2/task/sync",
+            headers={"Authorization": f"Token {HIVE_SECRET}"},
+            files={"media": ("test.jpg", tiny_jpg, "image/jpeg")},
+            timeout=15,
+        )
+        out["hive_test"] = {
+            "status": r.status_code,
+            "body_preview": r.text[:400],
+        }
+    except Exception as e:
+        out["hive_test"] = {"error": str(e)}
+
+    # Test HuggingFace
+    try:
+        r2 = requests.post(
+            "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
+            headers={"Authorization": f"Bearer {HF_TOKEN}"},
+            data=tiny_jpg,
+            timeout=15,
+        )
+        out["hf_test"] = {
+            "status": r2.status_code,
+            "body_preview": r2.text[:200],
+        }
+    except Exception as e:
+        out["hf_test"] = {"error": str(e)}
+
+    return jsonify(out)
+
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
