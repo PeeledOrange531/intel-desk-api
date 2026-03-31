@@ -382,87 +382,125 @@ async function analyzeFromURL() {
 // ── MAIN HANDLER ──────────────────────────────────────────────────────────────
 async function handleFile(file) {
   if(!file) return;
-  if(file.size > 10 * 1024 * 1024) { alert('File too large. Max 10MB.'); return; }
-  var isImage = file.type.startsWith('image/');
-  var isVideo = file.type.startsWith('video/');
-  if(!isImage && !isVideo) { alert('Please upload an image or video file.'); return; }
 
-  // Lock UI while analyzing
+  // Validate
+  if(file.size > 10 * 1024 * 1024) {
+    alert('File too large. Max 10MB.');
+    resetUploadUI(); return;
+  }
+  const isImage = file.type.startsWith('image/');
+  const isVideo = file.type.startsWith('video/');
+  if(!isImage && !isVideo) {
+    alert('Please upload an image or video file (JPG, PNG, WEBP, GIF, MP4).');
+    resetUploadUI(); return;
+  }
+
+  // Lock UI
   pendingFile = null;
-  var btn = document.getElementById('btnGo');
-  if(btn) { btn.textContent = 'Analyzing…'; btn.disabled = true; }
+  const btn = document.getElementById('btnGo');
+  if(btn){ btn.textContent = 'Analyzing…'; btn.disabled = true; }
   document.getElementById('dropTitle').textContent = 'Analyzing: ' + file.name;
-  document.getElementById('dropSub').textContent = 'Running all detection signals…';
+  document.getElementById('dropSub').textContent   = 'Running all detection signals…';
 
-  // Show progress
+  // Show progress panel, hide old results
   document.getElementById('progressWrap').classList.add('visible');
   document.getElementById('resultsWrap').classList.remove('visible');
   ['upload','hive','hf','ela','meta'].forEach(id => setProgress(id,'waiting','Queued…'));
 
-  // Read file
-  const arrayBuffer = await file.arrayBuffer();
-  const blob = new Blob([arrayBuffer], { type: file.type });
-
-  // Show original image preview
-  const imgURL = URL.createObjectURL(blob);
-  document.getElementById('originalImg').src = imgURL;
-
-  // Run ELA client-side immediately
-  setProgress('ela','running','Computing…');
-  const elaResult = await computeELA(blob, imgURL);
-  setProgress('ela','done', elaResult.anomalyScore > 0.3 ? `Anomaly score: ${(elaResult.anomalyScore*100).toFixed(0)}%` : 'Low anomaly');
-
-  // Run metadata analysis
-  setProgress('meta','running','Scanning…');
-  const metaResult = analyzeMetadata(arrayBuffer, file);
-  setProgress('meta','done', metaResult.hasAISig ? '⚠ AI signature found' : 'No AI signatures');
-
-  // Send to Render for Hive + HuggingFace
-  setProgress('upload','running','Uploading…');
-  setProgress('hive','running','Analyzing…');
-  setProgress('hf','running','Analyzing…');
-
-  let serverResult = null;
   try {
-    const formData = new FormData();
-    formData.append('image', blob, file.name || 'image.jpg');
+    // Read file bytes
+    const arrayBuffer = await file.arrayBuffer();
+    const blob = new Blob([arrayBuffer], { type: file.type });
+    const imgURL = URL.createObjectURL(blob);
 
-    setProgress('upload','done','Sent');
-
-    const r = await fetch(`${PROXY}/deepfake/analyze`, {
-      method: 'POST',
-      body: formData,
-    });
-
-    if(!r.ok) throw new Error(`Server error: HTTP ${r.status}`);
-    serverResult = await r.json();
-
-    // Parse Hive result
-    const hive = serverResult.hive;
-    if(hive && !hive.error) {
-      setProgress('hive','done','Complete');
+    // Show preview (image only — video shows placeholder)
+    const origImg = document.getElementById('originalImg');
+    if(isImage) {
+      origImg.src = imgURL;
+      origImg.style.display = 'block';
     } else {
-      setProgress('hive','error', hive?.error || 'Failed');
+      origImg.src = '';
+      origImg.style.display = 'none';
     }
 
-    // Parse HuggingFace result
-    const hf = serverResult.huggingface;
-    if(hf && !hf.error) {
-      setProgress('hf','done','Complete');
+    // ELA — images only
+    let elaResult = { anomalyScore:0, avgDiff:0, maxDiff:0, width:0, height:0 };
+    if(isImage) {
+      setProgress('ela','running','Computing…');
+      try {
+        elaResult = await computeELA(blob, imgURL);
+        setProgress('ela','done', elaResult.anomalyScore > 0.3
+          ? 'Anomaly: ' + (elaResult.anomalyScore*100).toFixed(0) + '%'
+          : 'Low anomaly');
+      } catch(elaErr) {
+        setProgress('ela','error','ELA failed: ' + String(elaErr).slice(0,40));
+      }
     } else {
-      setProgress('hf','error', hf?.error || 'Failed');
+      setProgress('ela','done','N/A — video file');
+      document.getElementById('elaCanvas').style.display = 'none';
     }
-  } catch(e) {
-    setProgress('upload','error', e.message.slice(0,40));
-    setProgress('hive','error','Server unavailable');
-    setProgress('hf','error','Server unavailable');
+
+    // Metadata analysis
+    setProgress('meta','running','Scanning…');
+    let metaResult = { hasAISig:false, foundSigs:{}, format:'Unknown', hasC2PA:false, hasXMP:false, hasEXIF:false, hasGPS:false };
+    try {
+      metaResult = analyzeMetadata(arrayBuffer, file);
+      setProgress('meta','done', metaResult.hasAISig ? '⚠ AI signature found' : 'No AI signatures');
+    } catch(metaErr) {
+      setProgress('meta','error','Metadata scan failed');
+    }
+
+    // Server analysis (Hive + HuggingFace)
+    setProgress('upload','running','Uploading…');
+    setProgress('hive','running','Analyzing…');
+    setProgress('hf','running','Analyzing…');
+
+    let serverResult = null;
+    try {
+      const formData = new FormData();
+      formData.append('image', blob, file.name || 'image.jpg');
+      setProgress('upload','done','Sent');
+
+      const r = await fetch('https://intel-desk-api.onrender.com/deepfake/analyze', {
+        method: 'POST',
+        body: formData,
+      });
+
+      if(!r.ok) throw new Error('Server returned HTTP ' + r.status);
+      serverResult = await r.json();
+
+      const hive = serverResult.hive;
+      setProgress('hive', hive && !hive.error ? 'done' : 'error',
+        hive && !hive.error ? 'Complete' : (hive && hive.error ? hive.error.slice(0,30) : 'No response'));
+
+      const hf = serverResult.huggingface;
+      setProgress('hf', hf && !hf.error ? 'done' : 'error',
+        hf && !hf.error ? 'Complete' : (hf && hf.error ? hf.error.slice(0,30) : 'No response'));
+
+    } catch(serverErr) {
+      setProgress('upload','error', String(serverErr).slice(0,40));
+      setProgress('hive','error','Server unavailable');
+      setProgress('hf','error','Server unavailable');
+    }
+
+    // Render results regardless of server success
+    renderResults(serverResult, elaResult, metaResult, file, imgURL);
+
+  } catch(outerErr) {
+    // Catch-all so UI never freezes
+    alert('Analysis error: ' + String(outerErr));
+    resetUploadUI();
   }
-
-  // Render results
-  renderResults(serverResult, elaResult, metaResult, file, imgURL);
 }
 
-// ── ERROR LEVEL ANALYSIS ──────────────────────────────────────────────────────
+function resetUploadUI() {
+  const btn = document.getElementById('btnGo');
+  if(btn){ btn.textContent = 'Analyze This File →'; btn.disabled = false; }
+  document.getElementById('dropTitle').textContent = 'Click anywhere here to choose a file';
+  document.getElementById('dropSub').textContent   = 'JPG · PNG · WEBP · GIF · Max 10MB · File is not stored';
+}
+
+
 async function computeELA(blob, imgURL) {
   return new Promise((resolve) => {
     const img = new Image();
