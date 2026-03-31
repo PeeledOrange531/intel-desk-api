@@ -498,28 +498,69 @@ function scanMeta(ab, file) {
 // ── SHOW RESULTS ──────────────────────────────────────────────────────────────
 function showResults(server, ela, meta, file, imgURL) {
 
-  // Parse Hive
+  // Parse Hive V2 response
+  // V2 format: {status:[{response:{output:[{classes:[{class, score}]}]}}]}
   var hiveScore = null;
+  var hiveSource = null;
   try {
     if(server && server.hive && !server.hive.error) {
       var h = server.hive;
-      var classes = (h.status&&h.status[0]&&h.status[0].response&&h.status[0].response.output&&h.status[0].response.output[0]&&h.status[0].response.output[0].classes)||[];
-      var aiCls = classes.find(function(c){ return c.class&&(c.class.toLowerCase().includes('ai')||c.class.toLowerCase().includes('generated')||c.class.toLowerCase().includes('fake')); });
+      console.log('Hive raw:', JSON.stringify(h).slice(0,300));
+      // Try V2 structure
+      var output = h.status && h.status[0] && h.status[0].response &&
+                   h.status[0].response.output && h.status[0].response.output[0];
+      var classes = (output && output.classes) || [];
+      // Look for AI-generated class (not deepfake)
+      var aiCls = classes.find(function(x){
+        var cl = (x.class||'').toLowerCase();
+        return cl.includes('ai_generated') || cl === 'yes' ||
+               cl.includes('generated') || cl.includes('artificial');
+      });
       if(aiCls) hiveScore = Math.round(aiCls.score*100);
-      if(hiveScore===null && h.result) hiveScore = Math.round((h.result.ai_generated||0)*100);
+      // Look for source model
+      var srcCls = classes.find(function(x){
+        var cl = (x.class||'').toLowerCase();
+        return cl.includes('midjourney')||cl.includes('dall')||cl.includes('stable')||cl.includes('firefly');
+      });
+      if(srcCls && srcCls.score > 0.3) hiveSource = srcCls.class;
+      // Fallback: if all classes present, find highest non-real score
+      if(hiveScore === null && classes.length > 0) {
+        var notReal = classes.filter(function(x){ return !(x.class||'').toLowerCase().includes('real') && !(x.class||'').toLowerCase().includes('not_ai'); });
+        if(notReal.length) {
+          var best = notReal.sort(function(a,b){return b.score-a.score;})[0];
+          if(best.score > 0.1) hiveScore = Math.round(best.score*100);
+        }
+      }
     }
-  } catch(e){}
+  } catch(e){ console.warn('Hive parse error', e); }
 
-  // Parse HuggingFace
+  // Parse HuggingFace — handles both old array format and new {model, output} format
   var hfScore = null;
+  var hfModel = '';
   try {
     if(server && server.huggingface && !server.huggingface.error) {
       var hf = server.huggingface;
-      var arr = Array.isArray(hf) ? hf : (Array.isArray(hf[0]) ? hf[0] : []);
-      var aiEntry = arr.find(function(e){ return e.label&&(e.label.toLowerCase().includes('artificial')||e.label.toLowerCase().includes('ai')||e.label.toLowerCase().includes('fake')||e.label.toLowerCase().includes('generated')); });
-      if(aiEntry) hfScore = Math.round(aiEntry.score*100);
+      // New format: {model: "...", output: [...]}
+      var arr = hf.output ? (Array.isArray(hf.output) ? hf.output : [hf.output]) :
+                Array.isArray(hf) ? hf :
+                Array.isArray(hf[0]) ? hf[0] : [];
+      hfModel = hf.model || '';
+      // Look for AI/fake label
+      var aiEntry = arr.find(function(e){
+        if(!e.label) return false;
+        var l = e.label.toLowerCase();
+        return l.includes('artificial') || l.includes('ai') ||
+               l.includes('fake') || l.includes('generated') || l === 'ai';
+      });
+      if(aiEntry) {
+        hfScore = Math.round(aiEntry.score*100);
+      } else if(arr.length > 0) {
+        // If no clear AI label, use highest score as proxy
+        var sorted = arr.slice().sort(function(a,b){ return b.score-a.score; });
+        console.log('HF labels:', arr.map(function(x){return x.label+':'+x.score;}));
+      }
     }
-  } catch(e){}
+  } catch(e){ console.warn('HF parse error', e); }
 
   var elaScore = Math.round(ela.anomalyScore*100);
   var metaScore = meta.hasAISig ? 95 : 5;
@@ -554,12 +595,12 @@ function showResults(server, ela, meta, file, imgURL) {
       label: hiveScore!==null?(hiveScore>70?'AI Detected':hiveScore>40?'Suspicious':'Authentic'):(server&&server.hive&&server.hive.error?'Error':'N/A'),
       cls:   hiveScore!==null?(hiveScore>70?'ai':hiveScore>40?'warn':'ok'):'na',
       color: hiveScore>70?'#c0392b':hiveScore>40?'#e87b4a':'#4ec994',
-      detail: hiveScore!==null?'Dedicated AI/deepfake neural network. Score: '+hiveScore+'%':(server&&server.hive&&server.hive.error)||'Server unavailable' },
+      detail: hiveScore!==null?('AI/deepfake neural network. Score: '+hiveScore+'%'+(hiveSource?' · Likely: '+hiveSource:'')):(server&&server.hive&&server.hive.error||'Server unavailable — check Render logs') },
     { name:'HuggingFace Classifier', score:hfScore,
       label: hfScore!==null?(hfScore>70?'AI Detected':hfScore>40?'Suspicious':'Authentic'):(server&&server.huggingface&&server.huggingface.error?'Error':'N/A'),
       cls:   hfScore!==null?(hfScore>70?'ai':hfScore>40?'warn':'ok'):'na',
       color: hfScore>70?'#c0392b':hfScore>40?'#e87b4a':'#4ec994',
-      detail: hfScore!==null?'SDXL/Stable Diffusion detector model. Score: '+hfScore+'%':(server&&server.huggingface&&server.huggingface.error)||'Server unavailable' },
+      detail: hfScore!==null?('Model: '+(hfModel||'AI detector')+'. Score: '+hfScore+'%'):(server&&server.huggingface&&server.huggingface.error)||'Server unavailable' },
     { name:'Error Level Analysis', score:elaScore,
       label: elaScore>50?'High Anomaly':elaScore>25?'Moderate':'Low Anomaly',
       cls:   elaScore>50?'warn':elaScore>25?'warn':'ok',
