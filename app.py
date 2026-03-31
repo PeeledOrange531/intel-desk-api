@@ -903,33 +903,38 @@ def debug_deepfake():
         "hf_test":        None,
     }
 
-    # Test Hive with a tiny 1x1 white JPEG
-    tiny_jpg = (
-        b"\xff\xd8\xff\xe0\x00\x10JFIF\x00\x01\x01\x00\x00\x01\x00\x01\x00\x00"
-        b"\xff\xdb\x00C\x00\x08\x06\x06\x07\x06\x05\x08\x07\x07\x07\t\t"
-        b"\x08\n\x0c\x14\r\x0c\x0b\x0b\x0c\x19\x12\x13\x0f\x14\x1d\x1a"
-        b"\x1f\x1e\x1d\x1a\x1c\x1c $.' ",#\x1c\x1c(7),01444\x1f'9=82<.342\x1e"
-        b"\xc0\x00\x0b\x08\x00\x01\x00\x01\x01\x01\x11\x00"
-        b"\xff\xc4\x00\x1f\x00\x00\x01\x05\x01\x01\x01\x01\x01\x01\x00"
-        b"\x00\x00\x00\x00\x00\x00\x00\x01\x02\x03\x04\x05\x06\x07\x08"
-        b"\t\n\x0b\xff\xc4\x00\xb5\x10\x00\x02\x01\x03\x03\x02\x04\x03"
-        b"\x05\x05\x04\x04\x00\x00\x01}\x01\x02\x03\x00\x04\x11\x05\x12"
-        b"!1A\x06\x13Qa\x07\"q\x142\x81\x91\xa1\x08#B\xb1\xc1\x15R\xd1"
-        b"\xf0$3br\x82\t\n\x16\x17\x18\x19\x1a%&\'()*456789:CDEFGHIJ"
-        b"STUVWXYZ\xff\xda\x00\x08\x01\x01\x00\x00?\x00\xf5\xfe\xff\xd9"
+    # Minimal valid 1x1 white JPEG (base64 encoded to avoid escape issues)
+    import base64 as _b64debug
+    tiny_jpg = _b64debug.b64decode(
+        "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8U"
+        "HRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgN"
+        "DRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy"
+        "MjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAA"
+        "AAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/"
+        "aAAwDAQACEQMRAD8AJQAB/9k="
     )
 
     try:
-        r = requests.post(
-            "https://api.thehive.ai/api/v2/task/sync",
-            headers={"Authorization": f"Token {HIVE_SECRET}"},
-            files={"media": ("test.jpg", tiny_jpg, "image/jpeg")},
-            timeout=15,
-        )
-        out["hive_test"] = {
-            "status": r.status_code,
-            "body_preview": r.text[:400],
-        }
+        auth_styles = [
+            ("Bearer_secret", "Bearer " + HIVE_SECRET),
+            ("Token_secret",  "Token "  + HIVE_SECRET),
+            ("Bearer_keyid",  "Bearer " + HIVE_KEY_ID),
+            ("Token_keyid",   "Token "  + HIVE_KEY_ID),
+        ]
+        hive_results = {}
+        for item in auth_styles:
+            style_name = item[0]
+            style_val  = item[1]
+            r = requests.post(
+                "https://api.thehive.ai/api/v2/task/sync",
+                headers={"Authorization": style_val},
+                files={"media": ("test.jpg", tiny_jpg, "image/jpeg")},
+                timeout=10,
+            )
+            hive_results[style_name] = {"status": r.status_code, "body": r.text[:150]}
+            if r.status_code == 200:
+                break
+        out["hive_test"] = hive_results
     except Exception as e:
         out["hive_test"] = {"error": str(e)}
 
@@ -1112,18 +1117,44 @@ def deepfake_analyze():
     # Endpoint: POST /api/v2/task/sync
     # Header:   Authorization: Token <SECRET_KEY>
     try:
+        # Try V3 Bearer auth with secret key first (Playground API keys)
         hive_resp = requests.post(
             "https://api.thehive.ai/api/v2/task/sync",
             headers={
-                "Authorization": f"Token {HIVE_SECRET}",
+                "Authorization": f"Bearer {HIVE_SECRET}",
                 "Accept": "application/json",
             },
-            files={
-                "media": (img_file.filename or "image.jpg", img_bytes, mime_type)
-            },
+            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
             timeout=30,
         )
-        log.info(f"Hive response: {hive_resp.status_code} — {hive_resp.text[:200]}")
+        log.info(f"Hive Bearer attempt: {hive_resp.status_code} — {hive_resp.text[:200]}")
+
+        if hive_resp.status_code in (401, 403):
+            # Try Token auth with secret key
+            hive_resp = requests.post(
+                "https://api.thehive.ai/api/v2/task/sync",
+                headers={
+                    "Authorization": f"Token {HIVE_SECRET}",
+                    "Accept": "application/json",
+                },
+                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+                timeout=30,
+            )
+            log.info(f"Hive Token(secret) attempt: {hive_resp.status_code} — {hive_resp.text[:200]}")
+
+        if hive_resp.status_code in (401, 403):
+            # Try Token auth with key ID
+            hive_resp = requests.post(
+                "https://api.thehive.ai/api/v2/task/sync",
+                headers={
+                    "Authorization": f"Token {HIVE_KEY_ID}",
+                    "Accept": "application/json",
+                },
+                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+                timeout=30,
+            )
+            log.info(f"Hive Token(keyid) attempt: {hive_resp.status_code} — {hive_resp.text[:200]}")
+
         if hive_resp.status_code == 200:
             result["hive"] = hive_resp.json()
         else:
