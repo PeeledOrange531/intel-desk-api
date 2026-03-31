@@ -1034,124 +1034,86 @@ def deepfake_analyze():
     if "image" not in request.files:
         return jsonify({"error": "No image file provided"}), 400
 
-    img_file = request.files["image"]
+    img_file  = request.files["image"]
     img_bytes = img_file.read()
-    img_b64   = _b64.b64encode(img_bytes).decode()
     mime_type = img_file.content_type or "image/jpeg"
     file_size = len(img_bytes)
 
     result = {
-        "file_size":  file_size,
-        "mime_type":  mime_type,
-        "hive":       None,
-        "huggingface":None,
-        "metadata":   None,
+        "file_size":   file_size,
+        "mime_type":   mime_type,
+        "hive":        None,
+        "huggingface": None,
     }
 
-    # ── Signal 1: Hive AI Detection ──────────────────────────────────────────
+    # ── Signal 1: Hive AI Detection (V2 API, Secret Key as bearer token) ──────
+    # The V2 API uses the SECRET key (not key ID) as the bearer token
+    # Endpoint: POST /api/v2/task/sync
+    # Header:   Authorization: Token <SECRET_KEY>
     try:
-        import hmac as _hmac
-        import time as _time
-
-        # Build Hive V3 auth signature
-        ts        = str(int(_time.time() * 1000))
-        path      = "/api/v3/task/sync/media_analyzer"
-        body_str  = ""  # no body hash for multipart
-        sig_str   = f"{HIVE_KEY_ID}{ts}{path}"
-        sig       = _hmac.new(
-            HIVE_SECRET.encode(),
-            sig_str.encode(),
-            _hashlib.sha256
-        ).hexdigest()
-
         hive_resp = requests.post(
-            "https://api.thehive.ai/api/v3/task/sync/media_analyzer",
+            "https://api.thehive.ai/api/v2/task/sync",
             headers={
-                "Api-Key": HIVE_KEY_ID,
-                "Authorization": f"Token {HIVE_KEY_ID}",
+                "Authorization": f"Token {HIVE_SECRET}",
+                "Accept": "application/json",
             },
-            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
-            data={"models": "ai-generated-and-deepfake-content-detection"},
+            files={
+                "media": (img_file.filename or "image.jpg", img_bytes, mime_type)
+            },
             timeout=30,
         )
+        log.info(f"Hive response: {hive_resp.status_code} — {hive_resp.text[:200]}")
         if hive_resp.status_code == 200:
             result["hive"] = hive_resp.json()
         else:
-            # Try alternate endpoint
-            hive_resp2 = requests.post(
-                "https://api.thehive.ai/api/v2/task/sync",
-                headers={"Authorization": f"Token {HIVE_KEY_ID}"},
-                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
-                timeout=30,
-            )
-            if hive_resp2.status_code == 200:
-                result["hive"] = hive_resp2.json()
-            else:
-                result["hive"] = {"error": f"HTTP {hive_resp.status_code}", "detail": hive_resp.text[:200]}
+            result["hive"] = {
+                "error": f"HTTP {hive_resp.status_code}",
+                "detail": hive_resp.text[:300]
+            }
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
 
-    # ── Signal 2: HuggingFace — AI image detector ─────────────────────────────
-    try:
-        hf_resp = requests.post(
-            "https://api-inference.huggingface.co/models/Organika/sdxl-detector",
-            headers={"Authorization": f"Bearer {HF_TOKEN}"},
-            data=img_bytes,
-            timeout=30,
-        )
-        if hf_resp.status_code == 200:
-            result["huggingface"] = hf_resp.json()
-        else:
-            # Fallback model
-            hf_resp2 = requests.post(
-                "https://api-inference.huggingface.co/models/umm-maybe/AI-image-detector",
-                headers={"Authorization": f"Bearer {HF_TOKEN}"},
+    # ── Signal 2: HuggingFace — try multiple live models ─────────────────────
+    # Models ordered by reliability — falls through to next on failure
+    HF_MODELS = [
+        "umm-maybe/AI-image-detector",
+        "haywoodsloan/ai-image-detector-deploy",
+        "Heem2/AI-image-detector",
+        "microsoft/resnet-50",  # generic classifier, last resort
+    ]
+    hf_success = False
+    for model in HF_MODELS:
+        try:
+            hf_resp = requests.post(
+                f"https://api-inference.huggingface.co/models/{model}",
+                headers={
+                    "Authorization": f"Bearer {HF_TOKEN}",
+                    "Content-Type": mime_type,
+                },
                 data=img_bytes,
                 timeout=30,
             )
-            if hf_resp2.status_code == 200:
-                result["huggingface"] = hf_resp2.json()
+            log.info(f"HF {model}: {hf_resp.status_code} — {hf_resp.text[:100]}")
+            if hf_resp.status_code == 200:
+                result["huggingface"] = {
+                    "model": model,
+                    "output": hf_resp.json()
+                }
+                hf_success = True
+                break
+            elif hf_resp.status_code == 503:
+                # Model loading — note it but try next
+                result["huggingface"] = {"error": f"Model {model} loading, try again in 20s"}
             else:
-                result["huggingface"] = {"error": f"HTTP {hf_resp.status_code}"}
-    except Exception as e:
-        result["huggingface"] = {"error": str(e)[:100]}
+                continue
+        except Exception as e:
+            continue
 
-    # ── Signal 3: Basic metadata check ───────────────────────────────────────
-    try:
-        import io as _io
-        # Check for EXIF via raw bytes
-        meta = {}
-        if img_bytes[:2] == b"\xff\xd8":
-            meta["format"] = "JPEG"
-        elif img_bytes[:8] == b"\x89PNG\r\n\x1a\n":
-            meta["format"] = "PNG"
-        elif img_bytes[:4] in (b"RIFF", b"WEBP"):
-            meta["format"] = "WEBP"
-        else:
-            meta["format"] = "Unknown"
-
-        # Check for common AI generator signatures in bytes
-        raw_str = img_bytes[:4096].decode("latin-1", errors="ignore").lower()
-        ai_sigs = {
-            "stable diffusion": "stable diffusion" in raw_str or "diffusion" in raw_str,
-            "midjourney":       "midjourney" in raw_str,
-            "dall-e":           "dall-e" in raw_str or "openai" in raw_str,
-            "firefly":          "firefly" in raw_str or "adobe firefly" in raw_str,
-            "comfyui":          "comfyui" in raw_str,
-            "automatic1111":    "automatic1111" in raw_str or "webui" in raw_str,
-            "novelai":          "novelai" in raw_str,
-        }
-        meta["ai_signatures"] = {k: v for k, v in ai_sigs.items() if v}
-        meta["has_ai_signature"] = any(ai_sigs.values())
-
-        # File size heuristic — AI images often lack progressive JPEG data
-        meta["file_size_kb"] = round(file_size / 1024, 1)
-
-        result["metadata"] = meta
-    except Exception as e:
-        result["metadata"] = {"error": str(e)[:100]}
+    if not hf_success and not result["huggingface"]:
+        result["huggingface"] = {"error": "All HuggingFace models unavailable"}
 
     return jsonify(result)
+
 
 
 if __name__ == "__main__":
