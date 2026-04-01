@@ -969,6 +969,66 @@ def debug_deepfake():
     return jsonify(out)
 
 
+
+@app.route("/debug-hive", methods=["GET","OPTIONS"])
+@corsify
+def debug_hive():
+    """Test Hive with a real image URL to see exact response structure."""
+    import base64 as _b64dh
+
+    # Fetch a known real image
+    try:
+        test_img = requests.get(
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/320px-Cat03.jpg",
+            timeout=10
+        )
+        img_bytes = test_img.content
+        mime_type = "image/jpeg"
+    except Exception as e:
+        return jsonify({"error": f"Could not fetch test image: {e}"})
+
+    results = {}
+
+    # Try all approaches and return raw responses
+    approaches = [
+        ("V2_token_secret",
+         "https://api.thehive.ai/api/v2/task/sync",
+         {"Authorization": f"Token {HIVE_SECRET}"},
+         "media"),
+        ("V3_bearer_media",
+         "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+         {"Authorization": f"Bearer {HIVE_SECRET}"},
+         "media"),
+        ("V3_bearer_image",
+         "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+         {"Authorization": f"Bearer {HIVE_SECRET}"},
+         "image"),
+    ]
+
+    for name, url, headers, field in approaches:
+        try:
+            r = requests.post(
+                url, headers=headers,
+                files={field: ("cat.jpg", img_bytes, mime_type)},
+                timeout=20,
+            )
+            try:
+                body = r.json()
+            except Exception:
+                body = r.text[:500]
+            results[name] = {"status": r.status_code, "body": body}
+            if r.status_code == 200:
+                break
+        except Exception as e:
+            results[name] = {"error": str(e)}
+
+    return jsonify({
+        "hive_key_id": HIVE_KEY_ID[:8] + "..." if HIVE_KEY_ID else "NOT SET",
+        "hive_secret": HIVE_SECRET[:8] + "..." if HIVE_SECRET else "NOT SET",
+        "results": results,
+    })
+
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
