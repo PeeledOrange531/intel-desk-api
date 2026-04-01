@@ -990,37 +990,80 @@ def debug_hive():
     results = {}
 
     # Try all approaches and return raw responses
-    approaches = [
-        ("V2_token_secret",
-         "https://api.thehive.ai/api/v2/task/sync",
-         {"Authorization": f"Token {HIVE_SECRET}"},
-         "media"),
-        ("V3_bearer_media",
-         "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
-         {"Authorization": f"Bearer {HIVE_SECRET}"},
-         "media"),
-        ("V3_bearer_image",
-         "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
-         {"Authorization": f"Bearer {HIVE_SECRET}"},
-         "image"),
-    ]
+    # Try every possible approach
+    import base64 as _b64dh2
 
-    for name, url, headers, field in approaches:
-        try:
-            r = requests.post(
-                url, headers=headers,
-                files={field: ("cat.jpg", img_bytes, mime_type)},
-                timeout=20,
-            )
-            try:
-                body = r.json()
-            except Exception:
-                body = r.text[:500]
-            results[name] = {"status": r.status_code, "body": body}
-            if r.status_code == 200:
-                break
-        except Exception as e:
-            results[name] = {"error": str(e)}
+    # Approach 1: V3 with URL (avoids file encoding issues entirely)
+    try:
+        r = requests.post(
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+            headers={"Authorization": f"Bearer {HIVE_SECRET}", "Content-Type": "application/json"},
+            json={"url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/3a/Cat03.jpg/320px-Cat03.jpg"},
+            timeout=20,
+        )
+        try: body = r.json()
+        except: body = r.text[:300]
+        results["V3_url_json"] = {"status": r.status_code, "body": body}
+    except Exception as e:
+        results["V3_url_json"] = {"error": str(e)}
+
+    # Approach 2: V3 multipart with io.BytesIO
+    try:
+        import io
+        r = requests.post(
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+            headers={"Authorization": f"Bearer {HIVE_SECRET}"},
+            files={"media": ("cat.jpg", io.BytesIO(img_bytes), "image/jpeg")},
+            timeout=20,
+        )
+        try: body = r.json()
+        except: body = r.text[:300]
+        results["V3_bytesio"] = {"status": r.status_code, "body": body}
+    except Exception as e:
+        results["V3_bytesio"] = {"error": str(e)}
+
+    # Approach 3: V3 with base64 data URI
+    try:
+        b64 = _b64dh2.b64encode(img_bytes).decode()
+        r = requests.post(
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+            headers={"Authorization": f"Bearer {HIVE_SECRET}", "Content-Type": "application/json"},
+            json={"image": f"data:image/jpeg;base64,{b64}"},
+            timeout=20,
+        )
+        try: body = r.json()
+        except: body = r.text[:300]
+        results["V3_base64_uri"] = {"status": r.status_code, "body": body}
+    except Exception as e:
+        results["V3_base64_uri"] = {"error": str(e)}
+
+    # Approach 4: V3 raw bytes POST
+    try:
+        r = requests.post(
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+            headers={"Authorization": f"Bearer {HIVE_SECRET}", "Content-Type": "image/jpeg"},
+            data=img_bytes,
+            timeout=20,
+        )
+        try: body = r.json()
+        except: body = r.text[:300]
+        results["V3_raw_bytes"] = {"status": r.status_code, "body": body}
+    except Exception as e:
+        results["V3_raw_bytes"] = {"error": str(e)}
+
+    # Approach 5: V3 with form field named "file"
+    try:
+        r = requests.post(
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+            headers={"Authorization": f"Bearer {HIVE_SECRET}"},
+            files={"file": ("cat.jpg", img_bytes, "image/jpeg")},
+            timeout=20,
+        )
+        try: body = r.json()
+        except: body = r.text[:300]
+        results["V3_file_field"] = {"status": r.status_code, "body": body}
+    except Exception as e:
+        results["V3_file_field"] = {"error": str(e)}
 
     return jsonify({
         "hive_key_id": HIVE_KEY_ID[:8] + "..." if HIVE_KEY_ID else "NOT SET",
