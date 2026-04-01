@@ -1228,100 +1228,87 @@ def deepfake_analyze():
         "huggingface": None,
     }
 
-    # ── Signal 1: Hive AI Detection (V2 API, Secret Key as bearer token) ──────
-    # The V2 API uses the SECRET key (not key ID) as the bearer token
-    # Endpoint: POST /api/v2/task/sync
-    # Header:   Authorization: Token <SECRET_KEY>
+    # ── Signal 1: Hive V3 AI-Generated Image Detection ──────────────────────
+    # Using URL-based submission instead of file upload to avoid multipart issues
     try:
-        # Hive V3 — try multiple approaches to find working one
         import base64 as _b64h
-        img_b64 = _b64h.b64encode(img_bytes).decode()
+        img_b64  = _b64h.b64encode(img_bytes).decode()
+        data_uri = f"data:{mime_type};base64,{img_b64}"
 
-        # Approach 1: multipart with "media" field (V2 style)
+        # Send as JSON with data URI — avoids multipart encoding issues
         hive_resp = requests.post(
-            "https://api.thehive.ai/api/v2/task/sync",
+            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
             headers={
-                "Authorization": f"Token {HIVE_SECRET}",
-                "Accept": "application/json",
+                "Authorization": f"Bearer {HIVE_SECRET}",
+                "Content-Type":  "application/json",
+                "Accept":        "application/json",
             },
-            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+            json={"url": data_uri},
             timeout=30,
         )
-        log.info(f"Hive V2 Token: {hive_resp.status_code} — {hive_resp.text[:200]}")
+        log.info(f"Hive V3 JSON url: {hive_resp.status_code} — {hive_resp.text[:300]}")
 
-        if hive_resp.status_code not in (200,):
-            # Approach 2: V3 with multipart "media" field
+        if hive_resp.status_code != 200:
+            # Try with raw base64 field
             hive_resp = requests.post(
                 "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
                 headers={
                     "Authorization": f"Bearer {HIVE_SECRET}",
-                    "Accept": "application/json",
+                    "Content-Type":  "application/json",
                 },
-                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+                json={"image": img_b64},
                 timeout=30,
             )
-            log.info(f"Hive V3 Bearer+media: {hive_resp.status_code} — {hive_resp.text[:200]}")
+            log.info(f"Hive V3 JSON b64: {hive_resp.status_code} — {hive_resp.text[:300]}")
 
-        if hive_resp.status_code not in (200,):
-            # Approach 3: V3 JSON with base64
+        if hive_resp.status_code != 200:
+            # Try multipart with correct filename and explicit content type
             hive_resp = requests.post(
                 "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
-                headers={
-                    "Authorization": f"Bearer {HIVE_SECRET}",
-                    "Content-Type": "application/json",
-                    "Accept": "application/json",
-                },
-                json={"input": {"image": f"data:{mime_type};base64,{img_b64}"}},
+                headers={"Authorization": f"Bearer {HIVE_SECRET}"},
+                files={"file": ("image.jpg", img_bytes, "image/jpeg")},
                 timeout=30,
             )
-            log.info(f"Hive V3 JSON b64: {hive_resp.status_code} — {hive_resp.text[:200]}")
+            log.info(f"Hive V3 multipart file: {hive_resp.status_code} — {hive_resp.text[:300]}")
 
         if hive_resp.status_code == 200:
             hive_json = hive_resp.json()
-            log.info(f"Hive full response keys: {list(hive_json.keys()) if isinstance(hive_json, dict) else type(hive_json)}")
-            log.info(f"Hive full response: {str(hive_json)[:800]}")
+            log.info(f"Hive success: {str(hive_json)[:400]}")
 
-            # Exhaustively search for classes array in any nested structure
             def find_classes(obj, depth=0):
-                if depth > 6:
-                    return []
+                if depth > 8: return []
                 if isinstance(obj, list):
                     for item in obj:
                         r = find_classes(item, depth+1)
-                        if r:
-                            return r
+                        if r: return r
                 elif isinstance(obj, dict):
-                    if "classes" in obj and isinstance(obj["classes"], list) and len(obj["classes"]) > 0:
+                    if "classes" in obj and isinstance(obj["classes"], list) and obj["classes"]:
                         return obj["classes"]
                     for v in obj.values():
                         r = find_classes(v, depth+1)
-                        if r:
-                            return r
+                        if r: return r
                 return []
 
-            classes = find_classes(hive_json)
-            log.info(f"Hive classes found: {classes[:3] if classes else 'NONE'}")
-
-            # Build clean normalized result
+            classes      = find_classes(hive_json)
             ai_cls       = next((x for x in classes if x.get("class","").lower() in ("ai_generated","yes")), None)
             not_ai_cls   = next((x for x in classes if x.get("class","").lower() in ("not_ai_generated","no")), None)
             deepfake_cls = next((x for x in classes if "deepfake" in x.get("class","").lower()), None)
 
             result["hive"] = {
                 "classes":        classes,
-                "ai_score":       ai_cls["score"]       if ai_cls       else (1 - not_ai_cls["score"] if not_ai_cls else None),
+                "ai_score":       ai_cls["score"] if ai_cls else (1 - not_ai_cls["score"] if not_ai_cls else None),
                 "deepfake_score": deepfake_cls["score"] if deepfake_cls else None,
-                "raw_keys":       list(hive_json.keys()) if isinstance(hive_json, dict) else str(type(hive_json)),
             }
         else:
             result["hive"] = {
-                "error": f"HTTP {hive_resp.status_code}",
-                "detail": hive_resp.text[:400]
+                "error":  f"HTTP {hive_resp.status_code}",
+                "detail": hive_resp.text[:300],
             }
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
+        log.error(f"Hive exception: {e}")
 
-    # ── Signal 2: Deepfake score from normalized Hive result ────────────────
+    # ── Signal 2: Deepfake score from Hive response ───────────────────────────
     try:
         hive_norm = result.get("hive") or {}
         classes   = hive_norm.get("classes", [])
@@ -1337,13 +1324,11 @@ def deepfake_analyze():
             result["huggingface"] = {
                 "model":          "hive/deepfake-detection",
                 "deepfake_score": 0.0,
-                "note":           "No deepfake class in response — no face detected or not applicable",
+                "note":           "No deepfake class — no face detected",
                 "output":         classes,
             }
-        elif hive_norm.get("error"):
-            result["huggingface"] = {"error": "Hive signal 1 failed — no data to extract"}
         else:
-            result["huggingface"] = {"error": "No classes in Hive response"}
+            result["huggingface"] = {"error": "No Hive data available"}
     except Exception as e:
         result["huggingface"] = {"error": str(e)[:100]}
 
