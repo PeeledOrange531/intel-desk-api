@@ -1130,26 +1130,55 @@ def deepfake_analyze():
     # Endpoint: POST /api/v2/task/sync
     # Header:   Authorization: Token <SECRET_KEY>
     try:
-        # Hive V3 Playground endpoint — uses Bearer <SECRET_KEY>
-        # Model: hive/ai-generated-and-deepfake-content-detection
-        # Sends image as multipart form with field "image"
+        # Hive V3 — try multiple approaches to find working one
+        import base64 as _b64h
+        img_b64 = _b64h.b64encode(img_bytes).decode()
+
+        # Approach 1: multipart with "media" field (V2 style)
         hive_resp = requests.post(
-            "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+            "https://api.thehive.ai/api/v2/task/sync",
             headers={
-                "Authorization": f"Bearer {HIVE_SECRET}",
+                "Authorization": f"Token {HIVE_SECRET}",
                 "Accept": "application/json",
             },
-            files={"image": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
             timeout=30,
         )
-        log.info(f"Hive V3 response: {hive_resp.status_code} — {hive_resp.text[:300]}")
+        log.info(f"Hive V2 Token: {hive_resp.status_code} — {hive_resp.text[:200]}")
+
+        if hive_resp.status_code not in (200,):
+            # Approach 2: V3 with multipart "media" field
+            hive_resp = requests.post(
+                "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+                headers={
+                    "Authorization": f"Bearer {HIVE_SECRET}",
+                    "Accept": "application/json",
+                },
+                files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+                timeout=30,
+            )
+            log.info(f"Hive V3 Bearer+media: {hive_resp.status_code} — {hive_resp.text[:200]}")
+
+        if hive_resp.status_code not in (200,):
+            # Approach 3: V3 JSON with base64
+            hive_resp = requests.post(
+                "https://api.thehive.ai/api/v3/hive/ai-generated-and-deepfake-content-detection",
+                headers={
+                    "Authorization": f"Bearer {HIVE_SECRET}",
+                    "Content-Type": "application/json",
+                    "Accept": "application/json",
+                },
+                json={"input": {"image": f"data:{mime_type};base64,{img_b64}"}},
+                timeout=30,
+            )
+            log.info(f"Hive V3 JSON b64: {hive_resp.status_code} — {hive_resp.text[:200]}")
 
         if hive_resp.status_code == 200:
             result["hive"] = hive_resp.json()
         else:
             result["hive"] = {
                 "error": f"HTTP {hive_resp.status_code}",
-                "detail": hive_resp.text[:300]
+                "detail": hive_resp.text[:400]
             }
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
