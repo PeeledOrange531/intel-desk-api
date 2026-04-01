@@ -1175,19 +1175,29 @@ def deepfake_analyze():
 
         if hive_resp.status_code == 200:
             hive_json = hive_resp.json()
-            log.info(f"Hive full response: {str(hive_json)[:600]}")
+            log.info(f"Hive full response keys: {list(hive_json.keys()) if isinstance(hive_json, dict) else type(hive_json)}")
+            log.info(f"Hive full response: {str(hive_json)[:800]}")
 
-            # Normalize response — extract classes regardless of V2/V3 format
-            classes = []
-            try:
-                # V3 format: {"output": [{"classes": [...]}]}
-                if "output" in hive_json:
-                    classes = hive_json["output"][0].get("classes", [])
-                # V2 format: {"status": [{"response": {"output": [{"classes": [...]}]}}]}
-                elif "status" in hive_json:
-                    classes = hive_json["status"][0]["response"]["output"][0].get("classes", [])
-            except Exception as parse_e:
-                log.warning(f"Hive parse error: {parse_e}")
+            # Exhaustively search for classes array in any nested structure
+            def find_classes(obj, depth=0):
+                if depth > 6:
+                    return []
+                if isinstance(obj, list):
+                    for item in obj:
+                        r = find_classes(item, depth+1)
+                        if r:
+                            return r
+                elif isinstance(obj, dict):
+                    if "classes" in obj and isinstance(obj["classes"], list) and len(obj["classes"]) > 0:
+                        return obj["classes"]
+                    for v in obj.values():
+                        r = find_classes(v, depth+1)
+                        if r:
+                            return r
+                return []
+
+            classes = find_classes(hive_json)
+            log.info(f"Hive classes found: {classes[:3] if classes else 'NONE'}")
 
             # Build clean normalized result
             ai_cls       = next((x for x in classes if x.get("class","").lower() in ("ai_generated","yes")), None)
@@ -1198,7 +1208,7 @@ def deepfake_analyze():
                 "classes":        classes,
                 "ai_score":       ai_cls["score"]       if ai_cls       else (1 - not_ai_cls["score"] if not_ai_cls else None),
                 "deepfake_score": deepfake_cls["score"] if deepfake_cls else None,
-                "raw":            hive_json,
+                "raw_keys":       list(hive_json.keys()) if isinstance(hive_json, dict) else str(type(hive_json)),
             }
         else:
             result["hive"] = {
@@ -1208,36 +1218,29 @@ def deepfake_analyze():
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
 
-    # ── Signal 2: Extract deepfake score from Hive V3 response ──────────────
-    # The V3 endpoint returns both ai_generated AND deepfake classes together
-    # Re-parse the existing hive result for deepfake-specific score
+    # ── Signal 2: Deepfake score from normalized Hive result ────────────────
     try:
-        hive_raw = result.get("hive") or {}
-        classes = []
-        try:
-            classes = hive_raw.get("output", [{}])[0].get("classes", [])
-        except Exception:
-            pass
+        hive_norm = result.get("hive") or {}
+        classes   = hive_norm.get("classes", [])
+        df_score  = hive_norm.get("deepfake_score")
 
-        deepfake_cls   = next((x for x in classes if "deepfake" in x.get("class","").lower()), None)
-        not_df_cls     = next((x for x in classes if x.get("class","").lower() in ("not_deepfake","no_deepfake")), None)
-
-        if deepfake_cls is not None or not_df_cls is not None:
+        if df_score is not None:
             result["huggingface"] = {
-                "model": "hive/deepfake-detection",
-                "output": classes,
-                "deepfake_score": deepfake_cls["score"] if deepfake_cls else 0.0,
+                "model":          "hive/deepfake-detection",
+                "deepfake_score": df_score,
+                "output":         classes,
             }
         elif classes:
-            # V3 response present but no deepfake class — image has no detected faces
             result["huggingface"] = {
-                "model": "hive/deepfake-detection",
-                "output": classes,
+                "model":          "hive/deepfake-detection",
                 "deepfake_score": 0.0,
-                "note": "No face detected — deepfake analysis requires a face in the image",
+                "note":           "No deepfake class in response — no face detected or not applicable",
+                "output":         classes,
             }
+        elif hive_norm.get("error"):
+            result["huggingface"] = {"error": "Hive signal 1 failed — no data to extract"}
         else:
-            result["huggingface"] = {"error": "No Hive response to extract deepfake signal from"}
+            result["huggingface"] = {"error": "No classes in Hive response"}
     except Exception as e:
         result["huggingface"] = {"error": str(e)[:100]}
 
