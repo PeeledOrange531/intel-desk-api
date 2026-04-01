@@ -1233,29 +1233,32 @@ def deepfake_analyze():
     AIORNOT_KEY = os.environ.get("AIORNOT_KEY", "")
     try:
         if AIORNOT_KEY:
+            # AI or Not v2 API — multipart file upload
             aon_resp = requests.post(
-                "https://api.aiornot.com/v1/reports/image",
-                headers={
-                    "Authorization": f"Bearer {AIORNOT_KEY}",
-                    "Accept": "application/json",
-                },
-                json={"object": f"data:{mime_type};base64,{_b64.b64encode(img_bytes).decode()}"},
+                "https://api.aiornot.com/v2/image/sync",
+                headers={"Authorization": f"Bearer {AIORNOT_KEY}"},
+                files={"image": (img_file.filename or "image.jpg", img_bytes, mime_type)},
                 timeout=30,
             )
-            log.info(f"AI or Not: {aon_resp.status_code} — {aon_resp.text[:200]}")
+            log.info(f"AI or Not v2: {aon_resp.status_code} — {aon_resp.text[:300]}")
             if aon_resp.status_code == 200:
                 aon_data = aon_resp.json()
-                # Response: {report: {verdict: "ai|human", ai: {confidence}, human: {confidence}}}
-                report   = aon_data.get("report", aon_data)
-                verdict  = report.get("verdict", "")
-                ai_conf  = report.get("ai", {}).get("confidence", 0) if isinstance(report.get("ai"), dict) else report.get("ai", 0)
+                log.info(f"AI or Not full: {str(aon_data)[:400]}")
+                # v2 response: {report: {ai_generated: {verdict, ai: {confidence}, human: {confidence}}}}
+                report   = aon_data.get("report", {})
+                ai_gen   = report.get("ai_generated", report)
+                verdict  = ai_gen.get("verdict", "")
+                ai_info  = ai_gen.get("ai", {})
+                ai_conf  = ai_info.get("confidence", 0) if isinstance(ai_info, dict) else float(ai_info or 0)
+                deepfake = report.get("deepfake", {})
+                df_conf  = deepfake.get("confidence", None) if isinstance(deepfake, dict) else None
                 result["hive"] = {
-                    "classes":   [
+                    "classes": [
                         {"class": "ai_generated",     "score": float(ai_conf)},
                         {"class": "not_ai_generated", "score": 1 - float(ai_conf)},
                     ],
                     "ai_score":       float(ai_conf),
-                    "deepfake_score": None,
+                    "deepfake_score": float(df_conf) if df_conf is not None else None,
                     "verdict":        verdict,
                     "source":         "aiornot.com",
                 }
