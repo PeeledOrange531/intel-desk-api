@@ -185,7 +185,7 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
     <div class="progress-wrap" id="progressWrap">
       <div class="progress-step"><span class="ps-icon" id="pi-upload">⏳</span><span class="ps-label" id="pl-upload">Uploading image to analysis server</span><span class="ps-status" id="pst-upload">Waiting</span></div>
       <div class="progress-step"><span class="ps-icon" id="pi-hive">⏳</span><span class="ps-label" id="pl-hive">Hive AI — deepfake & AI-generated image detection</span><span class="ps-status" id="pst-hive">Waiting</span></div>
-      <div class="progress-step"><span class="ps-icon" id="pi-hf">⏳</span><span class="ps-label" id="pl-hf">HuggingFace — independent AI image classifier</span><span class="ps-status" id="pst-hf">Waiting</span></div>
+      <div class="progress-step"><span class="ps-icon" id="pi-hf">⏳</span><span class="ps-label" id="pl-hf">Hive Deepfake Detection — face manipulation analysis</span><span class="ps-status" id="pst-hf">Waiting</span></div>
       <div class="progress-step"><span class="ps-icon" id="pi-ela">⏳</span><span class="ps-label" id="pl-ela">Error Level Analysis — JPEG compression forensics</span><span class="ps-status" id="pst-ela">Waiting</span></div>
       <div class="progress-step"><span class="ps-icon" id="pi-meta">⏳</span><span class="ps-label" id="pl-meta">Metadata scan — AI generator signatures</span><span class="ps-status" id="pst-meta">Waiting</span></div>
     </div>
@@ -534,33 +534,27 @@ function showResults(server, ela, meta, file, imgURL) {
     }
   } catch(e){ console.warn('Hive parse error', e); }
 
-  // Parse HuggingFace — handles both old array format and new {model, output} format
+  // Parse Hive Deepfake Detection (second signal)
   var hfScore = null;
-  var hfModel = '';
+  var hfModel = 'Hive Deepfake Detection';
   try {
     if(server && server.huggingface && !server.huggingface.error) {
       var hf = server.huggingface;
-      // New format: {model: "...", output: [...]}
-      var arr = hf.output ? (Array.isArray(hf.output) ? hf.output : [hf.output]) :
-                Array.isArray(hf) ? hf :
-                Array.isArray(hf[0]) ? hf[0] : [];
-      hfModel = hf.model || '';
-      // Look for AI/fake label
-      var aiEntry = arr.find(function(e){
-        if(!e.label) return false;
-        var l = e.label.toLowerCase();
-        return l.includes('artificial') || l.includes('ai') ||
-               l.includes('fake') || l.includes('generated') || l === 'ai';
+      hfModel = hf.model || 'Hive Deepfake Detection';
+      // Handle Hive classes array
+      var arr = hf.output ? (Array.isArray(hf.output) ? hf.output : []) : [];
+      // Look for deepfake or ai_generated class
+      var fakeEntry = arr.find(function(e){
+        var cl = (e.class||e.label||'').toLowerCase();
+        return cl.includes('deepfake') || cl === 'ai_generated' || cl.includes('fake');
       });
-      if(aiEntry) {
-        hfScore = Math.round(aiEntry.score*100);
-      } else if(arr.length > 0) {
-        // If no clear AI label, use highest score as proxy
-        var sorted = arr.slice().sort(function(a,b){ return b.score-a.score; });
-        console.log('HF labels:', arr.map(function(x){return x.label+':'+x.score;}));
+      if(fakeEntry) {
+        hfScore = Math.round((fakeEntry.score||0)*100);
+      } else if(hf.deepfake_score !== null && hf.deepfake_score !== undefined) {
+        hfScore = Math.round(hf.deepfake_score*100);
       }
     }
-  } catch(e){ console.warn('HF parse error', e); }
+  } catch(e){ console.warn('Deepfake signal parse error', e); }
 
   var elaScore = Math.round(ela.anomalyScore*100);
   var metaScore = meta.hasAISig ? 95 : 5;
@@ -596,11 +590,11 @@ function showResults(server, ela, meta, file, imgURL) {
       cls:   hiveScore!==null?(hiveScore>70?'ai':hiveScore>40?'warn':'ok'):'na',
       color: hiveScore>70?'#c0392b':hiveScore>40?'#e87b4a':'#4ec994',
       detail: hiveScore!==null?('AI/deepfake neural network. Score: '+hiveScore+'%'+(hiveSource?' · Likely: '+hiveSource:'')):(server&&server.hive&&server.hive.error||'Server unavailable — check Render logs') },
-    { name:'HuggingFace Classifier', score:hfScore,
+    { name:'Hive Deepfake Detection', score:hfScore,
       label: hfScore!==null?(hfScore>70?'AI Detected':hfScore>40?'Suspicious':'Authentic'):(server&&server.huggingface&&server.huggingface.error?'Error':'N/A'),
       cls:   hfScore!==null?(hfScore>70?'ai':hfScore>40?'warn':'ok'):'na',
       color: hfScore>70?'#c0392b':hfScore>40?'#e87b4a':'#4ec994',
-      detail: hfScore!==null?('Model: '+(hfModel||'AI detector')+'. Score: '+hfScore+'%'):(server&&server.huggingface&&server.huggingface.error)||'Server unavailable' },
+      detail: hfScore!==null?('Hive face manipulation & deepfake classifier. Score: '+hfScore+'%'):(server&&server.huggingface&&server.huggingface.error)||'Not available' },
     { name:'Error Level Analysis', score:elaScore,
       label: elaScore>50?'High Anomaly':elaScore>25?'Moderate':'Low Anomaly',
       cls:   elaScore>50?'warn':elaScore>25?'warn':'ok',
