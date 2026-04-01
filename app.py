@@ -903,16 +903,24 @@ def debug_deepfake():
         "hf_test":        None,
     }
 
-    # Minimal valid 1x1 white JPEG (base64 encoded to avoid escape issues)
-    import base64 as _b64debug
-    tiny_jpg = _b64debug.b64decode(
-        "/9j/4AAQSkZJRgABAQEASABIAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8U"
-        "HRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgN"
-        "DRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIy"
-        "MjL/wAARCAABAAEDASIAAhEBAxEB/8QAFAABAAAAAAAAAAAAAAAAAAAACf/EABQQAQAAAAAA"
-        "AAAAAAAAAAAAAAD/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/"
-        "aAAwDAQACEQMRAD8AJQAB/9k="
-    )
+    # Use a real small JPEG from a public URL for testing
+    try:
+        _test_resp = requests.get(
+            "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/PNG_transparency_demonstration_1.png/120px-PNG_transparency_demonstration_1.png",
+            timeout=5
+        )
+        tiny_jpg = _test_resp.content
+    except Exception:
+        import base64 as _b64debug
+        # Fallback: minimal 8x8 JPEG
+        tiny_jpg = _b64debug.b64decode(
+            "/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDB"
+            "kSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/wAAR"
+            "CAAIAAgDASIAAhEBAxEB/8QAFgABAQEAAAAAAAAAAAAAAAAABgUE/8QAIRAAAQME"
+            "AgMAAAAAAAAAAAAAAQIDBAAFERIhMUH/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/8QA"
+            "FBEBAAAAAAAAAAAAAAAAAAAAAP/aAAwDAQACEQMRAD8Amk2Ta7TmMpIkSmS2z0sQ"
+            "60A5E5KznGefvQvSdOt59MiPusJU84kqUokk5Jz3oopJHSP/2Q=="
+        )
 
     try:
         # Test V3 endpoint with Bearer secret key
@@ -1146,44 +1154,65 @@ def deepfake_analyze():
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
 
-    # ── Signal 2: HuggingFace — try multiple live models ─────────────────────
-    # Models ordered by reliability — falls through to next on failure
-    HF_MODELS = [
-        "umm-maybe/AI-image-detector",
-        "haywoodsloan/ai-image-detector-deploy",
+    # ── Signal 2: HuggingFace — AI image detection ───────────────────────────
+    # Try multiple models — HF free tier models come and go
+    AI_DETECT_MODELS = [
+        "dima806/ai_vs_real_image_detection",
+        "prithivMLmods/Deep-Fake-Detector-Model",
         "Heem2/AI-image-detector",
-        "microsoft/resnet-50",  # generic classifier, last resort
+        "haywoodsloan/ai-image-detector-deploy",
+        "microsoft/resnet-50",
     ]
     hf_success = False
-    for model in HF_MODELS:
+    for model in AI_DETECT_MODELS:
         try:
             hf_resp = requests.post(
                 f"https://api-inference.huggingface.co/models/{model}",
                 headers={
                     "Authorization": f"Bearer {HF_TOKEN}",
-                    "Content-Type": mime_type,
+                    "x-wait-for-model": "true",
                 },
                 data=img_bytes,
                 timeout=30,
             )
             log.info(f"HF {model}: {hf_resp.status_code} — {hf_resp.text[:100]}")
             if hf_resp.status_code == 200:
-                result["huggingface"] = {
-                    "model": model,
-                    "output": hf_resp.json()
-                }
-                hf_success = True
-                break
+                try:
+                    parsed = hf_resp.json()
+                    if isinstance(parsed, list) and len(parsed) > 0:
+                        result["huggingface"] = {"model": model, "output": parsed}
+                        hf_success = True
+                        break
+                    elif isinstance(parsed, dict) and not parsed.get("error"):
+                        result["huggingface"] = {"model": model, "output": parsed}
+                        hf_success = True
+                        break
+                except Exception:
+                    pass
             elif hf_resp.status_code == 503:
-                # Model loading — note it but try next
-                result["huggingface"] = {"error": f"Model {model} loading, try again in 20s"}
-            else:
-                continue
-        except Exception as e:
+                # Model loading — first one that's loading, wait and retry once
+                import time as _t
+                _t.sleep(3)
+                hf_resp2 = requests.post(
+                    f"https://api-inference.huggingface.co/models/{model}",
+                    headers={"Authorization": f"Bearer {HF_TOKEN}"},
+                    data=img_bytes, timeout=30,
+                )
+                if hf_resp2.status_code == 200:
+                    try:
+                        parsed = hf_resp2.json()
+                        if isinstance(parsed, list) and len(parsed) > 0:
+                            result["huggingface"] = {"model": model, "output": parsed}
+                            hf_success = True
+                            break
+                    except Exception:
+                        pass
+        except Exception as hf_e:
+            log.info(f"HF {model} exception: {hf_e}")
             continue
 
-    if not hf_success and not result["huggingface"]:
-        result["huggingface"] = {"error": "All HuggingFace models unavailable"}
+    if not hf_success:
+        result["huggingface"] = {"error": "HuggingFace models unavailable — free tier models load on demand, retry in 30s"}
 
     return jsonify(result)
 
