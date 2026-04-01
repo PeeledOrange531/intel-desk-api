@@ -1183,38 +1183,36 @@ def deepfake_analyze():
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
 
-    # ── Signal 2: Hive deepfake-specific detection (second Hive call) ─────────
-    # Since HuggingFace free tier is unreliable, use Hive's dedicated deepfake
-    # detector as the second signal — different model head from AI generation
+    # ── Signal 2: Extract deepfake score from Hive V3 response ──────────────
+    # The V3 endpoint returns both ai_generated AND deepfake classes together
+    # Re-parse the existing hive result for deepfake-specific score
     try:
-        import base64 as _b64hf
-        # Try Hive V2 deepfake endpoint first
-        hf_resp = requests.post(
-            "https://api.thehive.ai/api/v2/task/sync",
-            headers={
-                "Authorization": f"Token {HIVE_SECRET}",
-                "Accept": "application/json",
-            },
-            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
-            timeout=30,
-        )
-        log.info(f"Hive deepfake signal: {hf_resp.status_code} — {hf_resp.text[:150]}")
-        if hf_resp.status_code == 200:
-            hive_data = hf_resp.json()
-            # Extract deepfake-specific classes
-            classes = []
-            try:
-                classes = hive_data["status"][0]["response"]["output"][0]["classes"]
-            except Exception:
-                pass
-            deepfake_cls = next((c for c in classes if "deepfake" in c.get("class","").lower()), None)
+        hive_raw = result.get("hive") or {}
+        classes = []
+        try:
+            classes = hive_raw.get("output", [{}])[0].get("classes", [])
+        except Exception:
+            pass
+
+        deepfake_cls   = next((x for x in classes if "deepfake" in x.get("class","").lower()), None)
+        not_df_cls     = next((x for x in classes if x.get("class","").lower() in ("not_deepfake","no_deepfake")), None)
+
+        if deepfake_cls is not None or not_df_cls is not None:
             result["huggingface"] = {
                 "model": "hive/deepfake-detection",
                 "output": classes,
-                "deepfake_score": deepfake_cls["score"] if deepfake_cls else None,
+                "deepfake_score": deepfake_cls["score"] if deepfake_cls else 0.0,
+            }
+        elif classes:
+            # V3 response present but no deepfake class — image has no detected faces
+            result["huggingface"] = {
+                "model": "hive/deepfake-detection",
+                "output": classes,
+                "deepfake_score": 0.0,
+                "note": "No face detected — deepfake analysis requires a face in the image",
             }
         else:
-            result["huggingface"] = {"error": f"Hive secondary signal HTTP {hf_resp.status_code}"}
+            result["huggingface"] = {"error": "No Hive response to extract deepfake signal from"}
     except Exception as e:
         result["huggingface"] = {"error": str(e)[:100]}
 
