@@ -1174,7 +1174,32 @@ def deepfake_analyze():
             log.info(f"Hive V3 JSON b64: {hive_resp.status_code} — {hive_resp.text[:200]}")
 
         if hive_resp.status_code == 200:
-            result["hive"] = hive_resp.json()
+            hive_json = hive_resp.json()
+            log.info(f"Hive full response: {str(hive_json)[:600]}")
+
+            # Normalize response — extract classes regardless of V2/V3 format
+            classes = []
+            try:
+                # V3 format: {"output": [{"classes": [...]}]}
+                if "output" in hive_json:
+                    classes = hive_json["output"][0].get("classes", [])
+                # V2 format: {"status": [{"response": {"output": [{"classes": [...]}]}}]}
+                elif "status" in hive_json:
+                    classes = hive_json["status"][0]["response"]["output"][0].get("classes", [])
+            except Exception as parse_e:
+                log.warning(f"Hive parse error: {parse_e}")
+
+            # Build clean normalized result
+            ai_cls       = next((x for x in classes if x.get("class","").lower() in ("ai_generated","yes")), None)
+            not_ai_cls   = next((x for x in classes if x.get("class","").lower() in ("not_ai_generated","no")), None)
+            deepfake_cls = next((x for x in classes if "deepfake" in x.get("class","").lower()), None)
+
+            result["hive"] = {
+                "classes":        classes,
+                "ai_score":       ai_cls["score"]       if ai_cls       else (1 - not_ai_cls["score"] if not_ai_cls else None),
+                "deepfake_score": deepfake_cls["score"] if deepfake_cls else None,
+                "raw":            hive_json,
+            }
         else:
             result["hive"] = {
                 "error": f"HTTP {hive_resp.status_code}",
