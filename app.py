@@ -1183,65 +1183,40 @@ def deepfake_analyze():
     except Exception as e:
         result["hive"] = {"error": str(e)[:100]}
 
-    # ── Signal 2: HuggingFace — AI image detection ───────────────────────────
-    # Try multiple models — HF free tier models come and go
-    AI_DETECT_MODELS = [
-        "dima806/ai_vs_real_image_detection",
-        "prithivMLmods/Deep-Fake-Detector-Model",
-        "Heem2/AI-image-detector",
-        "haywoodsloan/ai-image-detector-deploy",
-        "microsoft/resnet-50",
-    ]
-    hf_success = False
-    for model in AI_DETECT_MODELS:
-        try:
-            hf_resp = requests.post(
-                f"https://api-inference.huggingface.co/models/{model}",
-                headers={
-                    "Authorization": f"Bearer {HF_TOKEN}",
-                    "x-wait-for-model": "true",
-                },
-                data=img_bytes,
-                timeout=30,
-            )
-            log.info(f"HF {model}: {hf_resp.status_code} — {hf_resp.text[:100]}")
-            if hf_resp.status_code == 200:
-                try:
-                    parsed = hf_resp.json()
-                    if isinstance(parsed, list) and len(parsed) > 0:
-                        result["huggingface"] = {"model": model, "output": parsed}
-                        hf_success = True
-                        break
-                    elif isinstance(parsed, dict) and not parsed.get("error"):
-                        result["huggingface"] = {"model": model, "output": parsed}
-                        hf_success = True
-                        break
-                except Exception:
-                    pass
-            elif hf_resp.status_code == 503:
-                # Model loading — first one that's loading, wait and retry once
-                import time as _t
-                _t.sleep(3)
-                hf_resp2 = requests.post(
-                    f"https://api-inference.huggingface.co/models/{model}",
-                    headers={"Authorization": f"Bearer {HF_TOKEN}"},
-                    data=img_bytes, timeout=30,
-                )
-                if hf_resp2.status_code == 200:
-                    try:
-                        parsed = hf_resp2.json()
-                        if isinstance(parsed, list) and len(parsed) > 0:
-                            result["huggingface"] = {"model": model, "output": parsed}
-                            hf_success = True
-                            break
-                    except Exception:
-                        pass
-        except Exception as hf_e:
-            log.info(f"HF {model} exception: {hf_e}")
-            continue
-
-    if not hf_success:
-        result["huggingface"] = {"error": "HuggingFace models unavailable — free tier models load on demand, retry in 30s"}
+    # ── Signal 2: Hive deepfake-specific detection (second Hive call) ─────────
+    # Since HuggingFace free tier is unreliable, use Hive's dedicated deepfake
+    # detector as the second signal — different model head from AI generation
+    try:
+        import base64 as _b64hf
+        # Try Hive V2 deepfake endpoint first
+        hf_resp = requests.post(
+            "https://api.thehive.ai/api/v2/task/sync",
+            headers={
+                "Authorization": f"Token {HIVE_SECRET}",
+                "Accept": "application/json",
+            },
+            files={"media": (img_file.filename or "image.jpg", img_bytes, mime_type)},
+            timeout=30,
+        )
+        log.info(f"Hive deepfake signal: {hf_resp.status_code} — {hf_resp.text[:150]}")
+        if hf_resp.status_code == 200:
+            hive_data = hf_resp.json()
+            # Extract deepfake-specific classes
+            classes = []
+            try:
+                classes = hive_data["status"][0]["response"]["output"][0]["classes"]
+            except Exception:
+                pass
+            deepfake_cls = next((c for c in classes if "deepfake" in c.get("class","").lower()), None)
+            result["huggingface"] = {
+                "model": "hive/deepfake-detection",
+                "output": classes,
+                "deepfake_score": deepfake_cls["score"] if deepfake_cls else None,
+            }
+        else:
+            result["huggingface"] = {"error": f"Hive secondary signal HTTP {hf_resp.status_code}"}
+    except Exception as e:
+        result["huggingface"] = {"error": str(e)[:100]}
 
     return jsonify(result)
 
