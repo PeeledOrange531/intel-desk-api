@@ -498,63 +498,50 @@ function scanMeta(ab, file) {
 // ── SHOW RESULTS ──────────────────────────────────────────────────────────────
 function showResults(server, ela, meta, file, imgURL) {
 
-  // Parse Hive V2 response
-  // V2 format: {status:[{response:{output:[{classes:[{class, score}]}]}}]}
+  // Parse normalized Hive response {ai_score, deepfake_score, classes}
   var hiveScore = null;
   var hiveSource = null;
   try {
     if(server && server.hive && !server.hive.error) {
       var h = server.hive;
-      console.log('Hive raw:', JSON.stringify(h).slice(0,300));
-      // Try V2 structure
-      var output = h.status && h.status[0] && h.status[0].response &&
-                   h.status[0].response.output && h.status[0].response.output[0];
-      var classes = (output && output.classes) || [];
-      // Look for AI-generated class (not deepfake)
-      var aiCls = classes.find(function(x){
-        var cl = (x.class||'').toLowerCase();
-        return cl.includes('ai_generated') || cl === 'yes' ||
-               cl.includes('generated') || cl.includes('artificial');
-      });
-      if(aiCls) hiveScore = Math.round(aiCls.score*100);
-      // Look for source model
+      console.log('Hive normalized:', JSON.stringify(h).slice(0,300));
+
+      // Read pre-normalized scores from backend
+      if(h.ai_score !== null && h.ai_score !== undefined) {
+        hiveScore = Math.round(h.ai_score * 100);
+      }
+
+      // Look for source model in classes
+      var classes = h.classes || [];
       var srcCls = classes.find(function(x){
         var cl = (x.class||'').toLowerCase();
-        return cl.includes('midjourney')||cl.includes('dall')||cl.includes('stable')||cl.includes('firefly');
+        return (cl.includes('midjourney') || cl.includes('dall') ||
+                cl.includes('stable') || cl.includes('firefly') ||
+                cl.includes('flux') || cl.includes('sora') ||
+                cl.includes('ideogram') || cl.includes('imagen')) &&
+               (x.score||0) > 0.15;
       });
-      if(srcCls && srcCls.score > 0.3) hiveSource = srcCls.class;
-      // Fallback: if all classes present, find highest non-real score
-      if(hiveScore === null && classes.length > 0) {
-        var notReal = classes.filter(function(x){ return !(x.class||'').toLowerCase().includes('real') && !(x.class||'').toLowerCase().includes('not_ai'); });
-        if(notReal.length) {
-          var best = notReal.sort(function(a,b){return b.score-a.score;})[0];
-          if(best.score > 0.1) hiveScore = Math.round(best.score*100);
-        }
-      }
+      if(srcCls) hiveSource = srcCls.class;
     }
   } catch(e){ console.warn('Hive parse error', e); }
 
-  // Parse Hive Deepfake Detection (second signal)
+  // Parse Hive Deepfake Detection — reads from normalized hive response
   var hfScore = null;
   var hfModel = 'Hive Deepfake Detection';
   try {
-    if(server && server.huggingface && !server.huggingface.error) {
+    if(server && server.hive && !server.hive.error) {
+      var hd = server.hive;
+      if(hd.deepfake_score !== null && hd.deepfake_score !== undefined) {
+        hfScore = Math.round(hd.deepfake_score * 100);
+      }
+    } else if(server && server.huggingface && !server.huggingface.error) {
+      // Fallback to huggingface field if present
       var hf = server.huggingface;
-      hfModel = hf.model || 'Hive Deepfake Detection';
-      // Handle Hive classes array
-      var arr = hf.output ? (Array.isArray(hf.output) ? hf.output : []) : [];
-      // Look for deepfake or ai_generated class
-      var fakeEntry = arr.find(function(e){
-        var cl = (e.class||e.label||'').toLowerCase();
-        return cl.includes('deepfake') || cl === 'ai_generated' || cl.includes('fake');
-      });
-      if(fakeEntry) {
-        hfScore = Math.round((fakeEntry.score||0)*100);
-      } else if(hf.deepfake_score !== null && hf.deepfake_score !== undefined) {
-        hfScore = Math.round(hf.deepfake_score*100);
+      if(hf.deepfake_score !== null && hf.deepfake_score !== undefined) {
+        hfScore = Math.round(hf.deepfake_score * 100);
       }
     }
-  } catch(e){ console.warn('Deepfake signal parse error', e); }
+  } catch(e){ console.warn('Deepfake parse error', e); }
 
   var elaScore = Math.round(ela.anomalyScore*100);
   var metaScore = meta.hasAISig ? 95 : 5;
