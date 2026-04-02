@@ -441,41 +441,98 @@ function parseEU(xml){
 }
 
 function parseUK(xmlDoc){
-  // FCDO UK Sanctions List schema (live from Jan 2026)
-  // Strips namespaces first to ensure getElementsByTagName works reliably
+  // FCDO UK Sanctions List — robust multi-strategy parser
   const entries=[];
   try {
-    // Get raw XML string and strip all namespace prefixes/declarations
-    const serializer = new XMLSerializer();
-    let raw = serializer.serializeToString(xmlDoc);
-    // Remove namespace declarations and prefixes
-    raw = raw.replace(/xmlns[^"]*"[^"]*"/g,'').replace(/<([a-zA-Z]+):[a-zA-Z]/g,'<$1').replace(/<\/[a-zA-Z]+:/g,'</');
-    const parser2 = new DOMParser();
-    const doc2 = parser2.parseFromString(raw,'application/xml');
-    const nodes = [...doc2.getElementsByTagName('Designation')];
+    // Debug: log root element and first child to understand structure
+    console.log('UK XML root:', xmlDoc.documentElement?.tagName, xmlDoc.documentElement?.namespaceURI);
+    const allTags = new Set([...xmlDoc.getElementsByTagName('*')].slice(0,50).map(n=>n.localName||n.nodeName));
+    console.log('UK XML tags (first 50 elements):', [...allTags].join(', '));
+
+    // Strategy 1: try direct getElementsByTagName (works if no namespace issues)
+    let nodes = [...xmlDoc.getElementsByTagName('Designation')];
+
+    // Strategy 2: strip namespaces and re-parse
+    if(!nodes.length){
+      const serializer = new XMLSerializer();
+      let raw = serializer.serializeToString(xmlDoc);
+      // More aggressive namespace removal
+      raw = raw
+        .replace(/\s+xmlns(?::\w+)?="[^"]*"/g, '')   // remove xmlns declarations
+        .replace(/<(\w+):(\w)/g, '<$2')                // strip ns prefix from open tags
+        .replace(/<\/(\w+):(\w)/g, '</$2')            // strip ns prefix from close tags
+        .replace(/(\s)(\w+):(\w+)=/g, ' $3=');        // strip ns from attributes
+      const parser2 = new DOMParser();
+      const doc2 = parser2.parseFromString(raw, 'application/xml');
+      nodes = [...doc2.getElementsByTagName('Designation')];
+    }
+
+    // Strategy 3: try the wildcard approach
+    if(!nodes.length){
+      nodes = [...xmlDoc.getElementsByTagName('*')].filter(n =>
+        n.localName === 'Designation' || n.nodeName.endsWith(':Designation') || n.nodeName === 'Designation'
+      );
+    }
+
+    console.log(`UK parseUK: found ${nodes.length} Designation nodes`);
+
     for(const node of nodes){
       let primary='';
       const akas=[];
-      for(const n of node.getElementsByTagName('n')){
-        const name=(n.getElementsByTagName('Name6')[0]||{}).textContent?.trim()||'';
-        const nameType=(n.getElementsByTagName('NameType')[0]||{}).textContent?.trim()||'';
-        if(!name) continue;
-        if(nameType==='Primary Name') primary=name;
-        else akas.push(name);
+
+      // Get all name-related elements — try multiple tag name patterns
+      const nameNodes = [
+        ...node.getElementsByTagName('Names'),
+        ...node.getElementsByTagName('Name'),
+        ...node.getElementsByTagName('n'),
+      ];
+
+      for(const nameNode of nameNodes){
+        // Try all possible name field tags
+        const nameVal =
+          (nameNode.getElementsByTagName('Name6')[0] ||
+           nameNode.getElementsByTagName('NameValue')[0] ||
+           nameNode.getElementsByTagName('WholeName')[0] ||
+           nameNode.getElementsByTagName('FullName')[0] ||
+           nameNode.getElementsByTagName('Name1')[0] ||
+           null)?.textContent?.trim() || '';
+
+        const nameType =
+          (nameNode.getElementsByTagName('NameType')[0] ||
+           nameNode.getElementsByTagName('Type')[0] ||
+           null)?.textContent?.trim() || '';
+
+        if(!nameVal) continue;
+        if(nameType === 'Primary Name' || nameType === 'primary' || !primary){
+          if(!primary) primary = nameVal;
+        }
+        if(nameType && nameType !== 'Primary Name') akas.push(nameVal);
       }
-      if(!primary && akas.length) primary=akas.shift();
+
+      // If still no primary, try direct text elements
+      if(!primary){
+        const directName =
+          (node.getElementsByTagName('Name6')[0] ||
+           node.getElementsByTagName('WholeName')[0] ||
+           node.getElementsByTagName('FullName')[0] ||
+           null)?.textContent?.trim();
+        if(directName) primary = directName;
+      }
+
+      if(!primary && akas.length) primary = akas.shift();
       if(!primary) continue;
+
       entries.push({
         source:'uk',
-        uid:(node.getElementsByTagName('UniqueID')[0]||{}).textContent?.trim()||'',
-        type:(node.getElementsByTagName('IndividualEntityShip')[0]||{}).textContent?.trim()||'Individual',
+        uid:(node.getElementsByTagName('UniqueID')[0]||node.getElementsByTagName('UniqueId')[0]||{}).textContent?.trim()||'',
+        type:(node.getElementsByTagName('IndividualEntityShip')[0]||node.getElementsByTagName('EntityType')[0]||{}).textContent?.trim()||'Individual',
         primary, akas,
-        programs:(node.getElementsByTagName('RegimeName')[0]||{}).textContent?.trim()||'',
+        programs:(node.getElementsByTagName('RegimeName')[0]||node.getElementsByTagName('Regime')[0]||{}).textContent?.trim()||'',
         country:'',
-        dateList:(node.getElementsByTagName('DateDesignated')[0]||{}).textContent?.trim()||'',
+        dateList:(node.getElementsByTagName('DateDesignated')[0]||node.getElementsByTagName('ListedOn')[0]||{}).textContent?.trim()||'',
       });
     }
-  } catch(e) { console.error('UK parse error:',e); }
+  } catch(e){ console.error('UK parse error:',e); }
   return entries;
 }
 
