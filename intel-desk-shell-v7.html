@@ -117,14 +117,53 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 .sidebar-scroll::-webkit-scrollbar{width:3px;}
 .sidebar-scroll::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.15);border-radius:2px;}
 
+
+.sidebar-hint{
+  font-family:var(--mono);font-size:9px;
+  color:rgba(200,169,110,0.35)!important;
+  padding:8px 16px;
+  border-bottom:1px solid var(--border);
+  text-align:center;
+  letter-spacing:0.12em;
+  background:rgba(200,169,110,0.03);
+}
 .nav-cat{
   font-family:var(--mono);font-size:9px;font-weight:500;
-  text-transform:uppercase;letter-spacing:0.22em;
-  color:rgba(240,236,228,0.28)!important;
-  padding:14px 18px 7px;display:flex;align-items:center;gap:10px;
+  text-transform:uppercase;letter-spacing:0.18em;
+  color:rgba(240,236,228,0.50)!important;
+  padding:11px 16px;display:flex;align-items:center;gap:9px;
+  cursor:pointer;user-select:none;
+  border-top:1px solid var(--border);
+  background:var(--bg2);
+  transition:background 0.15s, color 0.15s;
+  position:relative;
 }
-.nav-cat::after{content:'';flex:1;height:1px;background:var(--border);}
-.nav-cat-tools{display:block!important;max-height:none!important;}
+.nav-cat:first-child{border-top:none;}
+.nav-cat:hover{
+  background:rgba(200,169,110,0.06);
+  color:rgba(240,236,228,0.80)!important;
+}
+/* Arrow — big and obvious */
+.nav-cat-arrow{
+  font-size:10px;
+  color:#c8a96e!important;
+  flex-shrink:0;
+  transition:transform 0.2s;
+  display:inline-block;
+  width:14px;text-align:center;
+}
+.nav-cat.open .nav-cat-arrow{transform:rotate(0deg);}
+/* Divider line after label */
+.nav-cat::after{content:'';flex:1;height:1px;background:rgba(255,255,255,0.06);}
+/* Count badge */
+.nav-cat-count{
+  font-size:8px;font-weight:500;
+  background:rgba(200,169,110,0.12);
+  color:#c8a96e!important;
+  padding:1px 7px;border:1px solid rgba(200,169,110,0.20);
+  margin-left:2px;flex-shrink:0;
+}
+.nav-cat-tools{display:block;}
 /* Tool count badge on category */
 .nav-cat-count{
   font-size:8px;
@@ -198,45 +237,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
   gap:32px;
 }
 
-.welcome-eyebrow{
-  display:flex;align-items:center;gap:16px;
-}
-.welcome-eyebrow::before,.welcome-eyebrow::after{content:'';display:block;width:48px;height:1px;background:rgba(200,169,110,0.25);}
-.welcome-eyebrow span{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.24em;color:rgba(200,169,110,0.55)!important;}
 
-.welcome-title{
-  font-family:var(--serif);
-  font-size:clamp(52px,7vw,96px);
-  font-weight:300;line-height:0.9;
-  text-align:center;color:#f5f2ec!important;
-}
-.welcome-title em{font-style:italic;color:#e8d5a3!important;}
-
-.welcome-sub{
-  font-family:var(--mono);font-size:13px;font-weight:400;
-  color:rgba(240,236,228,0.50)!important;
-  text-align:center;max-width:520px;line-height:1.9;
-}
-
-/* Stats row */
-.welcome-stats{
-  display:flex;gap:0;background:var(--border);
-  border:1px solid var(--border);
-}
-.welcome-stat{
-  padding:14px 32px;background:var(--bg2);
-  display:flex;flex-direction:column;gap:4px;align-items:center;
-  border-right:1px solid var(--border);
-}
-.welcome-stat:last-child{border-right:none;}
-.ws-num{font-family:var(--serif);font-size:36px;font-weight:300;color:#c8a96e!important;line-height:1;}
-.ws-lbl{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.35)!important;}
-
-/* Divider line */
-.welcome-divider{
-  width:1px;height:60px;
-  background:linear-gradient(to bottom, transparent, rgba(200,169,110,0.3), transparent);
-}
 
 /* CTA hint */
 .welcome-cta{
@@ -249,14 +250,150 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 /* Category chips */
 .welcome-cats{display:flex;gap:1px;flex-wrap:wrap;justify-content:center;max-width:600px;}
-.welcome-cat{
-  font-family:var(--mono);font-size:10px;font-weight:500;
-  text-transform:uppercase;letter-spacing:0.12em;
-  color:rgba(240,236,228,0.35)!important;
-  border:1px solid rgba(255,255,255,0.07);
-  padding:6px 14px;background:var(--bg2);
-  transition:all 0.15s;cursor:default;
+/* ── WELCOME ORBS — strong and visible ── */
+.welcome-orb{position:absolute;border-radius:50%;pointer-events:none;filter:blur(60px);}
+.orb-1{
+  width:500px;height:500px;
+  background:radial-gradient(circle,rgba(200,169,110,0.45) 0%,rgba(200,169,110,0.15) 40%,transparent 70%);
+  top:-120px;left:-80px;
+  animation:orbDrift1 14s ease-in-out infinite;
 }
+.orb-2{
+  width:380px;height:380px;
+  background:radial-gradient(circle,rgba(126,184,228,0.35) 0%,rgba(126,184,228,0.10) 40%,transparent 70%);
+  bottom:-60px;right:-40px;
+  animation:orbDrift2 18s ease-in-out infinite;
+}
+.orb-3{
+  width:280px;height:280px;
+  background:radial-gradient(circle,rgba(78,201,148,0.28) 0%,rgba(78,201,148,0.08) 40%,transparent 70%);
+  top:45%;left:55%;
+  animation:orbDrift3 22s ease-in-out infinite;
+}
+@keyframes orbDrift1{
+  0%,100%{transform:translate(0,0) scale(1);opacity:0.7;}
+  33%{transform:translate(40px,-30px) scale(1.1);opacity:1;}
+  66%{transform:translate(-20px,20px) scale(0.95);opacity:0.8;}
+}
+@keyframes orbDrift2{
+  0%,100%{transform:translate(0,0) scale(1);opacity:0.6;}
+  40%{transform:translate(-35px,25px) scale(1.08);opacity:0.9;}
+  70%{transform:translate(20px,-15px) scale(1.04);opacity:0.7;}
+}
+@keyframes orbDrift3{
+  0%,100%{transform:translate(0,0) scale(1);opacity:0.5;}
+  50%{transform:translate(-25px,-35px) scale(1.12);opacity:0.8;}
+}
+/* ── WELCOME TITLE SHIMMER ── */
+.welcome-title{
+  font-family:var(--serif);
+  font-size:clamp(52px,8vw,96px);
+  font-weight:300;line-height:0.90;
+  text-align:center;
+  color:#f5f2ec!important;
+}
+.welcome-title em{
+  font-style:italic;
+  background:linear-gradient(90deg,#c8a96e 0%,#f5e6b0 35%,#e8d5a3 55%,#c8a96e 80%,#a07840 100%);
+  background-size:250% 100%;
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  animation:shimmer 4s ease-in-out infinite;
+}
+.welcome-sub{
+  font-family:var(--mono);font-size:12px;
+  color:rgba(240,236,228,0.50)!important;
+  text-align:center;max-width:480px;line-height:1.9;
+}
+@keyframes shimmer{
+  0%,100%{background-position:100% 0;}
+  50%{background-position:0% 0;}
+}
+
+
+/* ── EYEBROW PULSE DOT ── */
+.orb-dot{
+  width:8px;height:8px;
+  background:#4ec994;border-radius:50%;flex-shrink:0;
+  animation:pulse 2s ease-in-out infinite;
+  box-shadow:0 0 0 0 rgba(78,201,148,0.6);
+}
+@keyframes pulse{
+  0%{opacity:0.6;transform:scale(1);box-shadow:0 0 0 0 rgba(78,201,148,0.6);}
+  50%{opacity:1;transform:scale(1.2);box-shadow:0 0 0 6px rgba(78,201,148,0);}
+  100%{opacity:0.6;transform:scale(1);box-shadow:0 0 0 0 rgba(78,201,148,0);}
+}
+.welcome-eyebrow{display:flex;align-items:center;gap:10px;justify-content:center;margin-bottom:20px;}
+.welcome-eyebrow span{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.22em;color:rgba(240,236,228,0.40)!important;}
+
+/* ── WELCOME DIVIDER ── */
+.welcome-divider{
+  width:120px;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(200,169,110,0.70),transparent);
+  margin:20px auto 24px;
+  position:relative;
+}
+.welcome-divider::after{
+  content:'◆';
+  position:absolute;top:-6px;left:50%;transform:translateX(-50%);
+  font-size:8px;color:rgba(200,169,110,0.55)!important;
+  background:var(--bg);padding:0 4px;
+}
+
+/* ── CATEGORY CARDS ── */
+.welcome-cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:2px;width:100%;max-width:700px;margin:0 auto;}
+.wcat-card{
+  background:rgba(255,255,255,0.03);
+  border:1px solid rgba(255,255,255,0.09);
+  padding:18px 16px 16px;
+  cursor:pointer;
+  transition:all 0.25s;
+  text-align:left;
+  position:relative;
+  overflow:hidden;
+}
+.wcat-card::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(200,169,110,0.12) 0%,transparent 55%);
+  opacity:0;transition:opacity 0.25s;
+}
+.wcat-card::after{
+  content:'';position:absolute;
+  bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,transparent,rgba(200,169,110,0.50),transparent);
+  transform:scaleX(0);transition:transform 0.25s;
+}
+.wcat-card:hover{
+  border-color:rgba(200,169,110,0.35);
+  background:rgba(200,169,110,0.07);
+  transform:translateY(-2px);
+  box-shadow:0 8px 32px rgba(0,0,0,0.40),0 0 0 1px rgba(200,169,110,0.15);
+}
+.wcat-card:hover::before{opacity:1;}
+.wcat-card:hover::after{transform:scaleX(1);}
+.wcat-icon{font-size:22px;margin-bottom:10px;display:block;transition:transform 0.25s;}
+.wcat-card:hover .wcat-icon{transform:scale(1.15);}
+.wcat-name{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.75)!important;line-height:1.4;margin-bottom:5px;}
+.wcat-count{font-family:var(--mono);font-size:9px;color:#c8a96e!important;letter-spacing:0.08em;}
+
+/* ── WELCOME STATS ── */
+.welcome-stats{
+  display:flex;gap:0;justify-content:center;margin:24px 0 0;
+  border:1px solid rgba(200,169,110,0.18);
+  background:rgba(200,169,110,0.04);
+}
+.welcome-stat{flex:1;padding:16px 8px;text-align:center;border-right:1px solid rgba(200,169,110,0.12);}
+.welcome-stat:last-child{border-right:none;}
+.ws-num{
+  font-family:var(--serif);font-size:28px;font-weight:300;
+  color:#e8d5a3!important;line-height:1;
+  text-shadow:0 0 20px rgba(200,169,110,0.40);
+}
+.ws-lbl{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.28)!important;margin-top:5px;}
+
+/* ── WELCOME CTA ── */
+.welcome-cta{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.22)!important;margin-bottom:0;}
 
 /* SEO ACCORDION */
 /* SEO ACCORDION — clamped preview with expand */
@@ -472,7 +609,10 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
   <!-- SIDEBAR -->
   <nav class="sidebar" id="sidebar">
-    <div class="sidebar-scroll" id="sidebarScroll"></div>
+    <div class="sidebar-hint">
+    <span>▸ Click category to expand</span>
+  </div>
+  <div class="sidebar-scroll" id="sidebarScroll"></div>
   </nav>
 
   <!-- WORKSPACE -->
@@ -480,18 +620,25 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
     <!-- Welcome screen -->
     <div class="welcome" id="welcome">
-      <div class="welcome-bg"></div>
+      <!-- Ambient orbs -->
+      <div class="welcome-orb orb-1"></div>
+      <div class="welcome-orb orb-2"></div>
+      <div class="welcome-orb orb-3"></div>
       <div class="welcome-grid-bg"></div>
+
       <div class="welcome-content">
-        <div class="welcome-eyebrow"><span>Open Source Intelligence</span></div>
+        <div class="welcome-eyebrow">
+          <span class="orb-dot"></span>
+          <span>Open Source Intelligence Suite</span>
+        </div>
         <div class="welcome-title">The <em>Intel</em><br>Desk</div>
         <div class="welcome-sub">
-          A professional suite of investigative tools for journalists,<br>
+          A professional suite of investigative tools for journalists,
           security researchers, and intelligence analysts.
         </div>
         <div class="welcome-stats" id="welcomeStats"></div>
-        <div class="welcome-cta">Select a tool from the sidebar</div>
-        <div class="welcome-cats" id="welcomeCats"></div>
+        <div class="welcome-divider"></div>
+        <div class="welcome-cat-grid" id="welcomeCats"></div>
       </div>
     </div>
 
@@ -567,7 +714,7 @@ const CATEGORIES = [
     label: 'Documents & Files',
     tools: [
       {
-        id:'exif', icon:'📷', live:true,
+        id:'exif', icon:'📷', live:true, newTab:true,
         name:'EXIF Data Extractor',
         desc:'GPS, camera data & image metadata',
         url:`${BASE}/exif-extractor.html`,
@@ -575,7 +722,7 @@ const CATEGORIES = [
         seo:`Every photograph contains hidden <strong>EXIF metadata</strong> — camera model, settings, timestamp, and <strong>precise GPS coordinates</strong>. This tool extracts all metadata and plots any GPS location on an interactive dark map.`,
       },
       {
-        id:'deepfake', icon:'🔍', live:true,
+        id:'deepfake', icon:'🔍', live:true, newTab:true,
         name:'AI & Deepfake Detector',
         desc:'Hive AI · HuggingFace · ELA · Metadata',
         url:`${BASE}/deepfake-detector.html`,
@@ -583,7 +730,7 @@ const CATEGORIES = [
         seo:`Multi-signal AI-generated image and deepfake detector. Combines Hive AI neural network, HuggingFace classifier, Error Level Analysis, and metadata forensics into a weighted confidence score.`,
       },
       {
-        id:'docs', icon:'📄', live:true,
+        id:'docs', icon:'📄', live:true, newTab:true,
         name:'PDF & DOCX Metadata',
         desc:'Author, timestamps & revision history',
         url:`${BASE}/metadata-extractor.html`,
@@ -761,8 +908,15 @@ function buildSidebar() {
   const scroll = document.getElementById('sidebarScroll');
   if(!scroll) return;
   let html = '';
-  CATEGORIES.forEach(function(cat) {
-    html += '<div class="nav-cat">' + cat.label + '</div>';
+  CATEGORIES.forEach(function(cat, ci) {
+    const isOpen = false; // all collapsed by default — user clicks to expand
+    const liveCount = cat.tools.filter(t => t.live).length;
+    html += '<div class="nav-cat" id="cat-hdr-' + cat.id + '" onclick="toggleCat(\''+cat.id+'\')"> ';
+    html += '<span class="nav-cat-arrow" id="cat-arrow-' + cat.id + '">' + (isOpen ? '▾' : '▸') + '</span>';
+    html += cat.label;
+    html += '<span class="nav-cat-count">' + liveCount + '</span>';
+    html += '</div>';
+    html += '<div class="nav-cat-tools" id="cat-tools-' + cat.id + '" style="' + (isOpen ? '' : 'display:none;') + '">';
     cat.tools.forEach(function(t) {
       const cls = 'tool-btn' + (t.live ? '' : ' soon');
       const click = t.live ? 'loadTool(\'' + t.id + '\')' : '';
@@ -770,32 +924,81 @@ function buildSidebar() {
       html += '<div class="tool-btn-inner">';
       html += '<div class="tool-icon">' + t.icon + '</div>';
       html += '<div class="tool-info">';
-      html += '<div class="tool-name">' + t.name + '</div>';
+      html += '<div class="tool-name">' + t.name + (t.newTab ? ' <span style="font-size:9px;opacity:0.35;">↗</span>' : '') + '</div>';
       html += '<div class="tool-desc">' + t.desc + '</div>';
       html += '</div>';
       if(!t.live) html += '<span class="soon-badge">Soon</span>';
       html += '</div></button>';
     });
+    html += '</div>';
   });
   scroll.innerHTML = html;
 }
 
+function toggleCat(id) {
+  const tools = document.getElementById('cat-tools-' + id);
+  const arrow = document.getElementById('cat-arrow-' + id);
+  if(!tools) return;
+  const isOpen = tools.style.display !== 'none';
+  tools.style.display = isOpen ? 'none' : 'block';
+  if(arrow) arrow.textContent = isOpen ? '▸' : '▾';
+}
 
-function openCatForTool(id){}
+
+function openCatForTool(id) {
+  CATEGORIES.forEach(function(cat) {
+    if(cat.tools.some(t => t.id === id)) {
+      const tools = document.getElementById('cat-tools-' + cat.id);
+      const arrow  = document.getElementById('cat-arrow-' + cat.id);
+      if(tools) { tools.style.display = 'block'; }
+      if(arrow)  { arrow.textContent = '▾'; }
+    }
+  });
+}
 
 
 function buildWelcome() {
-  // Stats
   document.getElementById('welcomeStats').innerHTML = `
-    <div class="welcome-stat"><div class="ws-num">${LIVE_TOOLS.length}</div><div class="ws-lbl">Live Tools</div></div>
-    <div class="welcome-stat"><div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div><div class="ws-lbl">Data Sources</div></div>
-    <div class="welcome-stat"><div class="ws-num">4</div><div class="ws-lbl">Sanctions Lists</div></div>
-    <div class="welcome-stat"><div class="ws-num">24k+</div><div class="ws-lbl">Sanctioned Entities</div></div>
+    <div class="welcome-stat">
+      <div class="ws-num">${LIVE_TOOLS.length}</div>
+      <div class="ws-lbl">Live Tools</div>
+    </div>
+    <div class="welcome-stat">
+      <div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div>
+      <div class="ws-lbl">Data Sources</div>
+    </div>
+    <div class="welcome-stat">
+      <div class="ws-num">4</div>
+      <div class="ws-lbl">Sanctions Lists</div>
+    </div>
+    <div class="welcome-stat">
+      <div class="ws-num">24k+</div>
+      <div class="ws-lbl">Sanctioned Entities</div>
+    </div>
   `;
 
-  // Category chips
-  document.getElementById('welcomeCats').innerHTML = CATEGORIES
-    .map(c => `<div class="welcome-cat">${c.label}</div>`).join('');
+  // Category cards — click to open first tool in that category
+  const CAT_ICONS = {
+    'email-comms':  '✉',
+    'documents':    '📄',
+    'compliance':   '⚖',
+    'geospatial':   '🌐',
+    'live-intel':   '📡',
+    'identity':     '👤',
+    'ip-domain':    '🔗',
+    'image-forensics': '🔍',
+  };
+  document.getElementById('welcomeCats').innerHTML = CATEGORIES.map(function(cat) {
+    const icon = CAT_ICONS[cat.id] || '◈';
+    const liveCount = cat.tools.filter(t => t.live).length;
+    const firstLive = cat.tools.find(t => t.live);
+    const click = firstLive ? `loadTool('${firstLive.id}')` : '';
+    return `<div class="wcat-card" onclick="${click}">
+      <div class="wcat-icon">${icon}</div>
+      <div class="wcat-name">${cat.label}</div>
+      <div class="wcat-count">${liveCount} tool${liveCount !== 1 ? 's' : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── BUILD TICKER ──────────────────────────────────────────────────────────────
@@ -840,7 +1043,21 @@ function buildTicker() {
 // ── LOAD TOOL ─────────────────────────────────────────────────────────────────
 function loadTool(id) {
   const t = ALL_TOOLS.find(t => t.id === id);
-  if (!t || !t.live || current === id) return;
+  if (!t || !t.live) return;
+
+  // Tools that need file upload open in a new tab
+  // (Squarespace iframe blocks file inputs and certain fetch calls)
+  if(t.newTab) {
+    window.open(t.url, '_blank', 'noopener');
+    // Still highlight in sidebar so user knows what they clicked
+    openCatForTool(id);
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${id}`)?.classList.add('active');
+    closeSidebar();
+    return;
+  }
+
+  if(current === id) return;
   current = id;
 
   // Sidebar — open the right category and mark active
@@ -851,7 +1068,6 @@ function loadTool(id) {
   // Hide welcome, show tool UI
   document.getElementById('welcome').classList.add('hidden');
   document.getElementById('seoAcc').style.display = '';
-  // seoLbl no longer used
   document.getElementById('seoBody').innerHTML = t.seo || '';
   document.getElementById('seoBody').classList.remove('expanded');
   document.getElementById('seoToggle').textContent='Read more';
@@ -986,6 +1202,22 @@ document.addEventListener('DOMContentLoaded', function() {
   buildSidebar();
   buildWelcome();
   buildTicker();
+  // Animate stat numbers
+  setTimeout(function() {
+    document.querySelectorAll('.ws-num').forEach(function(el) {
+      const target = parseInt(el.textContent.replace(/[^0-9]/g,''));
+      if(!target || target > 10000) return;
+      let current = 0;
+      const step = Math.ceil(target / 30);
+      const suffix = el.textContent.includes('+') ? '+' : '';
+      el.textContent = '0' + suffix;
+      const timer = setInterval(function() {
+        current = Math.min(current + step, target);
+        el.textContent = current + suffix;
+        if(current >= target) clearInterval(timer);
+      }, 35);
+    });
+  }, 200);
 
   const hash = location.hash.slice(1);
   if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
@@ -1002,8 +1234,15 @@ function buildSidebar() {
   const scroll = document.getElementById('sidebarScroll');
   if(!scroll) return;
   let html = '';
-  CATEGORIES.forEach(function(cat) {
-    html += '<div class="nav-cat">' + cat.label + '</div>';
+  CATEGORIES.forEach(function(cat, ci) {
+    const isOpen = false; // all collapsed by default — user clicks to expand
+    const liveCount = cat.tools.filter(t => t.live).length;
+    html += '<div class="nav-cat" id="cat-hdr-' + cat.id + '" onclick="toggleCat(\''+cat.id+'\')"> ';
+    html += '<span class="nav-cat-arrow" id="cat-arrow-' + cat.id + '">' + (isOpen ? '▾' : '▸') + '</span>';
+    html += cat.label;
+    html += '<span class="nav-cat-count">' + liveCount + '</span>';
+    html += '</div>';
+    html += '<div class="nav-cat-tools" id="cat-tools-' + cat.id + '" style="' + (isOpen ? '' : 'display:none;') + '">';
     cat.tools.forEach(function(t) {
       const cls = 'tool-btn' + (t.live ? '' : ' soon');
       const click = t.live ? 'loadTool(\'' + t.id + '\')' : '';
@@ -1011,14 +1250,24 @@ function buildSidebar() {
       html += '<div class="tool-btn-inner">';
       html += '<div class="tool-icon">' + t.icon + '</div>';
       html += '<div class="tool-info">';
-      html += '<div class="tool-name">' + t.name + '</div>';
+      html += '<div class="tool-name">' + t.name + (t.newTab ? ' <span style="font-size:9px;opacity:0.35;">↗</span>' : '') + '</div>';
       html += '<div class="tool-desc">' + t.desc + '</div>';
       html += '</div>';
       if(!t.live) html += '<span class="soon-badge">Soon</span>';
       html += '</div></button>';
     });
+    html += '</div>';
   });
   scroll.innerHTML = html;
+}
+
+function toggleCat(id) {
+  const tools = document.getElementById('cat-tools-' + id);
+  const arrow = document.getElementById('cat-arrow-' + id);
+  if(!tools) return;
+  const isOpen = tools.style.display !== 'none';
+  tools.style.display = isOpen ? 'none' : 'block';
+  if(arrow) arrow.textContent = isOpen ? '▸' : '▾';
 }
 
 
@@ -1037,17 +1286,47 @@ function openCatForTool(toolId) {
 
 // ── BUILD WELCOME ─────────────────────────────────────────────────────────────
 function buildWelcome() {
-  // Stats
   document.getElementById('welcomeStats').innerHTML = `
-    <div class="welcome-stat"><div class="ws-num">${LIVE_TOOLS.length}</div><div class="ws-lbl">Live Tools</div></div>
-    <div class="welcome-stat"><div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div><div class="ws-lbl">Data Sources</div></div>
-    <div class="welcome-stat"><div class="ws-num">4</div><div class="ws-lbl">Sanctions Lists</div></div>
-    <div class="welcome-stat"><div class="ws-num">24k+</div><div class="ws-lbl">Sanctioned Entities</div></div>
+    <div class="welcome-stat">
+      <div class="ws-num">${LIVE_TOOLS.length}</div>
+      <div class="ws-lbl">Live Tools</div>
+    </div>
+    <div class="welcome-stat">
+      <div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div>
+      <div class="ws-lbl">Data Sources</div>
+    </div>
+    <div class="welcome-stat">
+      <div class="ws-num">4</div>
+      <div class="ws-lbl">Sanctions Lists</div>
+    </div>
+    <div class="welcome-stat">
+      <div class="ws-num">24k+</div>
+      <div class="ws-lbl">Sanctioned Entities</div>
+    </div>
   `;
 
-  // Category chips
-  document.getElementById('welcomeCats').innerHTML = CATEGORIES
-    .map(c => `<div class="welcome-cat">${c.label}</div>`).join('');
+  // Category cards — click to open first tool in that category
+  const CAT_ICONS = {
+    'email-comms':  '✉',
+    'documents':    '📄',
+    'compliance':   '⚖',
+    'geospatial':   '🌐',
+    'live-intel':   '📡',
+    'identity':     '👤',
+    'ip-domain':    '🔗',
+    'image-forensics': '🔍',
+  };
+  document.getElementById('welcomeCats').innerHTML = CATEGORIES.map(function(cat) {
+    const icon = CAT_ICONS[cat.id] || '◈';
+    const liveCount = cat.tools.filter(t => t.live).length;
+    const firstLive = cat.tools.find(t => t.live);
+    const click = firstLive ? `loadTool('${firstLive.id}')` : '';
+    return `<div class="wcat-card" onclick="${click}">
+      <div class="wcat-icon">${icon}</div>
+      <div class="wcat-name">${cat.label}</div>
+      <div class="wcat-count">${liveCount} tool${liveCount !== 1 ? 's' : ''}</div>
+    </div>`;
+  }).join('');
 }
 
 // ── BUILD TICKER ──────────────────────────────────────────────────────────────
@@ -1092,7 +1371,21 @@ function buildTicker() {
 // ── LOAD TOOL ─────────────────────────────────────────────────────────────────
 function loadTool(id) {
   const t = ALL_TOOLS.find(t => t.id === id);
-  if (!t || !t.live || current === id) return;
+  if (!t || !t.live) return;
+
+  // Tools that need file upload open in a new tab
+  // (Squarespace iframe blocks file inputs and certain fetch calls)
+  if(t.newTab) {
+    window.open(t.url, '_blank', 'noopener');
+    // Still highlight in sidebar so user knows what they clicked
+    openCatForTool(id);
+    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`btn-${id}`)?.classList.add('active');
+    closeSidebar();
+    return;
+  }
+
+  if(current === id) return;
   current = id;
 
   // Sidebar — open the right category and mark active
@@ -1103,7 +1396,6 @@ function loadTool(id) {
   // Hide welcome, show tool UI
   document.getElementById('welcome').classList.add('hidden');
   document.getElementById('seoAcc').style.display = '';
-  // seoLbl no longer used
   document.getElementById('seoBody').innerHTML = t.seo || '';
   document.getElementById('seoBody').classList.remove('expanded');
   document.getElementById('seoToggle').textContent='Read more';
@@ -1238,6 +1530,22 @@ document.addEventListener('DOMContentLoaded', function() {
   buildSidebar();
   buildWelcome();
   buildTicker();
+  // Animate stat numbers
+  setTimeout(function() {
+    document.querySelectorAll('.ws-num').forEach(function(el) {
+      const target = parseInt(el.textContent.replace(/[^0-9]/g,''));
+      if(!target || target > 10000) return;
+      let current = 0;
+      const step = Math.ceil(target / 30);
+      const suffix = el.textContent.includes('+') ? '+' : '';
+      el.textContent = '0' + suffix;
+      const timer = setInterval(function() {
+        current = Math.min(current + step, target);
+        el.textContent = current + suffix;
+        if(current >= target) clearInterval(timer);
+      }, 35);
+    });
+  }, 200);
 
   const hash = location.hash.slice(1);
   if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
