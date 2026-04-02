@@ -3,547 +3,452 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Coordinate Converter — DD, DMS, DDM, MGRS, UTM, USNG, what3words | The Intel Desk</title>
-<meta name="description" content="Free coordinate converter tool. Convert between Decimal Degrees, DMS, Degrees Decimal Minutes, MGRS, UTM, USNG, and what3words instantly. Used by journalists, OSINT investigators, military analysts, and field researchers.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<title>Coordinate Converter — Decimal Degrees, DMS, MGRS, UTM | The Intel Desk</title>
+<meta name="description" content="Free coordinate converter. Convert between Decimal Degrees, Degrees Minutes Seconds, DDM, Military Grid Reference System, UTM and USNG. Click any map location to convert instantly.">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
 <style>
-:root {
-  --bg: #050505; --bg2: #0a0a0a; --bg3: #111111;
-  --border: rgba(255,255,255,0.07); --border-hover: rgba(255,255,255,0.18);
-  --text: #f5f2ec; --text-muted: rgba(240,236,228,0.75); --text-dim: rgba(240,236,228,0.50);
-  --accent: #c8a96e; --accent2: #e8d5a3; --accent-dim: rgba(200,169,110,0.15);
-  --green: #4ec994; --orange: #e87b4a; --blue: #7eb8e4; --red: #c0392b; --gray: #666;
-  --mono: 'DM Mono', monospace; --serif: 'Cormorant Garamond', Georgia, serif; --sans: 'Syne', sans-serif;
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
 }
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #050505 !important; color: #f5f2ec !important; font-family: var(--sans); min-height: 100vh; position: relative; overflow-x: hidden; }
-body * { color: inherit; }
-body::before { content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.6;
-  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.08'/%3E%3C/svg%3E");
-  background-repeat: repeat; background-size: 256px; }
-.page-wrap { position: relative; z-index: 1; padding: 0 48px; max-width: 1200px; margin: 0 auto; }
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+.wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
 
-/* HERO */
-.hero { padding: 80px 0 60px; border-bottom: 1px solid var(--border); animation: fadeUp 0.6s ease both; }
-.eyebrow { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
-.eyebrow::before { content: ''; display: block; width: 32px; height: 1px; background: var(--accent); flex-shrink: 0; }
-.eyebrow span { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.20em; color: #c8a96e !important; }
-.hero h1 { font-family: var(--serif); font-size: clamp(38px, 5vw, 68px); font-weight: 300; line-height: 0.95; color: #f5f2ec !important; }
-.hero h1 em { font-style: italic; color: #e8d5a3 !important; }
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,32px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
 
-/* INPUT SECTION */
-.input-section { padding: 48px 0 0; animation: fadeUp 0.6s 0.12s ease both; }
-.section-label { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.18em; color: rgba(240,236,228,0.50) !important; display: flex; align-items: center; gap: 16px; margin-bottom: 16px; }
-.section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+/* MAIN LAYOUT: input left, map+results right */
+.main-grid{display:grid;grid-template-columns:320px 1fr;gap:2px;align-items:start;}
 
-/* FORMAT TABS */
-.format-tabs { display: flex; gap: 0; margin-bottom: 2px; flex-wrap: wrap; }
-.format-tab { background: transparent; border: 1px solid var(--border); border-right: none; color: rgba(240,236,228,0.40) !important; font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 11px 18px; cursor: pointer; transition: all 0.2s; }
-.format-tab:last-child { border-right: 1px solid var(--border); }
-.format-tab:hover { color: rgba(240,236,228,0.75) !important; border-color: var(--border-hover); }
-.format-tab.active { background: var(--accent-dim); border-color: rgba(200,169,110,0.3); color: #c8a96e !important; }
+/* ── INPUT PANE ── */
+.input-pane{}
+.pane-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.28)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;}
 
-/* INPUT PANELS */
-.input-panel { display: none; background: var(--bg2); border: 1px solid var(--border); padding: 28px; }
-.input-panel.active { display: block; }
-.input-grid { display: grid; gap: 2px; }
-.input-grid.two-col { grid-template-columns: 1fr 1fr; }
-.input-grid.three-col { grid-template-columns: 1fr 1fr 1fr; }
-.input-grid.four-col { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.fmt-list{border:1px solid var(--border);}
+.fmt-btn{width:100%;background:var(--bg2);border:none;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;gap:10px;padding:10px 14px;cursor:pointer;transition:background .15s;text-align:left;border-left:2px solid transparent;}
+.fmt-btn:last-child{border-bottom:none;}
+.fmt-btn:hover{background:rgba(200,169,110,.03);}
+.fmt-btn.active{background:var(--adim);border-left-color:#c8a96e;}
+.fmt-code{font-family:var(--mono);font-size:11px;font-weight:500;color:#c8a96e!important;width:46px;flex-shrink:0;padding-top:1px;}
+.fmt-info strong{display:block;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.70)!important;line-height:1.3;}
+.fmt-info span{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.28)!important;line-height:1.4;}
 
-.field-wrap { display: flex; flex-direction: column; gap: 0; }
-.field-label { font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: rgba(240,236,228,0.40) !important; padding: 8px 14px 6px; background: var(--bg3); border: 1px solid var(--border); border-bottom: none; }
-.field-input { background: var(--bg); border: 1px solid var(--border); color: #f5f2ec !important; font-family: var(--mono); font-size: 14px; padding: 14px; outline: none; transition: border-color 0.2s; width: 100%; }
-.field-input::placeholder { color: rgba(240,236,228,0.25) !important; }
-.field-input:focus { border-color: rgba(200,169,110,0.4); }
-select.field-input { cursor: pointer; appearance: none; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%23c8a96e'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; padding-right: 36px; }
-select.field-input option { background: #0a0a0a; color: #f5f2ec; }
+.fields-box{border:1px solid var(--border);border-top:none;background:var(--bg2);}
+.fpanel{display:none;padding:14px 16px;}
+.fpanel.active{display:block;}
+.fg{display:grid;gap:6px;margin-bottom:8px;}
+.two{grid-template-columns:1fr 1fr;}
+.three{grid-template-columns:1fr 1fr 1fr;}
+.four{grid-template-columns:1fr 1fr 1fr 1fr;}
+.field label{display:block;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.25)!important;margin-bottom:3px;}
+.field input,.field select{width:100%;background:var(--bg3);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:8px 10px;outline:none;transition:border-color .2s;}
+.field input:focus,.field select:focus{border-color:rgba(200,169,110,.40);}
+.field input::placeholder{color:rgba(240,236,228,.15)!important;}
+.field select option{background:#111;}
+.fhint{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.20)!important;line-height:1.6;margin-top:2px;}
 
-.input-hint-text { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.35) !important; margin-top: 8px; line-height: 1.6; }
-.input-hint-text em { color: #c8a96e !important; font-style: normal; }
+.act-row{display:flex;}
+.btn-go{flex:1;background:var(--adim);border:1px solid rgba(200,169,110,.28);border-top:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:13px;cursor:pointer;transition:all .2s;}
+.btn-go:hover{background:rgba(200,169,110,.25);color:#e8d5a3!important;}
+.btn-clr{background:transparent;border:1px solid var(--border);border-left:none;border-top:none;color:rgba(240,236,228,.22)!important;font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.10em;padding:13px 16px;cursor:pointer;transition:all .2s;}
+.btn-clr:hover{color:rgba(240,236,228,.60)!important;}
 
-/* ACTION BAR */
-.action-bar { display: flex; gap: 0; margin-top: 2px; }
-.btn-convert { background: var(--accent-dim); border: 1px solid rgba(200,169,110,0.3); color: #c8a96e !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 14px 36px; cursor: pointer; transition: background 0.2s, color 0.2s; }
-.btn-convert:hover { background: rgba(200,169,110,0.25); color: #e8d5a3 !important; }
-.btn-clear { background: transparent; border: 1px solid var(--border); border-left: none; color: rgba(240,236,228,0.40) !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 14px 24px; cursor: pointer; transition: all 0.2s; }
-.btn-clear:hover { border-color: var(--border-hover); color: #f5f2ec !important; }
-.btn-example { background: transparent; border: 1px solid var(--border); border-left: none; color: rgba(240,236,228,0.40) !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 14px 24px; cursor: pointer; transition: all 0.2s; margin-left: auto; border-left: 1px solid var(--border); }
-.btn-example:hover { border-color: var(--border-hover); color: #f5f2ec !important; }
+.examples-row{padding:10px 0 0;display:flex;gap:5px;flex-wrap:wrap;align-items:center;}
+.ex-lbl{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.22)!important;text-transform:uppercase;letter-spacing:.10em;}
+.ex-btn{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,.50)!important;background:transparent;border:1px solid rgba(200,169,110,.15);padding:4px 10px;cursor:pointer;transition:all .15s;}
+.ex-btn:hover{color:#c8a96e!important;border-color:rgba(200,169,110,.35);}
+
+/* ── RIGHT PANE ── */
+.right-pane{display:flex;flex-direction:column;gap:2px;}
+
+/* MAP */
+.map-wrap{position:relative;}
+.map-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.28)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;}
+.map-hint-tag{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.45)!important;border:1px solid rgba(200,169,110,.20);padding:2px 8px;}
+#map{height:280px;border:1px solid var(--border);background:#0a0a0a;}
+
+/* Leaflet dark overrides */
+.leaflet-tile-pane{filter:brightness(0.75) saturate(0.6) hue-rotate(185deg);}
+.leaflet-control-attribution{background:rgba(5,5,5,.8)!important;color:rgba(240,236,228,.30)!important;font-family:var(--mono);font-size:9px;}
+.leaflet-control-attribution a{color:rgba(200,169,110,.50)!important;}
+.leaflet-control-zoom a{background:var(--bg3)!important;color:#c8a96e!important;border-color:var(--border)!important;}
+.leaflet-control-zoom a:hover{background:var(--adim)!important;}
+.leaflet-popup-content-wrapper{background:var(--bg3);border:1px solid rgba(200,169,110,.25);border-radius:0;color:#f5f2ec;font-family:var(--mono);font-size:11px;}
+.leaflet-popup-tip{background:var(--bg3);}
 
 /* RESULTS */
-.results-wrap { display: none; flex-direction: column; gap: 2px; margin-top: 48px; animation: fadeUp 0.5s ease both; }
-.results-wrap.visible { display: flex; }
+.results-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.28)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;}
+#resultsContent{}
 
-.results-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 1px; background: var(--border); }
-.result-card { background: var(--bg2); padding: 24px 28px; display: flex; flex-direction: column; gap: 10px; transition: background 0.2s, border-color 0.2s; position: relative; overflow: hidden; cursor: pointer; }
-.result-card:hover { background: #0d0d0d; }
-.result-card::before { content: ''; position: absolute; top: 0; left: 0; width: 0; height: 2px; background: var(--accent); transition: width 0.3s ease; }
-.result-card:hover::before { width: 100%; }
+.empty-state{border:1px solid var(--border);background:var(--bg2);padding:clamp(28px,5vw,48px) 24px;text-align:center;}
+.empty-icon{font-size:28px;opacity:.2;margin-bottom:10px;}
+.empty-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.22)!important;line-height:1.9;}
 
-.result-format { font-family: var(--mono); font-size: 10px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.16em; color: rgba(240,236,228,0.40) !important; display: flex; align-items: center; gap: 8px; }
-.result-format-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--accent); flex-shrink: 0; }
-.result-value { font-family: var(--mono); font-size: 15px; color: #f5f2ec !important; line-height: 1.5; word-break: break-all; }
-.result-value.large { font-family: var(--serif); font-size: 22px; font-weight: 300; color: #e8d5a3 !important; line-height: 1.2; }
-.result-value.w3w { color: #e87b4a !important; font-size: 18px; font-family: var(--serif); font-weight: 300; }
-.result-value.w3w::before { content: '///'; color: #e87b4a; font-family: var(--mono); font-size: 13px; margin-right: 2px; }
-.result-sub { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.35) !important; line-height: 1.6; }
-.copy-hint { font-family: var(--mono); font-size: 9px; text-transform: uppercase; letter-spacing: 0.12em; color: rgba(240,236,228,0.20) !important; margin-top: 4px; }
-.result-card:hover .copy-hint { color: rgba(200,169,110,0.5) !important; }
+/* Primary card */
+.r-primary{background:var(--bg3);border:1px solid rgba(200,169,110,.15);padding:18px 20px;cursor:pointer;}
+.r-primary:hover{background:rgba(200,169,110,.03);}
+.r-tag{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:#c8a96e!important;margin-bottom:8px;display:flex;align-items:center;gap:8px;}
+.r-tag::after{content:'';flex:1;height:1px;background:rgba(200,169,110,.12);}
+.r-val-lg{font-family:var(--serif);font-size:clamp(20px,2.5vw,28px);font-weight:300;color:#e8d5a3!important;line-height:1.2;margin-bottom:5px;}
+.r-sub{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.22)!important;line-height:1.5;}
 
-/* Copy toast */
-.copy-toast { position: fixed; bottom: 32px; right: 32px; background: var(--bg3); border: 1px solid rgba(200,169,110,0.3); color: #c8a96e !important; font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.12em; padding: 12px 20px; z-index: 1000; opacity: 0; transform: translateY(8px); transition: opacity 0.2s, transform 0.2s; pointer-events: none; }
-.copy-toast.show { opacity: 1; transform: translateY(0); }
+/* Secondary grid */
+.r-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.r-card{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;cursor:pointer;transition:background .15s;position:relative;}
+.r-card:hover{background:rgba(200,169,110,.04);}
+.r-card-tag{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:rgba(200,169,110,.45)!important;margin-bottom:7px;}
+.r-card-val{font-family:var(--mono);font-size:12px;color:#f5f2ec!important;line-height:1.6;word-break:break-all;}
+.r-card-sub{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.20)!important;margin-top:6px;line-height:1.5;}
+.copy-lbl{position:absolute;top:9px;right:11px;font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:rgba(240,236,228,.12)!important;transition:color .15s;}
+.r-card:hover .copy-lbl{color:rgba(200,169,110,.40)!important;}
+.copy-lbl.done{color:#4ec994!important;}
 
-/* TERMINAL */
-.terminal-wrap { border: 1px solid var(--border); display: none; margin-top: 2px; }
-.terminal-wrap.visible { display: block; }
-.terminal-bar { background: var(--bg3); border-bottom: 1px solid var(--border); padding: 12px 20px; display: flex; align-items: center; justify-content: space-between; }
-.terminal-dots { display: flex; gap: 7px; }
-.dot { width: 11px; height: 11px; border-radius: 50%; }
-.dot-red { background: #5a2020; } .dot-yellow { background: #5a4a20; } .dot-green { background: #1e4a2e; }
-.terminal-label { font-family: var(--mono); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: rgba(240,236,228,0.50) !important; }
-.terminal-body { background: #050505 !important; padding: 28px; font-family: var(--mono); font-size: 13px; line-height: 1.8; overflow-x: auto; }
-.t-cmd { color: #c8a96e !important; } .t-found { color: #4ec994 !important; } .t-warn { color: #e87b4a !important; }
-.t-key { color: #e8d5a3 !important; } .t-dim { color: rgba(240,236,228,0.50) !important; font-size: 11px; }
-.t-div { color: rgba(240,236,228,0.50) !important; user-select: none; } .t-text { color: rgba(240,236,228,0.75) !important; }
-.t-cursor { display: inline-block; width: 8px; height: 14px; background: #c8a96e; vertical-align: middle; animation: blink 1.1s step-end infinite; }
+/* Map links */
+.map-links{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.map-link{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--bg2);border:1px solid var(--border);text-decoration:none;transition:background .15s;}
+.map-link:hover{background:var(--adim);}
+.map-link-icon{font-size:13px;flex-shrink:0;}
+.map-link span{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.30)!important;}
+.map-link strong{display:block;font-family:var(--mono);font-size:10px;color:#e8d5a3!important;}
 
-/* FOOTER */
-.footer { margin-top: 80px; padding: 28px 0; border-top: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-.footer-left { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.50) !important; }
-.footer-left strong { color: #c8a96e !important; font-weight: 500; }
-.footer-right { font-family: var(--mono); font-size: 11px; color: rgba(240,236,228,0.50) !important; max-width: 460px; text-align: right; line-height: 1.6; }
+.footer{margin-top:clamp(36px,5vw,64px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.28)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;max-width:500px;}
 
-@keyframes fadeUp { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
-@keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0; } }
-
-@media (max-width: 768px) {
-  .page-wrap { padding: 0 20px; }
-  .input-grid.two-col, .input-grid.three-col, .input-grid.four-col { grid-template-columns: 1fr; }
-  .results-grid { grid-template-columns: 1fr; }
-  .footer { flex-direction: column; gap: 12px; } .footer-right { text-align: left; }
-  .format-tab { font-size: 9px; padding: 10px 12px; }
+@media(max-width:960px){
+  .main-grid{grid-template-columns:1fr;}
+  .r-grid{grid-template-columns:1fr 1fr;}
+  #map{height:240px;}
+  .map-links{grid-template-columns:1fr 1fr;}
+  .footer-r{text-align:left;max-width:100%;}
 }
-
-  /* ── SEO BLOCK COLLAPSIBLE ── */
-  .seo-block {
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-top: none;
-    animation: fadeUp 0.6s 0.08s ease both;
-  }
-  .seo-block-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 32px;
-    cursor: pointer;
-    user-select: none;
-    gap: 16px;
-  }
-  .seo-block-header:hover { background: rgba(255,255,255,0.01); }
-  .seo-block-label {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.18em;
-    color: #c8a96e !important;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex: 1;
-  }
-  .seo-block-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-  .seo-toggle-btn {
-    font-family: var(--mono);
-    font-size: 9px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.14em;
-    color: rgba(200,169,110,0.55) !important;
-    background: transparent;
-    border: 1px solid rgba(200,169,110,0.22);
-    padding: 4px 14px;
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all 0.15s;
-  }
-  .seo-toggle-btn:hover { color: #c8a96e !important; border-color: rgba(200,169,110,0.45); }
-  .seo-block-body {
-    max-height: 72px;
-    overflow: hidden;
-    transition: max-height 0.4s cubic-bezier(0.4,0,0.2,1);
-    padding: 0 32px 14px;
-    position: relative;
-  }
-  .seo-block-body::after {
-    content: '';
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    height: 36px;
-    background: linear-gradient(transparent, var(--bg2));
-    pointer-events: none;
-    transition: opacity 0.3s;
-  }
-  .seo-block-body.expanded { max-height: 800px; }
-  .seo-block-body.expanded::after { opacity: 0; }
-  .seo-block p {
-    font-family: var(--mono);
-    font-size: 13px;
-    font-weight: 400;
-    line-height: 1.9;
-    color: rgba(240,236,228,0.75) !important;
-  }
-  .seo-block p strong { color: #e8d5a3 !important; font-weight: 500; }
-  .seo-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 8px;
-    margin-top: 20px;
-    padding-top: 20px;
-    border-top: 1px solid var(--border);
-  }
-  .seo-tag {
-    font-family: var(--mono);
-    font-size: 10px;
-    font-weight: 500;
-    text-transform: uppercase;
-    letter-spacing: 0.10em;
-    color: rgba(240,236,228,0.50) !important;
-    border: 1px solid var(--border);
-    padding: 4px 10px;
-  }
-
-/* ── UNIVERSAL MOBILE FIX ── */
-@media(max-width:768px){
-  .page-wrap{padding:0 16px!important;}
-  .hero{padding:40px 0 32px!important;}
-  .hero h1{font-size:clamp(32px,9vw,52px)!important;line-height:1.0!important;}
-  .input-grid{grid-template-columns:1fr!important;}
-  .search-row{flex-wrap:wrap!important;}
-  .search-input{border-right:1px solid var(--border)!important;border-bottom:none!important;}
-  .btn-lookup,.btn-analyze,.btn-run,.btn-calc,.btn-convert,.btn-search{width:100%!important;}
-  .summary-grid{grid-template-columns:1fr 1fr!important;}
-  .diagram-row{grid-template-columns:1fr!important;}
-  .results-grid .found-grid{grid-template-columns:1fr!important;}
-  .osint-grid{grid-template-columns:1fr 1fr!important;}
-  .verify-grid{grid-template-columns:1fr!important;}
-  .two-col{grid-template-columns:1fr!important;}
-  .engine-row{flex-direction:column!important;}
-  .engine-btn{border-right:1px solid var(--border)!important;border-top:none!important;}
-  .engine-btn:first-child{border-top:1px solid var(--border)!important;}
-  .source-row{flex-wrap:wrap!important;}
-  .source-tz-select{min-width:100%!important;border-right:1px solid var(--border)!important;}
-  .source-date,.source-time{flex:1!important;min-width:0!important;}
-  .btn-now,.btn-stop,.btn-myip{width:auto!important;}
-  .tz-cards-grid{grid-template-columns:1fr 1fr!important;}
-  .timeline-row-label{width:90px!important;font-size:9px!important;}
-  .seo-block-header{padding:10px 16px!important;}
-  .seo-block-body{padding:0 16px 14px!important;}
-  .terminal-body{padding:16px!important;font-size:11px!important;}
-  .map-wrap{height:260px!important;}
-  #ipMap,#sunMap{height:260px!important;}
-  .diagram-panel{padding:16px!important;}
-  canvas{max-width:100%!important;}
-  .footer{flex-direction:column!important;gap:8px!important;}
-  .footer-right{text-align:left!important;max-width:100%!important;}
-  .btn-row{flex-wrap:wrap!important;}
-  .lookup-toggles{flex-wrap:wrap!important;}
-  .input-grid{gap:0!important;}
-  .cat-grid{grid-template-columns:1fr 1fr!important;}
-  .mode-tabs{flex-wrap:wrap!important;}
-  .mode-tab{flex:1 1 30%!important;}
+@media(max-width:600px){
+  .four{grid-template-columns:1fr 1fr;}
+  .three{grid-template-columns:1fr 1fr;}
+  .r-grid{grid-template-columns:1fr;}
+  .map-links{grid-template-columns:1fr;}
 }
-@media(max-width:480px){
-  .summary-grid{grid-template-columns:1fr!important;}
-  .tz-cards-grid{grid-template-columns:1fr!important;}
-  .osint-grid{grid-template-columns:1fr!important;}
-  .cat-grid{grid-template-columns:1fr!important;}
-}
-
 </style>
 </head>
 <body>
-<div class="page-wrap">
+<div class="wrap">
 
-  <!-- HERO -->
-  <section class="hero">
+  <div class="hero">
     <div class="eyebrow"><span>Geospatial Intelligence</span></div>
     <h1>Coordinate <em>Converter</em></h1>
-  </section>
+  </div>
 
-  <!-- SEO BLOCK -->
-  <div class="seo-block">
-    <div class="seo-block-header" onclick="toggleSEOBlock()">
-      <div class="seo-block-label">What This Tool Does</div>
-      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+  <div class="main-grid">
+
+    <!-- LEFT: INPUT -->
+    <div class="input-pane">
+      <div class="pane-hdr">Input Format</div>
+
+      <div class="fmt-list">
+        <button class="fmt-btn active" data-fmt="dd" onclick="switchFmt('dd')">
+          <span class="fmt-code">DD</span>
+          <span class="fmt-info"><strong>Decimal Degrees</strong><span>Google Maps · GPS devices · Standard</span></span>
+        </button>
+        <button class="fmt-btn" data-fmt="dms" onclick="switchFmt('dms')">
+          <span class="fmt-code">DMS</span>
+          <span class="fmt-info"><strong>Degrees, Minutes, Seconds</strong><span>Traditional cartography · Survey documents</span></span>
+        </button>
+        <button class="fmt-btn" data-fmt="ddm" onclick="switchFmt('ddm')">
+          <span class="fmt-code">DDM</span>
+          <span class="fmt-info"><strong>Degrees, Decimal Minutes</strong><span>Aviation · Marine navigation</span></span>
+        </button>
+        <button class="fmt-btn" data-fmt="mgrs" onclick="switchFmt('mgrs')">
+          <span class="fmt-code">MGRS</span>
+          <span class="fmt-info"><strong>Military Grid Reference System</strong><span>NATO standard · Defense operations</span></span>
+        </button>
+        <button class="fmt-btn" data-fmt="utm" onclick="switchFmt('utm')">
+          <span class="fmt-code">UTM</span>
+          <span class="fmt-info"><strong>Universal Transverse Mercator</strong><span>Surveying · GIS · Metric grid</span></span>
+        </button>
+        <button class="fmt-btn" data-fmt="usng" onclick="switchFmt('usng')">
+          <span class="fmt-code">USNG</span>
+          <span class="fmt-info"><strong>US National Grid</strong><span>Civilian MGRS · US emergency services</span></span>
+        </button>
+      </div>
+
+      <div class="fields-box">
+        <!-- Decimal Degrees -->
+        <div class="fpanel active" id="fp-dd">
+          <div class="fg two">
+            <div class="field"><label>Latitude</label><input id="dd-lat" placeholder="51.5074" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Longitude</label><input id="dd-lng" placeholder="-0.1278" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')convert()"></div>
+          </div>
+          <p class="fhint">Negative = South / West &nbsp;·&nbsp; Range: Lat −90 to 90, Lng −180 to 180</p>
+        </div>
+
+        <!-- Degrees Minutes Seconds -->
+        <div class="fpanel" id="fp-dms">
+          <div class="fg four">
+            <div class="field"><label>Lat Deg °</label><input id="dms-latd" placeholder="51" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Lat Min ′</label><input id="dms-latm" placeholder="30" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Lat Sec ″</label><input id="dms-lats" placeholder="26.5" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Direction</label><select id="dms-latdir"><option>N</option><option>S</option></select></div>
+          </div>
+          <div class="fg four" style="margin-top:4px;">
+            <div class="field"><label>Lng Deg °</label><input id="dms-lngd" placeholder="0" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Lng Min ′</label><input id="dms-lngm" placeholder="7" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Lng Sec ″</label><input id="dms-lngs" placeholder="40.7" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Direction</label><select id="dms-lngdir"><option>E</option><option>W</option></select></div>
+          </div>
+        </div>
+
+        <!-- Degrees Decimal Minutes -->
+        <div class="fpanel" id="fp-ddm">
+          <div class="fg three">
+            <div class="field"><label>Lat Deg °</label><input id="ddm-latd" placeholder="51" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Lat Dec Min ′</label><input id="ddm-latm" placeholder="30.441" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Direction</label><select id="ddm-latdir"><option>N</option><option>S</option></select></div>
+          </div>
+          <div class="fg three" style="margin-top:4px;">
+            <div class="field"><label>Lng Deg °</label><input id="ddm-lngd" placeholder="0" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Lng Dec Min ′</label><input id="ddm-lngm" placeholder="7.678" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Direction</label><select id="ddm-lngdir"><option>E</option><option>W</option></select></div>
+          </div>
+        </div>
+
+        <!-- Military Grid Reference System -->
+        <div class="fpanel" id="fp-mgrs">
+          <div class="fg">
+            <div class="field"><label>MGRS Grid Reference</label><input id="mgrs-val" placeholder="30UXC8016208538" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')convert()"></div>
+          </div>
+          <p class="fhint">Zone + Band + 100km Square ID + Easting + Northing (even number of digits)</p>
+        </div>
+
+        <!-- Universal Transverse Mercator -->
+        <div class="fpanel" id="fp-utm">
+          <div class="fg four">
+            <div class="field"><label>Zone</label><input id="utm-zone" placeholder="30" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Band</label><input id="utm-band" placeholder="U" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Easting (m)</label><input id="utm-e" placeholder="699216" onkeydown="if(event.key==='Enter')convert()"></div>
+            <div class="field"><label>Northing (m)</label><input id="utm-n" placeholder="5710135" onkeydown="if(event.key==='Enter')convert()"></div>
+          </div>
+        </div>
+
+        <!-- US National Grid -->
+        <div class="fpanel" id="fp-usng">
+          <div class="fg">
+            <div class="field"><label>USNG Reference</label><input id="usng-val" placeholder="18SUJ2337306519" autocomplete="off" spellcheck="false" onkeydown="if(event.key==='Enter')convert()"></div>
+          </div>
+          <p class="fhint">US National Grid — civilian equivalent of Military Grid Reference System</p>
+        </div>
+      </div>
+
+      <div class="act-row">
+        <button class="btn-go" onclick="convert()">Convert →</button>
+        <button class="btn-clr" onclick="clearAll()">Clear</button>
+      </div>
+
+      <div class="examples-row">
+        <span class="ex-lbl">Examples:</span>
+        <button class="ex-btn" onclick="loadEx('london')">London</button>
+        <button class="ex-btn" onclick="loadEx('nyc')">New York</button>
+        <button class="ex-btn" onclick="loadEx('sydney')">Sydney</button>
+        <button class="ex-btn" onclick="loadEx('moscow')">Moscow</button>
+        <button class="ex-btn" onclick="loadEx('kandahar')">Kandahar</button>
+        <button class="ex-btn" onclick="loadEx('kiev')">Kyiv</button>
+      </div>
     </div>
-    <div class="seo-block-body" id="seoBlockBody">
-      <p>
-      Coordinates come in many formats depending on who recorded them and what system they were using — and converting between them manually is error-prone and slow. This free <strong>coordinate converter</strong> handles every major format used in the field: <strong>Decimal Degrees (DD)</strong>, the standard used by Google Maps and most digital platforms; <strong>Degrees Minutes Seconds (DMS)</strong>, the traditional format used in paper maps and official documents; <strong>Degrees Decimal Minutes (DDM)</strong>, used in aviation and marine navigation; <strong>MGRS (Military Grid Reference System)</strong>, the NATO standard used by military and defense; <strong>UTM (Universal Transverse Mercator)</strong>, the metric grid system used by surveyors and geographers; <strong>USNG (United States National Grid)</strong>, the civilian equivalent of MGRS used by US emergency services; and <strong>what3words</strong>, the three-word address system increasingly used by journalists, field investigators, and emergency responders. Enter coordinates in any format and instantly receive all others — no manual calculation, no errors. Every conversion is performed in real time with full precision. The tool also supports <strong>reverse what3words lookup</strong> — paste a three-word address like <em>///filled.count.soap</em> and instantly receive the precise GPS coordinates, MGRS grid reference, and all other formats. This makes it the only free tool that converts <strong>bidirectionally between what3words and every major coordinate standard</strong>. Essential for <strong>OSINT investigators geolocating field reports</strong>, <strong>journalists pinpointing locations from sources</strong>, <strong>search and rescue coordinators</strong>, <strong>military analysts working with MGRS grids</strong>, <strong>surveyors and GIS professionals</strong>, and anyone who needs to move coordinates between systems without error. Supports the WGS84 datum used globally by GPS systems.
-    </p>
-      <div class="seo-tags">
-      <span class="seo-tag">Coordinate Converter</span>
-      <span class="seo-tag">DD to DMS</span>
-      <span class="seo-tag">MGRS Converter</span>
-      <span class="seo-tag">UTM Converter</span>
-      <span class="seo-tag">what3words Converter</span>
-      <span class="seo-tag">what3words to GPS</span>
-      <span class="seo-tag">GPS to what3words</span>
-      <span class="seo-tag">USNG Converter</span>
-      <span class="seo-tag">DDM Converter</span>
-      <span class="seo-tag">Lat Long Converter</span>
-      <span class="seo-tag">DMS to Decimal</span>
-      <span class="seo-tag">MGRS to Lat Long</span>
-      <span class="seo-tag">Geolocation OSINT</span>
-      <span class="seo-tag">Military Grid</span>
-    </div>
+
+    <!-- RIGHT: MAP + RESULTS -->
+    <div class="right-pane">
+
+      <div class="map-wrap">
+        <div class="map-hdr">
+          Interactive Map
+          <span class="map-hint-tag">Click map to convert location</span>
+        </div>
+        <div id="map"></div>
+      </div>
+
+      <div class="results-hdr">All Coordinate Formats</div>
+      <div id="resultsContent">
+        <div class="empty-state">
+          <div class="empty-icon">⊕</div>
+          <div class="empty-text">Enter coordinates and click Convert —<br>or click any location on the map above</div>
+        </div>
+      </div>
+
     </div>
   </div>
 
-  <!-- INPUT -->
-  <section class="input-section">
-    <div class="section-label">Enter Coordinates</div>
-
-    <!-- Format tabs -->
-    <div class="format-tabs">
-      <button class="format-tab active" data-format="dd"   onclick="switchTab('dd')">DD</button>
-      <button class="format-tab"        data-format="dms"  onclick="switchTab('dms')">DMS</button>
-      <button class="format-tab"        data-format="ddm"  onclick="switchTab('ddm')">DDM</button>
-      <button class="format-tab"        data-format="mgrs" onclick="switchTab('mgrs')">MGRS</button>
-      <button class="format-tab"        data-format="utm"  onclick="switchTab('utm')">UTM</button>
-      <button class="format-tab"        data-format="usng" onclick="switchTab('usng')">USNG</button>
-      <button class="format-tab"        data-format="w3w"  onclick="switchTab('w3w')">///W3W</button>
-    </div>
-
-    <!-- DD panel -->
-    <div class="input-panel active" id="panel-dd">
-      <div class="input-grid two-col">
-        <div class="field-wrap">
-          <div class="field-label">Latitude</div>
-          <input class="field-input" id="dd-lat" type="text" placeholder="e.g. 39.188756" autocomplete="off" spellcheck="false">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Longitude</div>
-          <input class="field-input" id="dd-lng" type="text" placeholder="e.g. -76.815275" autocomplete="off" spellcheck="false">
-        </div>
-      </div>
-      <p class="input-hint-text">Negative latitude = South &nbsp;·&nbsp; Negative longitude = West &nbsp;·&nbsp; <em>e.g. 51.5074, -0.1278 (London)</em></p>
-    </div>
-
-    <!-- DMS panel -->
-    <div class="input-panel" id="panel-dms">
-      <div class="input-grid four-col">
-        <div class="field-wrap">
-          <div class="field-label">Lat Degrees</div>
-          <input class="field-input" id="dms-latd" type="text" placeholder="39" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Lat Minutes</div>
-          <input class="field-input" id="dms-latm" type="text" placeholder="11" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Lat Seconds</div>
-          <input class="field-input" id="dms-lats" type="text" placeholder="19.52" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">N / S</div>
-          <select class="field-input" id="dms-latdir"><option value="N">N — North</option><option value="S">S — South</option></select>
-        </div>
-      </div>
-      <div class="input-grid four-col" style="margin-top:2px">
-        <div class="field-wrap">
-          <div class="field-label">Lng Degrees</div>
-          <input class="field-input" id="dms-lngd" type="text" placeholder="76" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Lng Minutes</div>
-          <input class="field-input" id="dms-lngm" type="text" placeholder="48" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Lng Seconds</div>
-          <input class="field-input" id="dms-lngs" type="text" placeholder="54.99" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">E / W</div>
-          <select class="field-input" id="dms-lngdir"><option value="E">E — East</option><option value="W">W — West</option></select>
-        </div>
-      </div>
-    </div>
-
-    <!-- DDM panel -->
-    <div class="input-panel" id="panel-ddm">
-      <div class="input-grid four-col">
-        <div class="field-wrap">
-          <div class="field-label">Lat Degrees</div>
-          <input class="field-input" id="ddm-latd" type="text" placeholder="39" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Lat Dec. Minutes</div>
-          <input class="field-input" id="ddm-latm" type="text" placeholder="11.3254" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">N / S</div>
-          <select class="field-input" id="ddm-latdir"><option value="N">N</option><option value="S">S</option></select>
-        </div>
-        <div class="field-wrap" style="visibility:hidden"><div class="field-label">&nbsp;</div><input class="field-input"></div>
-      </div>
-      <div class="input-grid four-col" style="margin-top:2px">
-        <div class="field-wrap">
-          <div class="field-label">Lng Degrees</div>
-          <input class="field-input" id="ddm-lngd" type="text" placeholder="76" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Lng Dec. Minutes</div>
-          <input class="field-input" id="ddm-lngm" type="text" placeholder="48.9165" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">E / W</div>
-          <select class="field-input" id="ddm-lngdir"><option value="E">E</option><option value="W">W</option></select>
-        </div>
-        <div class="field-wrap" style="visibility:hidden"><div class="field-label">&nbsp;</div><input class="field-input"></div>
-      </div>
-    </div>
-
-    <!-- MGRS panel -->
-    <div class="input-panel" id="panel-mgrs">
-      <div class="input-grid two-col">
-        <div class="field-wrap">
-          <div class="field-label">MGRS String</div>
-          <input class="field-input" id="mgrs-input" type="text" placeholder="e.g. 18SUJ2339007417" autocomplete="off" spellcheck="false" style="grid-column:1/-1">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Precision</div>
-          <select class="field-input" id="mgrs-precision">
-            <option value="5">5 — 1 meter</option>
-            <option value="4">4 — 10 meters</option>
-            <option value="3" selected>3 — 100 meters</option>
-            <option value="2">2 — 1 km</option>
-            <option value="1">1 — 10 km</option>
-          </select>
-        </div>
-      </div>
-      <p class="input-hint-text">Enter full MGRS string including grid zone, 100km square ID, and easting/northing &nbsp;·&nbsp; <em>e.g. 18SUJ2339007417</em></p>
-    </div>
-
-    <!-- UTM panel -->
-    <div class="input-panel" id="panel-utm">
-      <div class="input-grid four-col">
-        <div class="field-wrap">
-          <div class="field-label">Zone Number</div>
-          <input class="field-input" id="utm-zone" type="text" placeholder="18" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Zone Letter</div>
-          <input class="field-input" id="utm-band" type="text" placeholder="S" autocomplete="off" maxlength="1">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Easting (m)</div>
-          <input class="field-input" id="utm-e" type="text" placeholder="323900" autocomplete="off">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Northing (m)</div>
-          <input class="field-input" id="utm-n" type="text" placeholder="4340741" autocomplete="off">
-        </div>
-      </div>
-      <p class="input-hint-text">Zone letter is the latitude band (C–X, excluding I and O) &nbsp;·&nbsp; Northern hemisphere if N–X, southern if C–M</p>
-    </div>
-
-    <!-- USNG panel -->
-    <div class="input-panel" id="panel-usng">
-      <div class="input-grid two-col">
-        <div class="field-wrap">
-          <div class="field-label">USNG String</div>
-          <input class="field-input" id="usng-input" type="text" placeholder="e.g. 18S UJ 23390 07417" autocomplete="off" spellcheck="false">
-        </div>
-        <div class="field-wrap">
-          <div class="field-label">Precision</div>
-          <select class="field-input" id="usng-precision">
-            <option value="5">5 — 1 meter</option>
-            <option value="4">4 — 10 meters</option>
-            <option value="3" selected>3 — 100 meters</option>
-            <option value="2">2 — 1 km</option>
-          </select>
-        </div>
-      </div>
-      <p class="input-hint-text">USNG is identical to MGRS for most practical purposes &nbsp;·&nbsp; Spaces between components are optional</p>
-    </div>
-
-    <!-- W3W panel -->
-    <div class="input-panel" id="panel-w3w">
-      <div class="input-grid" style="grid-template-columns:1fr">
-        <div class="field-wrap">
-          <div class="field-label">what3words Address</div>
-          <input class="field-input" id="w3w-input" type="text" placeholder="e.g. filled.count.soap  or  ///filled.count.soap" autocomplete="off" spellcheck="false">
-        </div>
-      </div>
-      <p class="input-hint-text">Enter the three words separated by dots — the <em>///</em> prefix is optional &nbsp;·&nbsp; Language must be English</p>
-    </div>
-
-    <!-- Action bar -->
-    <div class="action-bar">
-      <button class="btn-convert" onclick="convert()">Convert →</button>
-      <button class="btn-clear"   onclick="clearAll()">Clear</button>
-      <button class="btn-example" onclick="loadExample()">Load Example</button>
-    </div>
-  </section>
-
-  <!-- RESULTS -->
-  <div class="results-wrap" id="resultsWrap">
-    <div class="section-label" style="padding-top:0; margin-bottom:16px">All Formats</div>
-    <div class="results-grid" id="resultsGrid"></div>
-  </div>
-
-  <!-- TERMINAL -->
-  <div class="terminal-wrap" id="terminalWrap">
-    <div class="terminal-bar">
-      <div class="terminal-dots"><div class="dot dot-red"></div><div class="dot dot-yellow"></div><div class="dot dot-green"></div></div>
-      <div class="terminal-label">intel-desk — coordinate-converter</div>
-    </div>
-    <div class="terminal-body" id="terminalBody"></div>
-  </div>
-
-  <!-- FOOTER -->
   <footer class="footer">
-    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
-    <div class="footer-right">what3words conversion via the what3words API. All other conversions performed client-side. Coordinate precision may vary by format.</div>
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">All conversions use WGS84 datum · Military Grid Reference System precision to 1 metre · Click any result to copy · No data sent to servers</div>
   </footer>
 </div>
 
-<!-- Copy toast -->
-<div class="copy-toast" id="copyToast">Copied to clipboard</div>
-
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
-// ── CONFIG ────────────────────────────────────────────────────────────────────
-const PROXY_BASE = 'https://intel-desk-api.onrender.com';
+// ── MAP SETUP ──────────────────────────────────────────────────────────────────
+var map, marker;
 
-// ── TAB SWITCHING ─────────────────────────────────────────────────────────────
-function switchTab(fmt) {
-  document.querySelectorAll('.format-tab').forEach(t => t.classList.toggle('active', t.dataset.format === fmt));
-  document.querySelectorAll('.input-panel').forEach(p => p.classList.toggle('active', p.id === `panel-${fmt}`));
+function initMap() {
+  map = L.map('map', { zoomControl: true, attributionControl: true }).setView([20, 0], 2);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap contributors',
+    maxZoom: 18,
+  }).addTo(map);
+
+  // Custom dark marker
+  var icon = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;background:#c8a96e;border:2px solid #e8d5a3;border-radius:50%;box-shadow:0 0 8px rgba(200,169,110,0.6);"></div>',
+    iconSize: [14, 14],
+    iconAnchor: [7, 7],
+  });
+
+  map.on('click', function(e) {
+    var lat = Math.round(e.latlng.lat * 1e8) / 1e8;
+    var lng = Math.round(e.latlng.lng * 1e8) / 1e8;
+
+    if (marker) { marker.setLatLng([lat, lng]); }
+    else { marker = L.marker([lat, lng], { icon: icon }).addTo(map); }
+
+    // Fill DD inputs and convert
+    switchFmt('dd');
+    document.getElementById('dd-lat').value = lat;
+    document.getElementById('dd-lng').value = lng;
+    convert();
+  });
+}
+
+function updateMapMarker(lat, lng) {
+  if (!map) return;
+  var icon = L.divIcon({
+    className: '',
+    html: '<div style="width:14px;height:14px;background:#c8a96e;border:2px solid #e8d5a3;border-radius:50%;box-shadow:0 0 8px rgba(200,169,110,0.6);"></div>',
+    iconSize: [14, 14], iconAnchor: [7, 7],
+  });
+  if (marker) { marker.setLatLng([lat, lng]); }
+  else { marker = L.marker([lat, lng], { icon: icon }).addTo(map); }
+  map.setView([lat, lng], Math.max(map.getZoom(), 8), { animate: true });
+}
+
+// ── FORMAT SWITCHING ──────────────────────────────────────────────────────────
+function switchFmt(fmt) {
+  document.querySelectorAll('.fmt-btn').forEach(function(b) {
+    b.classList.toggle('active', b.dataset.fmt === fmt);
+  });
+  document.querySelectorAll('.fpanel').forEach(function(p) {
+    p.classList.toggle('active', p.id === 'fp-' + fmt);
+  });
 }
 
 // ── EXAMPLES ──────────────────────────────────────────────────────────────────
-const EXAMPLES = {
-  dd:   () => { document.getElementById('dd-lat').value='39.188756'; document.getElementById('dd-lng').value='-76.815275'; },
-  dms:  () => { document.getElementById('dms-latd').value='39'; document.getElementById('dms-latm').value='11'; document.getElementById('dms-lats').value='19.52'; document.getElementById('dms-latdir').value='N'; document.getElementById('dms-lngd').value='76'; document.getElementById('dms-lngm').value='48'; document.getElementById('dms-lngs').value='54.99'; document.getElementById('dms-lngdir').value='W'; },
-  ddm:  () => { document.getElementById('ddm-latd').value='39'; document.getElementById('ddm-latm').value='11.3253'; document.getElementById('ddm-latdir').value='N'; document.getElementById('ddm-lngd').value='76'; document.getElementById('ddm-lngm').value='48.9165'; document.getElementById('ddm-lngdir').value='W'; },
-  mgrs: () => { document.getElementById('mgrs-input').value='18SUJ2339007417'; },
-  utm:  () => { document.getElementById('utm-zone').value='18'; document.getElementById('utm-band').value='S'; document.getElementById('utm-e').value='323900'; document.getElementById('utm-n').value='4340741'; },
-  usng: () => { document.getElementById('usng-input').value='18S UJ 23390 07417'; },
-  w3w:  () => { document.getElementById('w3w-input').value='filled.count.soap'; },
-};
-
-function loadExample() {
-  const active = document.querySelector('.format-tab.active')?.dataset.format || 'dd';
-  EXAMPLES[active]?.();
+function loadEx(loc) {
+  var ex = {
+    london:   { lat: 51.5074,  lng: -0.1278  },
+    nyc:      { lat: 40.7128,  lng: -74.0060 },
+    sydney:   { lat: -33.8688, lng: 151.2093 },
+    moscow:   { lat: 55.7558,  lng: 37.6173  },
+    kandahar: { lat: 31.6289,  lng: 65.7372  },
+    kiev:     { lat: 50.4501,  lng: 30.5234  },
+  };
+  var e = ex[loc]; if (!e) return;
+  switchFmt('dd');
+  document.getElementById('dd-lat').value = e.lat;
+  document.getElementById('dd-lng').value = e.lng;
+  convert();
 }
 
-// ── INPUT READERS ─────────────────────────────────────────────────────────────
+// ── COPY ──────────────────────────────────────────────────────────────────────
+function copyVal(card, val) {
+  navigator.clipboard.writeText(val).then(function() {
+    var lbl = card.querySelector('.copy-lbl');
+    if (!lbl) return;
+    lbl.textContent = 'Copied!';
+    lbl.classList.add('done');
+    setTimeout(function() { lbl.textContent = 'Copy'; lbl.classList.remove('done'); }, 1800);
+  });
+}
+
+// ── CLEAR ──────────────────────────────────────────────────────────────────────
+function clearAll() {
+  document.querySelectorAll('.fpanel input').forEach(function(i) { i.value = ''; });
+  document.getElementById('resultsContent').innerHTML =
+    '<div class="empty-state"><div class="empty-icon">⊕</div><div class="empty-text">Enter coordinates and click Convert —<br>or click any location on the map above</div></div>';
+  if (marker && map) { map.removeLayer(marker); marker = null; }
+}
+
+// ── CONVERT ───────────────────────────────────────────────────────────────────
+async function convert() {
+  var fmt = (document.querySelector('.fmt-btn.active') || {}).dataset.fmt || 'dd';
+  var lat, lng;
+  try {
+    var readers = { dd: readDD, dms: readDMS, ddm: readDDM, mgrs: readMGRS, utm: readUTM, usng: readUSNG };
+    var r = await readers[fmt]();
+    lat = Math.round(r.lat * 1e8) / 1e8;
+    lng = Math.round(r.lng * 1e8) / 1e8;
+  } catch(e) {
+    alert(e.message || 'Could not read coordinates. Please check your input.');
+    return;
+  }
+
+  updateMapMarker(lat, lng);
+
+  var utm  = latLngToUTM(lat, lng);
+  var mgrs = latLngToMGRS(lat, lng, 5);
+  var usng = utm.zone + utm.band + ' ' + mgrs.slice(3,5) + ' ' +
+             String(Math.round(utm.easting)  % 100000).padStart(5,'0') + ' ' +
+             String(Math.round(utm.northing) % 100000).padStart(5,'0');
+
+  var ddVal  = lat + ', ' + lng;
+  var dmsLat = toDMS(lat, true);
+  var dmsLng = toDMS(lng, false);
+  var ddmLat = toDDM(lat, true);
+  var ddmLng = toDDM(lng, false);
+  var utmVal = utm.zone + utm.band + '  E ' + Math.round(utm.easting) + '  N ' + Math.round(utm.northing);
+  var gmUrl  = 'https://www.google.com/maps?q=' + lat + ',' + lng;
+  var osUrl  = 'https://www.openstreetmap.org/?mlat=' + lat + '&mlon=' + lng + '&zoom=14';
+
+  document.getElementById('resultsContent').innerHTML =
+    '<div class="r-primary" onclick="navigator.clipboard.writeText(\'' + ddVal + '\')" title="Click to copy">' +
+      '<div class="r-tag">Decimal Degrees</div>' +
+      '<div class="r-val-lg">' + ddVal + '</div>' +
+      '<div class="r-sub">Standard format · Google Maps · GPS devices · Click to copy</div>' +
+    '</div>' +
+    '<div class="r-grid">' +
+      rCard('Degrees, Minutes, Seconds', dmsLat + '\n' + dmsLng, 'Traditional cartography · Survey documents · Paper maps') +
+      rCard('Degrees, Decimal Minutes', ddmLat + '\n' + ddmLng, 'Aviation · Marine navigation · GPS receivers') +
+      rCard('Military Grid Reference System', mgrs, 'NATO standard · Military &amp; defense operations') +
+      rCard('Universal Transverse Mercator', utmVal, 'Surveying · GIS professionals · Metric grid system') +
+      rCard('US National Grid', usng, 'Civilian equivalent of Military Grid Reference System · US emergency services') +
+      rCard('Decimal — Lat / Lng', lat + '\n' + lng, 'Separated format · API-friendly · Programmers') +
+    '</div>' +
+    '<div class="map-links">' +
+      '<a class="map-link" href="' + gmUrl + '" target="_blank" rel="noopener"><span class="map-link-icon">🗺</span><span><strong>Google Maps</strong>Open location</span></a>' +
+      '<a class="map-link" href="' + osUrl + '" target="_blank" rel="noopener"><span class="map-link-icon">🌍</span><span><strong>OpenStreetMap</strong>Open source map</span></a>' +
+    '</div>';
+}
+
+function rCard(tag, val, sub) {
+  var copyVal = val.replace(/\n/g, ', ').replace(/'/g, "\\'");
+  var dispVal = val.replace(/\n/g, '<br>');
+  return '<div class="r-card" onclick="copyVal(this,\'' + copyVal + '\')">' +
+    '<div class="copy-lbl">Copy</div>' +
+    '<div class="r-card-tag">' + tag + '</div>' +
+    '<div class="r-card-val">' + dispVal + '</div>' +
+    '<div class="r-card-sub">' + sub + '</div>' +
+  '</div>';
+}
+
+// ── MATH FUNCTIONS ────────────────────────────────────────────────────────────
 function readDD() {
   const lat = parseFloat(document.getElementById('dd-lat').value);
   const lng = parseFloat(document.getElementById('dd-lng').value);
@@ -598,9 +503,6 @@ function readUSNG() {
   return mgrsToLatLng(s); // USNG and MGRS are identical algorithmically
 }
 
-// ── CONVERSION MATH ───────────────────────────────────────────────────────────
-
-// DD → DMS string
 function toDMS(dd, isLat) {
   const dir = dd < 0 ? (isLat ? 'S' : 'W') : (isLat ? 'N' : 'E');
   const abs = Math.abs(dd);
@@ -611,7 +513,6 @@ function toDMS(dd, isLat) {
   return `${deg}° ${String(min).padStart(2,'0')}' ${sec}" ${dir}`;
 }
 
-// DD → DDM string
 function toDDM(dd, isLat) {
   const dir = dd < 0 ? (isLat ? 'S' : 'W') : (isLat ? 'N' : 'E');
   const abs = Math.abs(dd);
@@ -620,7 +521,6 @@ function toDDM(dd, isLat) {
   return `${deg}° ${min}' ${dir}`;
 }
 
-// DD → UTM
 function latLngToUTM(lat, lng) {
   const a = 6378137.0, f = 1/298.257223563;
   const b = a*(1-f), e2 = 1-(b/a)**2;
@@ -642,7 +542,6 @@ function latLngToUTM(lat, lng) {
   return { zone: zoneNum, band: zoneLetter, easting: Math.round(E), northing: Math.round(N2) };
 }
 
-// UTM → DD
 function utmToLatLng(zoneNum, zoneLetter, E, N) {
   const a=6378137.0, f=1/298.257223563;
   const b=a*(1-f), e2=1-(b/a)**2, e12=e2/(1-e2);
@@ -663,7 +562,6 @@ function utmToLatLng(zoneNum, zoneLetter, E, N) {
   return { lat: lat*180/Math.PI, lng: lon*180/Math.PI };
 }
 
-// DD → MGRS
 function latLngToMGRS(lat, lng, precision=5) {
   const utm = latLngToUTM(lat, lng);
   const sq100k = get100kID(utm.easting, utm.northing, utm.zone);
@@ -684,7 +582,6 @@ function get100kID(easting, northing, zone) {
   return colArr[colIdx]+rowArr[rowIdx];
 }
 
-// MGRS → DD (simplified, handles standard MGRS strings)
 function mgrsToLatLng(mgrs) {
   mgrs = mgrs.replace(/\s/g,'').toUpperCase();
   const m = mgrs.match(/^(\d{1,2})([C-HJ-NP-X])([A-HJ-NP-Z]{2})(\d{2,10})$/);
@@ -718,188 +615,8 @@ function getNorthingFromID(row, zone, band) {
   return base + idx*100000;
 }
 
-// ── MAIN CONVERT ──────────────────────────────────────────────────────────────
-async function convert() {
-  const active = document.querySelector('.format-tab.active')?.dataset.format || 'dd';
-  let lat, lng;
-
-  try {
-    const readers = { dd:readDD, dms:readDMS, ddm:readDDM, mgrs:readMGRS, utm:readUTM, usng:readUSNG, w3w:readW3W };
-    const result = await readers[active]();
-    lat = result.lat; lng = result.lng;
-  } catch(e) {
-    alert(e.message);
-    return;
-  }
-
-  // Round to 8dp for display
-  lat = Math.round(lat*100000000)/100000000;
-  lng = Math.round(lng*100000000)/100000000;
-
-  const utm  = latLngToUTM(lat, lng);
-  const mgrs = latLngToMGRS(lat, lng, 5);
-
-  const results = {
-    dd:   { label:'Decimal Degrees',           value:`${lat}, ${lng}`,                sub:'Standard · Google Maps · GPS devices' },
-    dms:  { label:'Degrees Minutes Seconds',   value:`${toDMS(lat,true)}\n${toDMS(lng,false)}`, sub:'Traditional cartography · survey documents' },
-    ddm:  { label:'Degrees Decimal Minutes',   value:`${toDDM(lat,true)}\n${toDDM(lng,false)}`, sub:'Aviation · marine navigation · GPS receivers' },
-    mgrs: { label:'MGRS',                      value:mgrs,              sub:'NATO Military Grid Reference System' },
-    utm:  { label:'UTM',                       value:`${utm.zone}${utm.band}  E ${utm.easting}  N ${utm.northing}`, sub:'Universal Transverse Mercator · surveying' },
-    usng: { label:'USNG',                      value:`${utm.zone}${utm.band} ${mgrs.slice(3,5)} ${String(utm.easting%100000).padStart(5,'0')} ${String(utm.northing%100000).padStart(5,'0')}`, sub:'US National Grid · US emergency services' },
-    w3w:  { label:'what3words',                value:'Loading…',        sub:'what3words three-word address', loading:true },
-    gmaps:{ label:'Google Maps Link',          value:`https://maps.google.com/?q=${lat},${lng}`, sub:'Click to open in Google Maps', isUrl:true },
-  };
-
-  renderResults(results);
-  renderTerminal(lat, lng, results, utm, mgrs);
-
-  // Fetch w3w asynchronously
-  fetchW3W(lat, lng);
-}
-
-// ── readW3W — converts w3w address to lat/lng via proxy ─────────────────────────
-async function readW3W() {
-  let words = (document.getElementById('w3w-input').value || '').trim().replace(/^\/\/\//,'').toLowerCase();
-  if (!words || words.split('.').filter(Boolean).length !== 3) {
-    throw new Error('Enter a valid what3words address — three words separated by dots');
-  }
-  // We need to fetch from proxy synchronously-ish — return a promise the convert() flow can await
-  const resp = await fetch(`${PROXY_BASE}/w3w-reverse?words=${encodeURIComponent(words)}`);
-  if (!resp.ok) throw new Error(`what3words lookup failed (HTTP ${resp.status})`);
-  const data = await resp.json();
-  if (data.error) throw new Error(data.error);
-  if (!data.lat || !data.lng) throw new Error('No coordinates returned from what3words');
-  return { lat: data.lat, lng: data.lng };
-}
-
-// ── what3words ────────────────────────────────────────────────────────────────
-async function fetchW3W(lat, lng) {
-  try {
-    const resp = await fetch(`${PROXY_BASE}/w3w?lat=${lat}&lng=${lng}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    if (data.words) {
-      updateW3WCard(data.words, data.nearestPlace || '');
-    } else {
-      updateW3WCard(null, data.error || 'No result');
-    }
-  } catch(e) {
-    updateW3WCard(null, 'w3w unavailable');
-  }
-}
-
-function updateW3WCard(words, sub) {
-  const card = document.getElementById('w3w-card');
-  if (!card) return;
-  const val  = card.querySelector('.result-value');
-  const subEl= card.querySelector('.result-sub');
-  if (words) {
-    val.className = 'result-value w3w';
-    val.textContent = words;
-    subEl.textContent = sub || 'what3words address';
-  } else {
-    val.className = 'result-value';
-    val.style.color = 'var(--gray)';
-    val.textContent = sub;
-    subEl.textContent = 'what3words unavailable';
-  }
-}
-
-// ── RENDER RESULTS ────────────────────────────────────────────────────────────
-function renderResults(results) {
-  const grid = document.getElementById('resultsGrid');
-  grid.innerHTML = Object.entries(results).map(([key, r]) => {
-    const isLarge = ['dd'].includes(key);
-    const isW3W   = key === 'w3w';
-    const isUrl   = r.isUrl;
-    const valClass= isLarge ? 'large' : isW3W ? 'w3w' : '';
-    const idAttr  = key === 'w3w' ? 'id="w3w-card"' : '';
-    const valueHtml = isUrl
-      ? `<a href="${r.value}" target="_blank" rel="noopener" style="color:#7eb8e4;text-decoration:underline;font-family:var(--mono);font-size:12px;word-break:break-all;">${r.value}</a>`
-      : `<div class="result-value ${valClass}" style="${r.loading?'color:var(--gray)':''}">${r.value.replace(/\n/g,'<br>')}</div>`;
-    return `
-      <div class="result-card" ${idAttr} onclick="${isUrl ? `window.open('${r.value}','_blank')` : `copyValue('${r.value.replace(/'/g,"\\'")}', '${r.label}')`}">
-        <div class="result-format"><span class="result-format-dot"></span>${r.label}</div>
-        ${valueHtml}
-        <div class="result-sub">${r.sub}</div>
-        ${!isUrl ? '<div class="copy-hint">Click to copy</div>' : '<div class="copy-hint">Click to open</div>'}
-      </div>`;
-  }).join('');
-
-  document.getElementById('resultsWrap').classList.add('visible');
-  document.getElementById('terminalWrap').classList.add('visible');
-  document.getElementById('resultsWrap').scrollIntoView({ behavior:'smooth', block:'start' });
-}
-
-// ── TERMINAL ──────────────────────────────────────────────────────────────────
-function renderTerminal(lat, lng, results, utm, mgrs) {
-  const esc = s => String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  const ln  = (cls, t) => `<div class="t-${cls}">${esc(t)}</div>`;
-  const lnH = (cls, h) => `<div class="t-${cls}">${h}</div>`;
-  const div = () => `<div class="t-div">────────────────────────────────────────────────────────</div>`;
-  const b   = () => `<div>&nbsp;</div>`;
-
-  let h = '';
-  h += ln('cmd', `$ intel-desk convert-coordinates --lat ${lat} --lng ${lng} --all-formats`);
-  h += b();
-  h += div();
-  h += ln('key', '  COORDINATE CONVERSIONS');
-  h += div();
-
-  const rows = [
-    ['Decimal Deg',  `${lat}, ${lng}`],
-    ['DMS Lat',      toDMS(lat, true)],
-    ['DMS Lng',      toDMS(lng, false)],
-    ['DDM Lat',      toDDM(lat, true)],
-    ['DDM Lng',      toDDM(lng, false)],
-    ['MGRS',         mgrs],
-    ['UTM',          `${utm.zone}${utm.band} E${utm.easting} N${utm.northing}`],
-    ['USNG',         `${utm.zone}${utm.band} ${mgrs.slice(3,5)} ${String(utm.easting%100000).padStart(5,'0')} ${String(utm.northing%100000).padStart(5,'0')}`],
-    ['what3words',   'fetching via proxy…'],
-    ['Google Maps',  `https://maps.google.com/?q=${lat},${lng}`],
-  ];
-
-  for (const [k, v] of rows) {
-    h += lnH('text', `  <span class="t-key">${k.padEnd(14)}</span>  ${esc(v)}`);
-  }
-
-  h += b();
-  h += div();
-  h += ln('dim', `  Conversion complete — 8 formats · WGS84 datum`);
-  h += lnH('dim', `  <span class="t-cursor"></span>`);
-
-  document.getElementById('terminalBody').innerHTML = h;
-}
-
-// ── COPY ──────────────────────────────────────────────────────────────────────
-function copyValue(val, label) {
-  navigator.clipboard.writeText(val).then(() => {
-    const toast = document.getElementById('copyToast');
-    toast.textContent = `Copied: ${label}`;
-    toast.classList.add('show');
-    setTimeout(() => toast.classList.remove('show'), 2000);
-  });
-}
-
-// ── CLEAR ─────────────────────────────────────────────────────────────────────
-function clearAll() {
-  document.querySelectorAll('.field-input').forEach(el => { if(el.tagName!=='SELECT') el.value=''; });
-  document.getElementById('resultsWrap').classList.remove('visible');
-  document.getElementById('terminalWrap').classList.remove('visible');
-}
-
-// ── ENTER KEY ─────────────────────────────────────────────────────────────────
-document.addEventListener('keydown', e => { if(e.key==='Enter') convert(); });
-</script>
-
-<script>
-function toggleSEOBlock() {
-  const body = document.getElementById('seoBlockBody');
-  const btn  = document.getElementById('seoToggleBtn');
-  if (!body || !btn) return;
-  const expanded = body.classList.toggle('expanded');
-  btn.textContent = expanded ? 'Show Less' : 'Read More';
-}
+// ── INIT ──────────────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', initMap);
 </script>
 </body>
 </html>
