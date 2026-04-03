@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Data Breach Monitor | The Intel Desk</title>
-<meta name="description" content="Live data breach intelligence. Track the latest data breaches from HaveIBeenPwned. Search by company, filter by data type, view total accounts exposed.">
+<meta name="description" content="Browse every documented data breach. Search any company or service to see if it was breached, what data was stolen, and how many accounts were exposed.">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -15,91 +15,126 @@
   --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
 body *{color:inherit;}
-.wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
 
-.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,32px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+/* HERO */
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,28px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
 .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
 .eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
 .eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
 h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
 h1 em{font-style:italic;color:#e8d5a3!important;}
 
-/* STATS BAR */
+/* LOAD SCREEN */
+.load-screen{border:1px solid var(--border);background:var(--bg2);padding:clamp(48px,8vw,80px) clamp(24px,5vw,60px);text-align:center;}
+.load-icon{font-size:44px;margin-bottom:20px;opacity:.30;}
+.load-title{font-family:var(--serif);font-size:clamp(22px,3.5vw,36px);font-weight:300;color:#e8d5a3!important;margin-bottom:10px;}
+.load-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.35)!important;line-height:1.9;margin-bottom:8px;max-width:520px;margin-left:auto;margin-right:auto;}
+.load-stats{display:flex;justify-content:center;gap:32px;margin:20px 0 28px;flex-wrap:wrap;}
+.load-stat{text-align:center;}
+.load-stat-num{font-family:var(--serif);font-size:28px;font-weight:300;color:#c8a96e!important;}
+.load-stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.28)!important;margin-top:3px;}
+.btn-load{background:var(--adim);border:1px solid rgba(200,169,110,.40);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.16em;padding:14px 44px;cursor:pointer;transition:all .2s;display:inline-flex;align-items:center;gap:10px;}
+.btn-load:hover{background:rgba(200,169,110,.26);color:#e8d5a3!important;border-color:rgba(200,169,110,.55);}
+.btn-load-icon{font-size:14px;}
+
+/* DASHBOARD */
 .stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:2px;}
 .stat-cell{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;}
-.stat-num{font-family:var(--serif);font-size:clamp(22px,3vw,32px);font-weight:300;color:#e8d5a3!important;line-height:1;}
-.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.28)!important;margin-top:5px;}
-.stat-num.red{color:#c0392b!important;}
+.stat-num{font-family:var(--serif);font-size:clamp(22px,3vw,30px);font-weight:300;color:#e8d5a3!important;line-height:1;}
+.stat-num.red{color:#c0392b!important;text-shadow:0 0 20px rgba(192,57,43,.25);}
 .stat-num.orange{color:#e87b4a!important;}
+.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:rgba(240,236,228,.26)!important;margin-top:5px;}
 
-/* CONTROLS */
-.controls{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
-.search-wrap{flex:1;min-width:200px;position:relative;}
-.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:12px 16px 12px 38px;outline:none;transition:border-color .2s;}
-.search-input:focus{border-color:rgba(200,169,110,.35);}
-.search-input::placeholder{color:rgba(240,236,228,.20)!important;}
-.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.35;pointer-events:none;}
-.filter-btn{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(240,236,228,.40)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.10em;padding:12px 16px;cursor:pointer;transition:all .15s;white-space:nowrap;}
-.filter-btn.active{background:var(--adim);color:#c8a96e!important;border-color:rgba(200,169,110,.25);}
-.filter-btn:hover{color:rgba(240,236,228,.70)!important;}
-.sort-select{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(240,236,228,.50)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:12px 14px;outline:none;cursor:pointer;}
-.sort-select option{background:#111;}
+/* TIMELINE */
+.timeline{background:var(--bg2);border:1px solid var(--border);padding:13px 16px;margin-bottom:2px;}
+.tl-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:rgba(240,236,228,.26)!important;margin-bottom:9px;}
+.tl-bars{display:flex;align-items:flex-end;gap:3px;height:40px;}
+.tbar{flex:1;background:rgba(200,169,110,.13);border-radius:1px 1px 0 0;min-width:4px;transition:background .15s;cursor:default;}
+.tbar:hover{background:rgba(200,169,110,.38);}
+.tl-axis{display:flex;gap:3px;margin-top:4px;}
+.tax{flex:1;font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.16)!important;text-align:center;}
+
+/* SEARCH BAR */
+.search-bar{display:flex;gap:0;margin-bottom:2px;}
+.search-wrap{flex:1;position:relative;}
+.search-icon{position:absolute;left:14px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.28;pointer-events:none;}
+.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:14px;padding:14px 18px 14px 42px;outline:none;transition:border-color .2s;}
+.search-input:focus{border-color:rgba(200,169,110,.40);}
+.search-input::placeholder{color:rgba(240,236,228,.18)!important;}
+.btn-go{background:var(--adim);border:1px solid rgba(200,169,110,.30);border-left:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:14px 26px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.btn-go:hover{background:rgba(200,169,110,.26);color:#e8d5a3!important;}
+
+/* FILTER ROW */
+.filter-row{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
+.filter-btn{background:var(--bg2);border:1px solid var(--border);border-right:none;color:rgba(240,236,228,.38)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.09em;padding:9px 14px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.filter-btn:last-of-type{border-right:1px solid var(--border);}
+.filter-btn.active{background:var(--adim);color:#c8a96e!important;border-color:rgba(200,169,110,.22);position:relative;z-index:1;}
+.filter-btn:hover{color:rgba(240,236,228,.65)!important;}
+.sort-sel{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(240,236,228,.45)!important;font-family:var(--mono);font-size:10px;padding:9px 12px;outline:none;cursor:pointer;margin-left:auto;}
+.sort-sel option{background:#111;}
+
+.result-count{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.24)!important;padding:7px 0 4px;text-align:right;}
 
 /* BREACH GRID */
 .breach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:2px;}
-.breach-card{background:var(--bg2);border:1px solid var(--border);padding:18px 20px;transition:border-color .15s;position:relative;}
-.breach-card:hover{border-color:rgba(200,169,110,.20);}
-.breach-card.sensitive{border-left:2px solid #c0392b;}
-.bc-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
-.bc-logo{width:36px;height:36px;border-radius:0;object-fit:contain;background:rgba(255,255,255,.04);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:500;color:#c8a96e!important;}
-.bc-logo img{width:100%;height:100%;object-fit:contain;}
-.bc-title-wrap{flex:1;min-width:0;}
-.bc-title{font-family:var(--sans);font-size:14px;font-weight:600;color:#e8d5a3!important;line-height:1.2;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.bc-domain{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.30)!important;}
-.bc-date{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.28)!important;position:absolute;top:14px;right:16px;}
-.bc-count{font-family:var(--serif);font-size:22px;font-weight:300;color:#c0392b!important;margin-bottom:4px;}
-.bc-count-lbl{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.28)!important;text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;}
-.bc-tags{display:flex;flex-wrap:wrap;gap:4px;}
-.bc-tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border:1px solid;white-space:nowrap;}
-.bc-tag.pass{border-color:rgba(192,57,43,.35);color:#c0392b!important;}
-.bc-tag.email{border-color:rgba(126,184,228,.25);color:#7eb8e4!important;}
-.bc-tag.default{border-color:rgba(255,255,255,.10);color:rgba(240,236,228,.35)!important;}
-.bc-sensitive{position:absolute;bottom:12px;right:14px;font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#c0392b!important;opacity:.60;}
 
-/* LOADING / EMPTY */
-.loading-state,.empty-state{background:var(--bg2);border:1px solid var(--border);padding:48px 24px;text-align:center;}
-.ls-spinner{width:32px;height:32px;border:2px solid rgba(200,169,110,.15);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;}
+/* CARD */
+.b-card{background:var(--bg2);border:1px solid var(--border);display:flex;flex-direction:column;transition:border-color .2s;position:relative;}
+.b-card:hover{border-color:rgba(200,169,110,.20);}
+.b-card.sensitive{border-left:2px solid rgba(192,57,43,.55);}
+
+.b-head{display:flex;align-items:center;gap:11px;padding:14px 16px 10px;}
+.b-logo{width:36px;height:36px;flex-shrink:0;border:1px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.b-logo img{width:100%;height:100%;object-fit:contain;}
+.b-ini{font-family:var(--mono);font-size:11px;font-weight:500;color:#c8a96e!important;}
+.b-info{flex:1;min-width:0;}
+.b-title{font-family:var(--sans);font-size:13px;font-weight:600;color:#e8d5a3!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:2px;}
+.b-domain{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.26)!important;}
+.b-date{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.20)!important;text-align:right;white-space:nowrap;line-height:1.4;}
+
+.b-count{padding:2px 16px 9px;display:flex;align-items:baseline;gap:7px;}
+.b-num{font-family:var(--serif);font-size:26px;font-weight:300;color:#c0392b!important;line-height:1;}
+.b-num-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.10em;color:rgba(240,236,228,.25)!important;}
+
+/* DATA STOLEN SECTION */
+.b-stolen{padding:9px 16px 11px;border-top:1px solid rgba(255,255,255,.04);}
+.b-stolen-hdr{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.13em;color:rgba(240,236,228,.20)!important;margin-bottom:6px;}
+.b-tags{display:flex;flex-wrap:wrap;gap:3px;}
+.b-tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.05em;padding:2px 7px;border:1px solid;white-space:nowrap;}
+.t-pass {color:#c0392b!important;border-color:rgba(192,57,43,.32);background:rgba(192,57,43,.05);}
+.t-email{color:#7eb8e4!important;border-color:rgba(126,184,228,.22);}
+.t-phone{color:#e87b4a!important;border-color:rgba(232,123,74,.22);}
+.t-loc  {color:#c8a96e!important;border-color:rgba(200,169,110,.22);}
+.t-fin  {color:#c0392b!important;border-color:rgba(192,57,43,.30);background:rgba(192,57,43,.04);}
+.t-other{color:rgba(240,236,228,.32)!important;border-color:rgba(255,255,255,.08);}
+
+.b-desc{padding:7px 16px 12px;font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.27)!important;line-height:1.6;border-top:1px solid rgba(255,255,255,.03);}
+
+/* EMPTY / SPINNER */
+.spinner-wrap{padding:48px;text-align:center;}
+.spinner{width:28px;height:28px;border:2px solid rgba(200,169,110,.13);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.ls-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.28)!important;text-transform:uppercase;letter-spacing:.12em;}
-.empty-icon{font-size:28px;opacity:.2;margin-bottom:10px;}
-.empty-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.25)!important;line-height:1.9;}
+.spin-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.25)!important;}
+.empty{padding:40px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.24)!important;line-height:1.9;background:var(--bg2);border:1px solid var(--border);}
 
-/* TIMELINE BAR */
-.timeline{background:var(--bg2);border:1px solid var(--border);padding:16px 20px;margin-bottom:2px;}
-.timeline-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.28)!important;margin-bottom:10px;}
-.timeline-bars{display:flex;align-items:flex-end;gap:3px;height:48px;}
-.tbar{flex:1;background:rgba(200,169,110,.15);border-radius:1px 1px 0 0;transition:background .15s;cursor:default;min-width:6px;}
-.tbar:hover{background:rgba(200,169,110,.40);}
-.tbar-lbl{font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.20)!important;margin-top:4px;text-align:center;}
-.timeline-axis{display:flex;gap:3px;margin-top:4px;}
-.tax{flex:1;font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.18)!important;text-align:center;}
-
-.source-note{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.22)!important;padding:12px 0;text-align:right;}
-.source-note a{color:rgba(200,169,110,.50)!important;text-decoration:none;}
+.source-note{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.20)!important;padding:10px 0;text-align:right;}
+.source-note a{color:rgba(200,169,110,.42)!important;text-decoration:none;}
 .source-note a:hover{color:#c8a96e!important;}
 
-.footer{margin-top:clamp(36px,5vw,64px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
-.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.28)!important;line-height:1.7;}
+.footer{margin-top:clamp(36px,5vw,60px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.26)!important;line-height:1.7;}
 .footer-l strong{color:#c8a96e!important;}
 .footer-r{text-align:right;}
 
 @media(max-width:768px){
   .stats-bar{grid-template-columns:1fr 1fr;}
   .breach-grid{grid-template-columns:1fr;}
-  .controls{flex-direction:column;}
-  .filter-btn,.sort-select{border-left:1px solid var(--border);border-top:none;}
+  .filter-row{flex-wrap:wrap;}
+  .filter-btn{border-right:1px solid var(--border);}
+  .sort-sel{margin-left:0;width:100%;border-left:1px solid var(--border);border-top:none;}
   .footer-r{text-align:left;}
 }
 </style>
@@ -112,46 +147,77 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
     <h1>Data Breach <em>Monitor</em></h1>
   </div>
 
-  <div class="stats-bar" id="statsBar">
-    <div class="stat-cell"><div class="stat-num" id="statTotal">—</div><div class="stat-lbl">Total Breaches</div></div>
-    <div class="stat-cell"><div class="stat-num red" id="statAccounts">—</div><div class="stat-lbl">Accounts Exposed</div></div>
-    <div class="stat-cell"><div class="stat-num orange" id="statYear">—</div><div class="stat-lbl">Breaches This Year</div></div>
-    <div class="stat-cell"><div class="stat-num" id="statLatest">—</div><div class="stat-lbl">Most Recent</div></div>
-  </div>
-
-  <div class="timeline" id="timelineWrap" style="display:none;">
-    <div class="timeline-hdr">Breach frequency by year</div>
-    <div class="timeline-bars" id="timelineBars"></div>
-    <div class="timeline-axis" id="timelineAxis"></div>
-  </div>
-
-  <div class="controls">
-    <div class="search-wrap">
-      <span class="search-icon">🔍</span>
-      <input type="text" class="search-input" id="searchInput" placeholder="Search breaches — company name, domain, data type...">
-    </div>
-    <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
-    <button class="filter-btn" data-filter="passwords" onclick="setFilter('passwords',this)">Passwords</button>
-    <button class="filter-btn" data-filter="sensitive" onclick="setFilter('sensitive',this)">Sensitive</button>
-    <button class="filter-btn" data-filter="2025+" onclick="setFilter('2025+',this)">2025+</button>
-    <select class="sort-select" id="sortSelect" onchange="renderBreaches()">
-      <option value="date-desc">Newest First</option>
-      <option value="date-asc">Oldest First</option>
-      <option value="count-desc">Largest First</option>
-      <option value="count-asc">Smallest First</option>
-      <option value="alpha">A – Z</option>
-    </select>
-  </div>
-
-  <div id="breachContent">
-    <div class="loading-state">
-      <div class="ls-spinner"></div>
-      <div class="ls-text">Loading breach intelligence...</div>
+  <!-- LOAD SCREEN -->
+  <div id="loadScreen">
+    <div class="load-screen">
+      <div class="load-icon">🔓</div>
+      <div class="load-title">Every Documented Data Breach</div>
+      <div class="load-sub">
+        Search any company, service, or platform to see if it was breached —
+        what data was stolen, how many accounts were exposed,
+        and when it happened.
+      </div>
+      <div class="load-stats">
+        <div class="load-stat"><div class="load-stat-num">968+</div><div class="load-stat-lbl">Breaches</div></div>
+        <div class="load-stat"><div class="load-stat-num">17.5B</div><div class="load-stat-lbl">Accounts Exposed</div></div>
+        <div class="load-stat"><div class="load-stat-num">2007–Now</div><div class="load-stat-lbl">Date Range</div></div>
+      </div>
+      <button class="btn-load" onclick="loadBreaches()">
+        <span class="btn-load-icon">↓</span> Load Breach Database
+      </button>
     </div>
   </div>
 
-  <div class="source-note">
-    Data via <a href="https://haveibeenpwned.com" target="_blank">HaveIBeenPwned</a> (Troy Hunt) · Proxied via Intel Desk API · <span id="loadTime"></span>
+  <!-- DASHBOARD -->
+  <div id="dashboard" style="display:none;">
+
+    <div class="stats-bar">
+      <div class="stat-cell"><div class="stat-num" id="statTotal">—</div><div class="stat-lbl">Total Breaches</div></div>
+      <div class="stat-cell"><div class="stat-num red" id="statAccounts">—</div><div class="stat-lbl">Accounts Exposed</div></div>
+      <div class="stat-cell"><div class="stat-num orange" id="statRecent">—</div><div class="stat-lbl">Added Since 2024</div></div>
+      <div class="stat-cell"><div class="stat-num" id="statLatest">—</div><div class="stat-lbl">Most Recently Added</div></div>
+    </div>
+
+    <div class="timeline">
+      <div class="tl-hdr">Breach frequency by year</div>
+      <div class="tl-bars" id="tlBars"></div>
+      <div class="tl-axis" id="tlAxis"></div>
+    </div>
+
+    <!-- SEARCH + BUTTON -->
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input type="text" class="search-input" id="searchInput"
+          placeholder="Search any company, service, domain, or data type..."
+          onkeydown="if(event.key==='Enter')runSearch()">
+      </div>
+      <button class="btn-go" onclick="runSearch()">Search →</button>
+    </div>
+
+    <!-- FILTERS -->
+    <div class="filter-row">
+      <button class="filter-btn active" data-f="all"       onclick="setFilter('all',this)">All Breaches</button>
+      <button class="filter-btn"        data-f="passwords" onclick="setFilter('passwords',this)">Passwords Stolen</button>
+      <button class="filter-btn"        data-f="financial" onclick="setFilter('financial',this)">Financial Data</button>
+      <button class="filter-btn"        data-f="recent"    onclick="setFilter('recent',this)">Added 2024+</button>
+      <button class="filter-btn"        data-f="sensitive" onclick="setFilter('sensitive',this)">Sensitive Only</button>
+      <select class="sort-sel" id="sortSel" onchange="renderBreaches()">
+        <option value="added-desc">Newest Added First</option>
+        <option value="date-desc">Breach Date ↓</option>
+        <option value="count-desc">Largest Breach First</option>
+        <option value="count-asc">Smallest First</option>
+        <option value="alpha">A – Z</option>
+      </select>
+    </div>
+
+    <div class="result-count" id="resultCount"></div>
+    <div id="breachContent"></div>
+
+    <div class="source-note">
+      Data via <a href="https://haveibeenpwned.com" target="_blank">HaveIBeenPwned</a>
+      (Troy Hunt) · Proxied via Intel Desk API · <span id="loadTime"></span>
+    </div>
   </div>
 
   <div class="footer">
@@ -161,168 +227,183 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
 </div>
 
 <script>
-const HIBP_URL = 'https://intel-desk-api.onrender.com/hibp/breaches';
+const API = 'https://intel-desk-api.onrender.com';
 let allBreaches = [];
 let currentFilter = 'all';
+let currentQuery  = '';
 
 async function loadBreaches() {
+  document.getElementById('loadScreen').innerHTML =
+    '<div class="spinner-wrap"><div class="spinner"></div><div class="spin-lbl">Loading breach database...</div></div>';
   try {
-    const r = await fetch(HIBP_URL);
+    const r = await fetch(API + '/hibp/breaches');
     if (!r.ok) throw new Error('HTTP ' + r.status);
     allBreaches = await r.json();
     document.getElementById('loadTime').textContent = 'Loaded ' + new Date().toLocaleTimeString();
+    document.getElementById('loadScreen').style.display  = 'none';
+    document.getElementById('dashboard').style.display   = 'block';
     buildStats();
     buildTimeline();
     renderBreaches();
+    // Focus search
+    setTimeout(() => document.getElementById('searchInput').focus(), 100);
   } catch(e) {
-    document.getElementById('breachContent').innerHTML =
-      '<div class="empty-state"><div class="empty-icon">⚠</div>' +
-      '<div class="empty-text">Could not load breach data.<br>' + e.message + '<br><br>' +
-      '<a href="https://haveibeenpwned.com/PwnedWebsites" target="_blank" style="color:#c8a96e;">View on HaveIBeenPwned →</a></div></div>';
+    document.getElementById('loadScreen').innerHTML =
+      `<div class="load-screen"><div class="load-icon">⚠</div>
+      <div class="load-title">Could not load</div>
+      <div class="load-sub">${esc(e.message)}</div>
+      <button class="btn-load" onclick="loadBreaches()">Retry →</button></div>`;
   }
 }
 
 function buildStats() {
-  const total = allBreaches.length;
-  const accounts = allBreaches.reduce((n,b) => n + (b.PwnCount||0), 0);
-  const thisYear = allBreaches.filter(b => b.AddedDate && b.AddedDate.startsWith('2025')).length;
-  const latest = allBreaches
-    .filter(b => b.AddedDate)
-    .sort((a,b) => b.AddedDate.localeCompare(a.AddedDate))[0];
-
-  document.getElementById('statTotal').textContent = total.toLocaleString();
-  document.getElementById('statAccounts').textContent = fmtBig(accounts);
-  document.getElementById('statYear').textContent = thisYear;
+  const total    = allBreaches.length;
+  const accounts = allBreaches.reduce((n,b) => n+(b.PwnCount||0), 0);
+  const recent   = allBreaches.filter(b => b.AddedDate && b.AddedDate >= '2024').length;
+  const latest   = allBreaches.filter(b=>b.AddedDate)
+                    .sort((a,b)=>b.AddedDate.localeCompare(a.AddedDate))[0];
+  anim('statTotal',    total);
+  anim('statAccounts', accounts, true);
+  anim('statRecent',   recent);
   document.getElementById('statLatest').textContent = latest ? latest.Title : '—';
 }
 
-function buildTimeline() {
-  const yearCounts = {};
-  allBreaches.forEach(b => {
-    if (!b.BreachDate) return;
-    const yr = b.BreachDate.slice(0,4);
-    yearCounts[yr] = (yearCounts[yr]||0) + 1;
-  });
-  const years = Object.keys(yearCounts).sort();
-  if (!years.length) return;
+function anim(id, target, abbrev) {
+  const el = document.getElementById(id);
+  const start = Date.now(), dur = 1100;
+  function fmt(n) {
+    if (!abbrev) return n.toLocaleString();
+    if (n>=1e9) return (n/1e9).toFixed(1)+'B';
+    if (n>=1e6) return (n/1e6).toFixed(1)+'M';
+    if (n>=1e3) return Math.round(n/1e3)+'K';
+    return n;
+  }
+  (function step(){
+    const p = Math.min(1,(Date.now()-start)/dur);
+    el.textContent = fmt(Math.round(target*(1-Math.pow(1-p,3))));
+    if(p<1) requestAnimationFrame(step);
+  })();
+}
 
-  const maxVal = Math.max(...Object.values(yearCounts));
-  const barsEl = document.getElementById('timelineBars');
-  const axisEl = document.getElementById('timelineAxis');
-  // Only show every 3rd year label to avoid crowding
-  barsEl.innerHTML = years.map((yr,i) => {
-    const h = Math.max(4, Math.round((yearCounts[yr]/maxVal)*48));
-    return `<div class="tbar" style="height:${h}px;" title="${yr}: ${yearCounts[yr]} breaches"></div>`;
+function buildTimeline() {
+  const yr={};
+  allBreaches.forEach(b=>{if(b.BreachDate){const y=b.BreachDate.slice(0,4);yr[y]=(yr[y]||0)+1;}});
+  const years=Object.keys(yr).sort();
+  const max=Math.max(...Object.values(yr));
+  document.getElementById('tlBars').innerHTML=years.map(y=>{
+    const h=Math.max(3,Math.round((yr[y]/max)*40));
+    return `<div class="tbar" style="height:${h}px" title="${y}: ${yr[y]} breaches"></div>`;
   }).join('');
-  axisEl.innerHTML = years.map((yr,i) => {
-    return `<div class="tax">${i % 4 === 0 ? yr.slice(2) : ''}</div>`;
-  }).join('');
-  document.getElementById('timelineWrap').style.display = 'block';
+  document.getElementById('tlAxis').innerHTML=years.map((y,i)=>
+    `<div class="tax">${i%4===0?"'"+y.slice(2):''}</div>`).join('');
+}
+
+function runSearch() {
+  currentQuery = (document.getElementById('searchInput').value||'').trim();
+  renderBreaches();
 }
 
 function setFilter(f, btn) {
   currentFilter = f;
-  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-btn').forEach(b=>b.classList.remove('active'));
   btn.classList.add('active');
   renderBreaches();
 }
 
 function renderBreaches() {
-  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
-  const sort = document.getElementById('sortSelect').value;
+  const q = currentQuery.toLowerCase();
+  const sort = document.getElementById('sortSel').value;
 
-  let filtered = allBreaches.filter(b => {
-    // Search filter
+  let list = allBreaches.filter(b => {
     if (q) {
-      const searchable = [b.Title, b.Domain, b.Name, (b.DataClasses||[]).join(' ')].join(' ').toLowerCase();
-      if (!searchable.includes(q)) return false;
+      const hay = [b.Title,b.Domain,b.Name,(b.DataClasses||[]).join(' ')].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
     }
-    // Category filter
-    if (currentFilter === 'passwords') {
-      return (b.DataClasses||[]).some(d => d.toLowerCase().includes('password'));
-    }
-    if (currentFilter === 'sensitive') return b.IsSensitive || b.IsRetired === false;
-    if (currentFilter === '2025+') {
-      return b.AddedDate && b.AddedDate >= '2025';
-    }
+    if (currentFilter==='passwords') return (b.DataClasses||[]).some(d=>d.toLowerCase().includes('password'));
+    if (currentFilter==='financial')  return (b.DataClasses||[]).some(d=>{
+      const l=d.toLowerCase();
+      return l.includes('credit')||l.includes('bank')||l.includes('financial')||l.includes('payment');
+    });
+    if (currentFilter==='recent')    return b.AddedDate && b.AddedDate >= '2024';
+    if (currentFilter==='sensitive') return b.IsSensitive;
     return true;
   });
 
-  // Sort
-  filtered.sort((a,b) => {
-    if (sort === 'date-desc') return (b.AddedDate||'').localeCompare(a.AddedDate||'');
-    if (sort === 'date-asc')  return (a.AddedDate||'').localeCompare(b.AddedDate||'');
-    if (sort === 'count-desc') return (b.PwnCount||0) - (a.PwnCount||0);
-    if (sort === 'count-asc')  return (a.PwnCount||0) - (b.PwnCount||0);
-    if (sort === 'alpha') return (a.Title||'').localeCompare(b.Title||'');
+  list.sort((a,b)=>{
+    if(sort==='added-desc') return (b.AddedDate||'').localeCompare(a.AddedDate||'');
+    if(sort==='date-desc')  return (b.BreachDate||'').localeCompare(a.BreachDate||'');
+    if(sort==='count-desc') return (b.PwnCount||0)<(a.PwnCount||0)?1:-1;
+    if(sort==='count-asc')  return (b.PwnCount||0)>(a.PwnCount||0)?1:-1;
+    if(sort==='alpha')      return (a.Title||'').localeCompare(b.Title||'');
     return 0;
   });
 
-  if (!filtered.length) {
-    document.getElementById('breachContent').innerHTML =
-      '<div class="empty-state"><div class="empty-icon">🔍</div>' +
-      '<div class="empty-text">No breaches match your search.</div></div>';
-    return;
-  }
+  document.getElementById('resultCount').textContent =
+    list.length.toLocaleString() + ' of ' + allBreaches.length.toLocaleString() + ' breaches';
 
-  document.getElementById('breachContent').innerHTML =
-    '<div class="breach-grid">' + filtered.map(renderCard).join('') + '</div>';
+  document.getElementById('breachContent').innerHTML = list.length
+    ? '<div class="breach-grid">' + list.map(card).join('') + '</div>'
+    : '<div class="empty">No breaches match your search.<br>Try a company name, domain, or data type.</div>';
 }
 
-function renderCard(b) {
-  const classes = (b.DataClasses || []);
-  const hasPass = classes.some(d => d.toLowerCase().includes('password'));
-  const hasEmail = classes.some(d => d.toLowerCase().includes('email'));
-  const date = b.BreachDate ? b.BreachDate.slice(0,7) : (b.AddedDate ? b.AddedDate.slice(0,10) : '');
-  const addedDate = b.AddedDate ? b.AddedDate.slice(0,10) : '';
-  const initials = (b.Title||'?').replace(/[^A-Z0-9]/gi,'').slice(0,2).toUpperCase();
-  const logoUrl = b.LogoPath ? `https://haveibeenpwned.com${b.LogoPath}` : null;
+function tagCls(cls) {
+  const l = cls.toLowerCase();
+  if (l.includes('password')||l.includes('pin')) return 't-pass';
+  if (l.includes('email'))   return 't-email';
+  if (l.includes('phone')||l.includes('mobile')) return 't-phone';
+  if (l.includes('address')||l.includes('location')||l.includes('geographic')) return 't-loc';
+  if (l.includes('credit')||l.includes('bank')||l.includes('financial')||l.includes('payment')) return 't-fin';
+  return 't-other';
+}
 
-  const topTags = classes.slice(0,6).map(cls => {
-    const low = cls.toLowerCase();
-    const tagClass = low.includes('password') ? 'pass' : low.includes('email') ? 'email' : 'default';
-    return `<span class="bc-tag ${tagClass}">${cls}</span>`;
-  }).join('');
+function card(b) {
+  const dc      = b.DataClasses || [];
+  const added   = b.AddedDate  ? b.AddedDate.slice(0,10)  : '';
+  const breach  = b.BreachDate ? b.BreachDate.slice(0,7)  : '';
+  const ini     = (b.Title||'?').replace(/[^A-Z0-9]/gi,'').slice(0,2).toUpperCase();
+  const logo    = b.LogoPath   ? 'https://haveibeenpwned.com'+b.LogoPath : null;
+  const desc    = (b.Description||'').replace(/<[^>]+>/g,'')
+                    .replace(/&amp;/g,'&').replace(/&lt;/g,'<').replace(/&gt;/g,'>').trim();
+  const descShort = desc.length>130 ? desc.slice(0,128)+'…' : desc;
+  const tags    = dc.map(cl=>`<span class="b-tag ${tagCls(cl)}">${esc(cl)}</span>`).join('');
+  const logoHtml = logo
+    ? `<img src="${logo}" alt="${esc(b.Title)}" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><span class="b-ini" style="display:none">${ini}</span>`
+    : `<span class="b-ini">${ini}</span>`;
 
-  return `<div class="breach-card${b.IsSensitive ? ' sensitive' : ''}">
-    <div class="bc-date">${addedDate ? 'Added ' + addedDate : date}</div>
-    <div class="bc-header">
-      <div class="bc-logo">
-        ${logoUrl
-          ? `<img src="${logoUrl}" alt="${b.Title}" onerror="this.parentNode.textContent='${initials}'">`
-          : initials}
+  return `<div class="b-card${b.IsSensitive?' sensitive':''}">
+    <div class="b-head">
+      <div class="b-logo">${logoHtml}</div>
+      <div class="b-info">
+        <div class="b-title">${esc(b.Title)}</div>
+        <div class="b-domain">${esc(b.Domain||'—')}</div>
       </div>
-      <div class="bc-title-wrap">
-        <div class="bc-title">${esc(b.Title)}</div>
-        <div class="bc-domain">${esc(b.Domain||'—')}</div>
-      </div>
+      <div class="b-date">${added?'Added<br>'+added:breach}</div>
     </div>
-    <div class="bc-count">${fmtBig(b.PwnCount||0)}</div>
-    <div class="bc-count-lbl">accounts exposed</div>
-    <div class="bc-tags">${topTags}</div>
-    ${b.IsSensitive ? '<div class="bc-sensitive">⚠ Sensitive</div>' : ''}
+    <div class="b-count">
+      <div class="b-num">${fmt(b.PwnCount||0)}</div>
+      <div class="b-num-lbl">accounts exposed</div>
+    </div>
+    ${tags ? `<div class="b-stolen"><div class="b-stolen-hdr">Data stolen</div><div class="b-tags">${tags}</div></div>` : ''}
+    ${descShort ? `<div class="b-desc">${esc(descShort)}</div>` : ''}
   </div>`;
 }
 
-function fmtBig(n) {
-  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
-  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
-  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+function fmt(n) {
+  if(n>=1e9) return (n/1e9).toFixed(1)+'B';
+  if(n>=1e6) return (n/1e6).toFixed(1)+'M';
+  if(n>=1e3) return (n/1e3).toFixed(0)+'K';
   return n.toLocaleString();
 }
-
 function esc(s) {
   return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-// Search with debounce
-let searchTimer;
-document.getElementById('searchInput').addEventListener('input', function() {
-  clearTimeout(searchTimer);
-  searchTimer = setTimeout(renderBreaches, 200);
+// Search also fires on Enter
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('searchInput')?.addEventListener('keydown', e => {
+    if(e.key==='Enter') runSearch();
+  });
 });
-
-loadBreaches();
 </script>
 </body>
 </html>
