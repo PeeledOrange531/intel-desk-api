@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Data Breach Monitor | The Intel Desk</title>
+<meta name="description" content="Live data breach intelligence. Track the latest data breaches from HaveIBeenPwned. Search by company, filter by data type, view total accounts exposed.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+.wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,32px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* STATS BAR */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:2px;}
+.stat-cell{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;}
+.stat-num{font-family:var(--serif);font-size:clamp(22px,3vw,32px);font-weight:300;color:#e8d5a3!important;line-height:1;}
+.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.28)!important;margin-top:5px;}
+.stat-num.red{color:#c0392b!important;}
+.stat-num.orange{color:#e87b4a!important;}
+
+/* CONTROLS */
+.controls{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
+.search-wrap{flex:1;min-width:200px;position:relative;}
+.search-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:12px 16px 12px 38px;outline:none;transition:border-color .2s;}
+.search-input:focus{border-color:rgba(200,169,110,.35);}
+.search-input::placeholder{color:rgba(240,236,228,.20)!important;}
+.search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.35;pointer-events:none;}
+.filter-btn{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(240,236,228,.40)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.10em;padding:12px 16px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.filter-btn.active{background:var(--adim);color:#c8a96e!important;border-color:rgba(200,169,110,.25);}
+.filter-btn:hover{color:rgba(240,236,228,.70)!important;}
+.sort-select{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(240,236,228,.50)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.08em;padding:12px 14px;outline:none;cursor:pointer;}
+.sort-select option{background:#111;}
+
+/* BREACH GRID */
+.breach-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:2px;}
+.breach-card{background:var(--bg2);border:1px solid var(--border);padding:18px 20px;transition:border-color .15s;position:relative;}
+.breach-card:hover{border-color:rgba(200,169,110,.20);}
+.breach-card.sensitive{border-left:2px solid #c0392b;}
+.bc-header{display:flex;align-items:flex-start;gap:12px;margin-bottom:10px;}
+.bc-logo{width:36px;height:36px;border-radius:0;object-fit:contain;background:rgba(255,255,255,.04);border:1px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;font-weight:500;color:#c8a96e!important;}
+.bc-logo img{width:100%;height:100%;object-fit:contain;}
+.bc-title-wrap{flex:1;min-width:0;}
+.bc-title{font-family:var(--sans);font-size:14px;font-weight:600;color:#e8d5a3!important;line-height:1.2;margin-bottom:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bc-domain{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.30)!important;}
+.bc-date{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.28)!important;position:absolute;top:14px;right:16px;}
+.bc-count{font-family:var(--serif);font-size:22px;font-weight:300;color:#c0392b!important;margin-bottom:4px;}
+.bc-count-lbl{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.28)!important;text-transform:uppercase;letter-spacing:.12em;margin-bottom:10px;}
+.bc-tags{display:flex;flex-wrap:wrap;gap:4px;}
+.bc-tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;padding:2px 7px;border:1px solid;white-space:nowrap;}
+.bc-tag.pass{border-color:rgba(192,57,43,.35);color:#c0392b!important;}
+.bc-tag.email{border-color:rgba(126,184,228,.25);color:#7eb8e4!important;}
+.bc-tag.default{border-color:rgba(255,255,255,.10);color:rgba(240,236,228,.35)!important;}
+.bc-sensitive{position:absolute;bottom:12px;right:14px;font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:#c0392b!important;opacity:.60;}
+
+/* LOADING / EMPTY */
+.loading-state,.empty-state{background:var(--bg2);border:1px solid var(--border);padding:48px 24px;text-align:center;}
+.ls-spinner{width:32px;height:32px;border:2px solid rgba(200,169,110,.15);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.ls-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.28)!important;text-transform:uppercase;letter-spacing:.12em;}
+.empty-icon{font-size:28px;opacity:.2;margin-bottom:10px;}
+.empty-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.25)!important;line-height:1.9;}
+
+/* TIMELINE BAR */
+.timeline{background:var(--bg2);border:1px solid var(--border);padding:16px 20px;margin-bottom:2px;}
+.timeline-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.28)!important;margin-bottom:10px;}
+.timeline-bars{display:flex;align-items:flex-end;gap:3px;height:48px;}
+.tbar{flex:1;background:rgba(200,169,110,.15);border-radius:1px 1px 0 0;transition:background .15s;cursor:default;min-width:6px;}
+.tbar:hover{background:rgba(200,169,110,.40);}
+.tbar-lbl{font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.20)!important;margin-top:4px;text-align:center;}
+.timeline-axis{display:flex;gap:3px;margin-top:4px;}
+.tax{flex:1;font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.18)!important;text-align:center;}
+
+.source-note{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.22)!important;padding:12px 0;text-align:right;}
+.source-note a{color:rgba(200,169,110,.50)!important;text-decoration:none;}
+.source-note a:hover{color:#c8a96e!important;}
+
+.footer{margin-top:clamp(36px,5vw,64px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.28)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;}
+
+@media(max-width:768px){
+  .stats-bar{grid-template-columns:1fr 1fr;}
+  .breach-grid{grid-template-columns:1fr;}
+  .controls{flex-direction:column;}
+  .filter-btn,.sort-select{border-left:1px solid var(--border);border-top:none;}
+  .footer-r{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>Live Intelligence</span></div>
+    <h1>Data Breach <em>Monitor</em></h1>
+  </div>
+
+  <div class="stats-bar" id="statsBar">
+    <div class="stat-cell"><div class="stat-num" id="statTotal">—</div><div class="stat-lbl">Total Breaches</div></div>
+    <div class="stat-cell"><div class="stat-num red" id="statAccounts">—</div><div class="stat-lbl">Accounts Exposed</div></div>
+    <div class="stat-cell"><div class="stat-num orange" id="statYear">—</div><div class="stat-lbl">Breaches This Year</div></div>
+    <div class="stat-cell"><div class="stat-num" id="statLatest">—</div><div class="stat-lbl">Most Recent</div></div>
+  </div>
+
+  <div class="timeline" id="timelineWrap" style="display:none;">
+    <div class="timeline-hdr">Breach frequency by year</div>
+    <div class="timeline-bars" id="timelineBars"></div>
+    <div class="timeline-axis" id="timelineAxis"></div>
+  </div>
+
+  <div class="controls">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input type="text" class="search-input" id="searchInput" placeholder="Search breaches — company name, domain, data type...">
+    </div>
+    <button class="filter-btn active" data-filter="all" onclick="setFilter('all',this)">All</button>
+    <button class="filter-btn" data-filter="passwords" onclick="setFilter('passwords',this)">Passwords</button>
+    <button class="filter-btn" data-filter="sensitive" onclick="setFilter('sensitive',this)">Sensitive</button>
+    <button class="filter-btn" data-filter="2025+" onclick="setFilter('2025+',this)">2025+</button>
+    <select class="sort-select" id="sortSelect" onchange="renderBreaches()">
+      <option value="date-desc">Newest First</option>
+      <option value="date-asc">Oldest First</option>
+      <option value="count-desc">Largest First</option>
+      <option value="count-asc">Smallest First</option>
+      <option value="alpha">A – Z</option>
+    </select>
+  </div>
+
+  <div id="breachContent">
+    <div class="loading-state">
+      <div class="ls-spinner"></div>
+      <div class="ls-text">Loading breach intelligence...</div>
+    </div>
+  </div>
+
+  <div class="source-note">
+    Data via <a href="https://haveibeenpwned.com" target="_blank">HaveIBeenPwned</a> (Troy Hunt) · Updated continuously · <span id="loadTime"></span>
+  </div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">Breach data sourced from HaveIBeenPwned. For educational and investigative use only.</div>
+  </div>
+</div>
+
+<script>
+const HIBP_URL = 'https://haveibeenpwned.com/api/v3/breaches';
+let allBreaches = [];
+let currentFilter = 'all';
+
+async function loadBreaches() {
+  try {
+    const r = await fetch(HIBP_URL, {
+      headers: { 'User-Agent': 'IntelDesk/1.0 (https://inteldesk.io)' }
+    });
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    allBreaches = await r.json();
+    document.getElementById('loadTime').textContent = 'Loaded ' + new Date().toLocaleTimeString();
+    buildStats();
+    buildTimeline();
+    renderBreaches();
+  } catch(e) {
+    document.getElementById('breachContent').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">⚠</div>' +
+      '<div class="empty-text">Could not load breach data.<br>' + e.message + '<br><br>' +
+      '<a href="https://haveibeenpwned.com/PwnedWebsites" target="_blank" style="color:#c8a96e;">View on HaveIBeenPwned →</a></div></div>';
+  }
+}
+
+function buildStats() {
+  const total = allBreaches.length;
+  const accounts = allBreaches.reduce((n,b) => n + (b.PwnCount||0), 0);
+  const thisYear = allBreaches.filter(b => b.AddedDate && b.AddedDate.startsWith('2025')).length;
+  const latest = allBreaches
+    .filter(b => b.AddedDate)
+    .sort((a,b) => b.AddedDate.localeCompare(a.AddedDate))[0];
+
+  document.getElementById('statTotal').textContent = total.toLocaleString();
+  document.getElementById('statAccounts').textContent = fmtBig(accounts);
+  document.getElementById('statYear').textContent = thisYear;
+  document.getElementById('statLatest').textContent = latest ? latest.Title : '—';
+}
+
+function buildTimeline() {
+  const yearCounts = {};
+  allBreaches.forEach(b => {
+    if (!b.BreachDate) return;
+    const yr = b.BreachDate.slice(0,4);
+    yearCounts[yr] = (yearCounts[yr]||0) + 1;
+  });
+  const years = Object.keys(yearCounts).sort();
+  if (!years.length) return;
+
+  const maxVal = Math.max(...Object.values(yearCounts));
+  const barsEl = document.getElementById('timelineBars');
+  const axisEl = document.getElementById('timelineAxis');
+  // Only show every 3rd year label to avoid crowding
+  barsEl.innerHTML = years.map((yr,i) => {
+    const h = Math.max(4, Math.round((yearCounts[yr]/maxVal)*48));
+    return `<div class="tbar" style="height:${h}px;" title="${yr}: ${yearCounts[yr]} breaches"></div>`;
+  }).join('');
+  axisEl.innerHTML = years.map((yr,i) => {
+    return `<div class="tax">${i % 4 === 0 ? yr.slice(2) : ''}</div>`;
+  }).join('');
+  document.getElementById('timelineWrap').style.display = 'block';
+}
+
+function setFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderBreaches();
+}
+
+function renderBreaches() {
+  const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+  const sort = document.getElementById('sortSelect').value;
+
+  let filtered = allBreaches.filter(b => {
+    // Search filter
+    if (q) {
+      const searchable = [b.Title, b.Domain, b.Name, (b.DataClasses||[]).join(' ')].join(' ').toLowerCase();
+      if (!searchable.includes(q)) return false;
+    }
+    // Category filter
+    if (currentFilter === 'passwords') {
+      return (b.DataClasses||[]).some(d => d.toLowerCase().includes('password'));
+    }
+    if (currentFilter === 'sensitive') return b.IsSensitive || b.IsRetired === false;
+    if (currentFilter === '2025+') {
+      return b.AddedDate && b.AddedDate >= '2025';
+    }
+    return true;
+  });
+
+  // Sort
+  filtered.sort((a,b) => {
+    if (sort === 'date-desc') return (b.AddedDate||'').localeCompare(a.AddedDate||'');
+    if (sort === 'date-asc')  return (a.AddedDate||'').localeCompare(b.AddedDate||'');
+    if (sort === 'count-desc') return (b.PwnCount||0) - (a.PwnCount||0);
+    if (sort === 'count-asc')  return (a.PwnCount||0) - (b.PwnCount||0);
+    if (sort === 'alpha') return (a.Title||'').localeCompare(b.Title||'');
+    return 0;
+  });
+
+  if (!filtered.length) {
+    document.getElementById('breachContent').innerHTML =
+      '<div class="empty-state"><div class="empty-icon">🔍</div>' +
+      '<div class="empty-text">No breaches match your search.</div></div>';
+    return;
+  }
+
+  document.getElementById('breachContent').innerHTML =
+    '<div class="breach-grid">' + filtered.map(renderCard).join('') + '</div>';
+}
+
+function renderCard(b) {
+  const classes = (b.DataClasses || []);
+  const hasPass = classes.some(d => d.toLowerCase().includes('password'));
+  const hasEmail = classes.some(d => d.toLowerCase().includes('email'));
+  const date = b.BreachDate ? b.BreachDate.slice(0,7) : (b.AddedDate ? b.AddedDate.slice(0,10) : '');
+  const addedDate = b.AddedDate ? b.AddedDate.slice(0,10) : '';
+  const initials = (b.Title||'?').replace(/[^A-Z0-9]/gi,'').slice(0,2).toUpperCase();
+  const logoUrl = b.LogoPath ? `https://haveibeenpwned.com${b.LogoPath}` : null;
+
+  const topTags = classes.slice(0,6).map(cls => {
+    const low = cls.toLowerCase();
+    const tagClass = low.includes('password') ? 'pass' : low.includes('email') ? 'email' : 'default';
+    return `<span class="bc-tag ${tagClass}">${cls}</span>`;
+  }).join('');
+
+  return `<div class="breach-card${b.IsSensitive ? ' sensitive' : ''}">
+    <div class="bc-date">${addedDate ? 'Added ' + addedDate : date}</div>
+    <div class="bc-header">
+      <div class="bc-logo">
+        ${logoUrl
+          ? `<img src="${logoUrl}" alt="${b.Title}" onerror="this.parentNode.textContent='${initials}'">`
+          : initials}
+      </div>
+      <div class="bc-title-wrap">
+        <div class="bc-title">${esc(b.Title)}</div>
+        <div class="bc-domain">${esc(b.Domain||'—')}</div>
+      </div>
+    </div>
+    <div class="bc-count">${fmtBig(b.PwnCount||0)}</div>
+    <div class="bc-count-lbl">accounts exposed</div>
+    <div class="bc-tags">${topTags}</div>
+    ${b.IsSensitive ? '<div class="bc-sensitive">⚠ Sensitive</div>' : ''}
+  </div>`;
+}
+
+function fmtBig(n) {
+  if (n >= 1e9) return (n/1e9).toFixed(1) + 'B';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+  return n.toLocaleString();
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Search with debounce
+let searchTimer;
+document.getElementById('searchInput').addEventListener('input', function() {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(renderBreaches, 200);
+});
+
+loadBreaches();
+</script>
+</body>
+</html>
