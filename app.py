@@ -1103,6 +1103,29 @@ def cf_radar_proxy(endpoint):
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 
+
+# ── HIBP PROXY — HaveIBeenPwned breach list ────────────────────────────────────
+@app.route("/hibp/breaches", methods=["GET","OPTIONS"])
+@corsify
+def hibp_breaches():
+    """Proxy HIBP /breaches endpoint to avoid CORS + user-agent restrictions."""
+    try:
+        r = requests.get(
+            "https://haveibeenpwned.com/api/v3/breaches",
+            headers={
+                "User-Agent": "IntelDesk/1.0 (https://inteldesk.io; investigative tools)",
+                "Accept": "application/json",
+            },
+            timeout=20,
+        )
+        log.info(f"HIBP breaches: {r.status_code}, {len(r.content)} bytes")
+        if r.status_code == 200:
+            return Response(r.content, status=200, mimetype="application/json",
+                headers={"X-Total-Breaches": str(len(r.json()))})
+        return Response(r.content, status=r.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
