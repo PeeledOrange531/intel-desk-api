@@ -1072,6 +1072,37 @@ def debug_hive():
     })
 
 
+
+# ── CLOUDFLARE RADAR PROXY ─────────────────────────────────────────────────────
+# Proxies requests to Cloudflare Radar API so the token stays server-side
+
+CF_RADAR_BASE = "https://api.cloudflare.com/client/v4/radar"
+
+@app.route("/cf-radar/<path:endpoint>", methods=["GET","OPTIONS"])
+@corsify
+def cf_radar_proxy(endpoint):
+    if not CF_RADAR_TOKEN:
+        return jsonify({"error": "CLOUDFLARE_RADAR_TOKEN not configured"}), 503
+
+    # Forward query params
+    params = {k: v for k, v in request.args.items()}
+    url = f"{CF_RADAR_BASE}/{endpoint}"
+
+    try:
+        r = requests.get(
+            url,
+            headers={
+                "Authorization": f"Bearer {CF_RADAR_TOKEN}",
+                "Content-Type":  "application/json",
+            },
+            params=params,
+            timeout=20,
+        )
+        log.info(f"CF Radar {endpoint}: {r.status_code}")
+        return Response(r.content, status=r.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
@@ -1204,6 +1235,7 @@ import hashlib as _hashlib
 HIVE_KEY_ID  = os.environ.get("HIVE_KEY_ID", "")
 HIVE_SECRET  = os.environ.get("HIVE_SECRET", "")
 HF_TOKEN     = os.environ.get("HF_TOKEN", "")
+CF_RADAR_TOKEN = os.environ.get("CLOUDFLARE_RADAR_TOKEN", "")
 
 @app.route("/deepfake/analyze", methods=["POST","OPTIONS"])
 @corsify
