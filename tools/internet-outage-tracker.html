@@ -252,22 +252,26 @@ function showSetupNotice() {
 }
 
 async function loadAll() {
-  // Load outages
-  const outageData = await cfFetch('/annotations/outages', { limit: 50 });
+  // Load outages — last 30 days
+  const outageData = await cfFetch('/annotations/outages', { limit: 50, dateRange: '30d', format: 'json' });
   if (outageData && outageData.result) {
     dataCache.outages = outageData.result.annotations || [];
+    console.log('Outages loaded:', dataCache.outages.length, outageData.result.annotations?.[0]);
   }
 
-  // Load traffic anomalies
-  const anomData = await cfFetch('/traffic_anomalies', { limit: 50, status: 'VERIFIED' });
+  // Load traffic anomalies — last 7 days
+  const anomData = await cfFetch('/annotations/outages', { limit: 50, dateRange: '7d', format: 'json' });
   if (anomData && anomData.result) {
-    dataCache.anomalies = anomData.result.trafficAnomalies || [];
+    // Separate anomalies from confirmed outages
+    const all = anomData.result.annotations || [];
+    dataCache.anomalies = all.filter(a => !a.outage || a.outage.outageType === 'ANOMALY');
+    console.log('Anomalies:', dataCache.anomalies.length);
   }
 
-  // Load BGP route leaks
-  const bgpData = await cfFetch('/bgp/route_leaks', { limit: 20 });
+  // BGP — use annotations with longer range
+  const bgpData = await cfFetch('/annotations/outages', { limit: 20, dateRange: '90d', format: 'json' });
   if (bgpData && bgpData.result) {
-    dataCache.bgp = bgpData.result.routeLeaks || [];
+    dataCache.bgp = (bgpData.result.annotations || []).slice(0, 20);
   }
 
   updateStats();
@@ -275,19 +279,31 @@ async function loadAll() {
   renderFeed();
 }
 
+function getLocationCode(item) {
+  // CF API: locations is array of country codes
+  if (item.locations && item.locations.length) return item.locations[0];
+  if (item.locationsDetails && item.locationsDetails.length) return item.locationsDetails[0].code;
+  return null;
+}
+function getLocationName(item) {
+  if (item.locationsDetails && item.locationsDetails.length) return item.locationsDetails[0].name;
+  if (item.locations && item.locations.length) return item.locations[0];
+  return 'Unknown';
+}
+
 function updateStats() {
   const activeOut = dataCache.outages.filter(o => !o.endDate).length;
-  const countries = new Set([
-    ...dataCache.outages.map(o => o.locationCode).filter(Boolean),
-    ...dataCache.anomalies.map(a => a.locationCode).filter(Boolean),
-  ]).size;
+  const countryCodes = new Set([
+    ...dataCache.outages.map(getLocationCode).filter(Boolean),
+    ...dataCache.anomalies.map(getLocationCode).filter(Boolean),
+  ]);
 
   document.getElementById('statOutages').textContent   = activeOut || dataCache.outages.length;
   document.getElementById('statAnomalies').textContent = dataCache.anomalies.length;
-  document.getElementById('statCountries').textContent = countries;
-  document.getElementById('statStatus').textContent = activeOut > 0 ? 'Disrupted' : 'Nominal';
-  document.getElementById('statStatus').className = 'stat-num ' + (activeOut > 0 ? 'orange' : 'green');
-  document.getElementById('mapBadge').textContent = (dataCache.outages.length + dataCache.anomalies.length) + ' events';
+  document.getElementById('statCountries').textContent = countryCodes.size;
+  document.getElementById('statStatus').textContent    = activeOut > 0 ? 'Disrupted' : 'Nominal';
+  document.getElementById('statStatus').className      = 'stat-num ' + (activeOut > 0 ? 'orange' : 'green');
+  document.getElementById('mapBadge').textContent      = dataCache.outages.length + ' events';
 }
 
 function updateMap() {
@@ -296,20 +312,24 @@ function updateMap() {
   map.eachLayer(l => { if (l instanceof L.Marker) map.removeLayer(l); });
 
   dataCache.outages.forEach(o => {
-    const loc = o.locationCode && COUNTRY_COORDS[o.locationCode];
+    const code = getLocationCode(o);
+    const loc  = code && COUNTRY_COORDS[code];
     if (!loc) return;
     const isActive = !o.endDate;
+    const cause = o.outage ? (o.outage.outageCause || o.outage.outageType || 'Outage') : 'Internet disruption';
     makeMarker(loc[0], loc[1], isActive ? '#c0392b' : '#e87b4a',
-      o.locationName || o.locationCode,
-      (o.description || 'Internet outage') + (isActive ? ' — ACTIVE' : ' — Resolved'));
+      getLocationName(o),
+      cause + (isActive ? ' · ACTIVE' : ' · Resolved') +
+      (o.description ? '<br>' + o.description.slice(0,80) : ''));
   });
 
   dataCache.anomalies.forEach(a => {
-    const loc = a.locationCode && COUNTRY_COORDS[a.locationCode];
+    const code = getLocationCode(a);
+    const loc  = code && COUNTRY_COORDS[code];
     if (!loc) return;
     makeMarker(loc[0], loc[1], '#e87b4a',
-      a.locationName || a.locationCode,
-      'Traffic anomaly detected');
+      getLocationName(a),
+      'Traffic anomaly · ' + (a.dataSource || 'Cloudflare Radar'));
   });
 
   // Add monitoring dots for well-connected regions
@@ -350,25 +370,32 @@ function renderFeed() {
 function renderFeedItem(item, type) {
   let title, meta, badge, badgeClass, time;
 
+  const locName = getLocationName(item);
+  const locCode = getLocationCode(item);
+  const asnNames = (item.asnsDetails || []).map(a => a.name).join(', ');
+
   if (type === 'outages') {
-    title = item.locationName || item.locationCode || 'Unknown Location';
-    meta = item.description || item.outageType || 'Internet outage detected';
+    title = locName + (asnNames ? ' — ' + asnNames.slice(0,40) : '');
+    const cause = item.outage ? (item.outage.outageCause || item.outage.outageType) : '';
+    meta = (item.description || cause || 'Internet disruption detected') +
+           (item.scope ? ' · ' + item.scope : '');
     const isActive = !item.endDate;
     badge = isActive ? 'Active' : 'Resolved';
     badgeClass = isActive ? 'badge-red' : 'badge-blue';
     time = item.startDate ? fmtTime(item.startDate) : '';
   } else if (type === 'anomalies') {
-    title = (item.locationName || item.locationCode || '') + (item.asnName ? ' — ' + item.asnName : '');
-    meta = item.type || 'Traffic anomaly';
-    badge = item.status || 'Anomaly';
+    title = locName + (asnNames ? ' — ' + asnNames.slice(0,40) : '');
+    meta = item.description || item.dataSource || 'Traffic anomaly';
+    badge = 'Anomaly';
     badgeClass = 'badge-orange';
     time = item.startDate ? fmtTime(item.startDate) : '';
   } else {
-    title = item.leakAsName ? 'Route Leak: ' + item.leakAsName : 'BGP Route Leak';
-    meta = item.originAsName ? 'Origin: ' + item.originAsName : 'BGP routing anomaly';
-    badge = 'BGP';
+    title = locName || 'Network Event';
+    const originsStr = (item.originsDetails || []).map(o => o.name).join(', ');
+    meta = (item.description || '') + (originsStr ? ' · ' + originsStr.slice(0,60) : '');
+    badge = item.outage ? (item.outage.outageCause || 'BGP') : 'BGP';
     badgeClass = 'badge-blue';
-    time = item.detectedTime ? fmtTime(item.detectedTime) : '';
+    time = item.startDate ? fmtTime(item.startDate) : '';
   }
 
   return `<div class="feed-item">
