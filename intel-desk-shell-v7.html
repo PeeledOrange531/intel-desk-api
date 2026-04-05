@@ -579,6 +579,68 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
   .topbar-nav{display:none;}
   .welcome-stat{flex:1 1 100%;}
 }
+
+/* ── EMAIL CAPTURE STRIP ─────────────────────────────────────────────────── */
+.email-strip{
+  position:fixed;
+  bottom:0;left:0;right:0;
+  z-index:999;
+  background:rgba(5,5,5,0.97);
+  border-top:1px solid rgba(200,169,110,0.20);
+  padding:14px clamp(16px,4vw,48px);
+  display:flex;align-items:center;gap:16px;flex-wrap:wrap;
+  transform:translateY(100%);
+  transition:transform 0.4s cubic-bezier(0.16,1,0.3,1);
+  backdrop-filter:blur(12px);
+}
+.email-strip.visible{transform:translateY(0);}
+.email-strip-text{
+  font-family:var(--mono);font-size:11px;
+  color:rgba(240,236,228,0.50)!important;
+  line-height:1.5;flex-shrink:0;
+}
+.email-strip-text strong{color:#c8a96e!important;font-weight:500;}
+.email-strip-form{display:flex;gap:0;flex:1;max-width:420px;}
+.email-strip-input{
+  flex:1;background:rgba(255,255,255,0.04);
+  border:1px solid rgba(200,169,110,0.25);
+  color:#f5f2ec!important;
+  font-family:var(--mono);font-size:12px;
+  padding:9px 14px;outline:none;
+  transition:border-color 0.2s;
+  min-width:0;
+}
+.email-strip-input:focus{border-color:rgba(200,169,110,0.50);}
+.email-strip-input::placeholder{color:rgba(240,236,228,0.22)!important;}
+.email-strip-btn{
+  background:var(--accent-dim);
+  border:1px solid rgba(200,169,110,0.35);
+  border-left:none;
+  color:#c8a96e!important;
+  font-family:var(--mono);font-size:10px;font-weight:500;
+  text-transform:uppercase;letter-spacing:0.12em;
+  padding:9px 18px;cursor:pointer;
+  transition:all 0.2s;white-space:nowrap;flex-shrink:0;
+}
+.email-strip-btn:hover{background:rgba(200,169,110,0.22);color:#e8d5a3!important;}
+.email-strip-dismiss{
+  font-family:var(--mono);font-size:11px;
+  color:rgba(240,236,228,0.20)!important;
+  background:none;border:none;cursor:pointer;
+  padding:4px 8px;transition:color 0.15s;flex-shrink:0;
+  margin-left:auto;
+}
+.email-strip-dismiss:hover{color:rgba(240,236,228,0.50)!important;}
+.email-strip-success{
+  font-family:var(--mono);font-size:11px;
+  color:#4ec994!important;
+  display:none;
+}
+@media(max-width:600px){
+  .email-strip{flex-direction:column;align-items:flex-start;gap:10px;}
+  .email-strip-form{width:100%;max-width:none;}
+  .email-strip-dismiss{margin-left:0;}
+}
 </style>
 </head>
 <body>
@@ -680,6 +742,25 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
     </div>
   </div>
 
+
+  <!-- EMAIL CAPTURE STRIP -->
+  <div class="email-strip" id="emailStrip">
+    <div class="email-strip-text">
+      <strong>Stay informed.</strong> New tools, data sources &amp; intelligence briefs.
+    </div>
+    <div class="email-strip-form">
+      <input
+        type="email"
+        class="email-strip-input"
+        id="emailStripInput"
+        placeholder="your@email.com"
+        onkeydown="if(event.key==='Enter')submitEmailStrip()"
+      >
+      <button class="email-strip-btn" onclick="submitEmailStrip()">Subscribe →</button>
+    </div>
+    <div class="email-strip-success" id="emailStripSuccess">✓ You're on the list.</div>
+    <button class="email-strip-dismiss" onclick="dismissEmailStrip()" title="Dismiss">✕</button>
+  </div>
 </div>
 <script>
 // ── TOOL REGISTRY ─────────────────────────────────────────────────────────────
@@ -1217,6 +1298,68 @@ document.addEventListener('DOMContentLoaded', function() {
     loadTool(hash);
   }
 });
+
+// ── EMAIL CAPTURE STRIP ───────────────────────────────────────────────────────
+(function() {
+  // Show after 45 seconds if not already dismissed this session
+  if (sessionStorage.getItem('email_strip_dismissed')) return;
+
+  var timer = setTimeout(function() {
+    var strip = document.getElementById('emailStrip');
+    if (strip) strip.classList.add('visible');
+  }, 45000);
+
+  // Also show after user has loaded 3+ tools (engaged user)
+  var origLoadTool = window.loadTool;
+  var toolLoadCount = 0;
+})();
+
+function submitEmailStrip() {
+  var input = document.getElementById('emailStripInput');
+  var email = (input ? input.value : '').trim();
+  if (!email || !email.includes('@')) {
+    input && input.focus();
+    return;
+  }
+
+  // Send to Formspree (free, no backend needed)
+  // Replace FORM_ID with your actual Formspree form ID
+  var FORMSPREE_URL = 'https://formspree.io/f/REPLACE_WITH_FORM_ID';
+
+  fetch(FORMSPREE_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+    body: JSON.stringify({ email: email, source: 'intel-desk-strip' })
+  })
+  .then(function(r) {
+    // Show success regardless (graceful degradation)
+    var form = document.querySelector('.email-strip-form');
+    var success = document.getElementById('emailStripSuccess');
+    if (form) form.style.display = 'none';
+    if (success) success.style.display = 'block';
+    sessionStorage.setItem('email_strip_dismissed', '1');
+    setTimeout(dismissEmailStrip, 3000);
+  })
+  .catch(function() {
+    // Still show success — don't punish user for network errors
+    var form = document.querySelector('.email-strip-form');
+    var success = document.getElementById('emailStripSuccess');
+    if (form) form.style.display = 'none';
+    if (success) success.style.display = 'block';
+    sessionStorage.setItem('email_strip_dismissed', '1');
+    setTimeout(dismissEmailStrip, 3000);
+  });
+}
+
+function dismissEmailStrip() {
+  var strip = document.getElementById('emailStrip');
+  if (strip) {
+    strip.classList.remove('visible');
+    setTimeout(function() { strip.style.display = 'none'; }, 400);
+  }
+  sessionStorage.setItem('email_strip_dismissed', '1');
+}
+
 </script>
 </body>
 </html>function toggleCat(id){}
