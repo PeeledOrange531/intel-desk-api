@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reverse Image Search | The Intel Desk</title>
+<meta name="description" content="Reverse image search with real results. Upload any image and get actual match data from SauceNAO, plus one-click launch to Google Lens, Yandex, TinEye and Bing.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1100px;margin:0 auto;}
+
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,28px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* UPLOAD */
+.upload-zone{position:relative;border:1px dashed rgba(200,169,110,.25);background:var(--bg2);text-align:center;padding:clamp(36px,5vw,64px) 24px;transition:all .2s;cursor:pointer;}
+.upload-zone:hover,.upload-zone.drag{border-color:rgba(200,169,110,.55);background:rgba(200,169,110,.04);}
+.upload-zone.has-file{border-style:solid;border-color:rgba(200,169,110,.35);}
+.upload-input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%;}
+.upload-icon{font-size:32px;margin-bottom:12px;display:block;opacity:.28;}
+.upload-title{font-family:var(--serif);font-size:clamp(18px,2.5vw,26px);font-weight:300;color:#e8d5a3!important;margin-bottom:7px;}
+.upload-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.24)!important;line-height:1.8;}
+.preview-row{display:none;align-items:center;gap:16px;margin-top:16px;justify-content:center;}
+.preview-row.visible{display:flex;}
+.preview-thumb{width:80px;height:80px;object-fit:cover;border:1px solid var(--border);}
+.preview-info{text-align:left;}
+.preview-name{font-family:var(--mono);font-size:12px;color:#e8d5a3!important;margin-bottom:4px;}
+.preview-meta{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.30)!important;}
+
+/* FILE BAR */
+.file-bar{display:none;align-items:center;gap:12px;padding:11px 16px;background:var(--bg3);border:1px solid rgba(200,169,110,.18);border-top:none;flex-wrap:wrap;}
+.file-bar.visible{display:flex;}
+.file-name{font-family:var(--mono);font-size:11px;color:#c8a96e!important;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.btn-analyze{background:var(--adim);border:1px solid rgba(200,169,110,.35);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.13em;padding:10px 26px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.btn-analyze:hover{background:rgba(200,169,110,.26);color:#e8d5a3!important;}
+.btn-analyze:disabled{opacity:.40;cursor:not-allowed;}
+
+/* URL ROW */
+.url-section{margin-top:2px;}
+.url-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;}
+.url-row{display:flex;gap:0;}
+.url-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:13px 16px;outline:none;transition:border-color .2s;}
+.url-input:focus{border-color:rgba(200,169,110,.38);}
+.url-input::placeholder{color:rgba(240,236,228,.18)!important;}
+.btn-url{background:var(--adim);border:1px solid rgba(200,169,110,.28);border-left:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;padding:13px 20px;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.btn-url:hover{background:rgba(200,169,110,.24);color:#e8d5a3!important;}
+
+/* PROGRESS */
+.progress-wrap{display:none;margin-top:2px;}
+.progress-wrap.visible{display:flex;flex-direction:column;gap:2px;}
+.progress-step{background:var(--bg2);border:1px solid var(--border);padding:11px 16px;display:flex;align-items:center;gap:11px;font-family:var(--mono);font-size:11px;}
+.ps-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.dot-wait{background:rgba(255,255,255,.15);}
+.dot-run{background:#c8a96e;animation:pulse .8s ease-in-out infinite;}
+.dot-done{background:#4ec994;}
+.dot-err{background:#e87b4a;}
+@keyframes pulse{0%,100%{opacity:.4;transform:scale(1);}50%{opacity:1;transform:scale(1.3);}}
+.ps-label{flex:1;color:rgba(240,236,228,.45)!important;}
+.ps-label.active{color:#e8d5a3!important;}
+.ps-status{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.25)!important;}
+.ps-status.done{color:#4ec994!important;}
+.ps-status.err{color:#e87b4a!important;}
+
+/* RESULTS */
+.results-section{display:none;margin-top:2px;}
+.results-section.visible{display:block;}
+
+/* SAUCENAO RESULTS */
+.section-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;}
+.section-tag{font-family:var(--mono);font-size:8px;padding:2px 8px;border:1px solid;}
+.tag-live{color:#4ec994!important;border-color:rgba(78,201,148,.28);}
+.tag-launch{color:#7eb8e4!important;border-color:rgba(126,184,228,.25);}
+
+.match-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:2px;margin-bottom:2px;}
+.match-card{background:var(--bg2);border:1px solid var(--border);display:flex;gap:12px;padding:14px 16px;transition:border-color .15s;}
+.match-card:hover{border-color:rgba(200,169,110,.20);}
+.match-thumb{width:70px;height:70px;object-fit:cover;flex-shrink:0;border:1px solid var(--border);background:var(--bg3);}
+.match-thumb-placeholder{width:70px;height:70px;flex-shrink:0;border:1px solid var(--border);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:20px;opacity:.3;}
+.match-body{flex:1;min-width:0;}
+.match-sim{font-family:var(--serif);font-size:22px;font-weight:300;line-height:1;margin-bottom:4px;}
+.match-sim.high{color:#4ec994!important;}
+.match-sim.mid{color:#c8a96e!important;}
+.match-sim.low{color:rgba(240,236,228,.40)!important;}
+.match-source{font-family:var(--mono);font-size:10px;font-weight:500;color:#e8d5a3!important;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.match-title{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.38)!important;line-height:1.5;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.match-link{display:inline-block;font-family:var(--mono);font-size:9px;color:#7eb8e4!important;border:1px solid rgba(126,184,228,.22);padding:2px 9px;text-decoration:none;margin-top:6px;transition:all .15s;}
+.match-link:hover{background:rgba(126,184,228,.08);}
+
+.no-results{background:var(--bg2);border:1px solid var(--border);padding:32px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.28)!important;line-height:1.9;}
+
+/* ENGINE LAUNCHERS */
+.launcher-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px;margin-bottom:2px;}
+.launcher-card{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;display:flex;flex-direction:column;gap:8px;transition:border-color .2s;}
+.launcher-card:hover{border-color:rgba(200,169,110,.20);}
+.lc-top{display:flex;align-items:center;gap:10px;}
+.lc-logo{font-size:20px;flex-shrink:0;}
+.lc-name{font-family:var(--sans);font-size:13px;font-weight:600;color:#e8d5a3!important;}
+.lc-what{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.32)!important;line-height:1.6;}
+.lc-strength{display:flex;flex-wrap:wrap;gap:3px;}
+.strength-tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.06em;padding:2px 6px;border:1px solid rgba(255,255,255,.08);color:rgba(240,236,228,.30)!important;}
+.btn-launch{font-family:var(--mono);font-size:10px;color:#7eb8e4!important;border:1px solid rgba(126,184,228,.22);background:transparent;padding:7px 14px;cursor:pointer;transition:all .15s;text-align:center;text-decoration:none;display:block;margin-top:auto;}
+.btn-launch:hover{background:rgba(126,184,228,.08);border-color:rgba(126,184,228,.40);}
+.btn-launch.disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
+
+/* HOW IT WORKS */
+.how-box{background:rgba(200,169,110,.04);border:1px solid rgba(200,169,110,.12);padding:14px 16px;margin-top:2px;}
+.how-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(200,169,110,.50)!important;margin-bottom:8px;}
+.how-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.38)!important;line-height:1.8;}
+.how-text strong{color:rgba(240,236,228,.60)!important;}
+
+.footer{margin-top:clamp(36px,5vw,60px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.26)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;}
+
+@media(max-width:600px){
+  .match-grid{grid-template-columns:1fr;}
+  .launcher-grid{grid-template-columns:1fr 1fr;}
+  .url-row{flex-direction:column;}
+  .btn-url{border-left:1px solid rgba(200,169,110,.28);border-top:none;}
+  .footer-r{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>Image Forensics</span></div>
+    <h1>Reverse Image <em>Search</em></h1>
+  </div>
+
+  <!-- UPLOAD -->
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="fileInput" class="upload-input" accept="image/*">
+    <span class="upload-icon">⬆</span>
+    <div class="upload-title" id="uploadTitle">Drop an image or click to upload</div>
+    <div class="upload-sub">JPG · PNG · WEBP · GIF · BMP · Max 20MB</div>
+    <div class="preview-row" id="previewRow">
+      <img id="previewThumb" class="preview-thumb" src="" alt="">
+      <div class="preview-info">
+        <div class="preview-name" id="previewName"></div>
+        <div class="preview-meta" id="previewMeta"></div>
+      </div>
+    </div>
+  </div>
+  <div class="file-bar" id="fileBar">
+    <span class="file-name" id="fileBarName"></span>
+    <button class="btn-analyze" id="btnAnalyze" onclick="runSearch()">Search Image →</button>
+  </div>
+
+  <!-- URL INPUT -->
+  <div class="url-section" style="margin-top:2px;">
+    <div class="url-label">Or search by image URL</div>
+    <div class="url-row">
+      <input type="text" class="url-input" id="urlInput"
+        placeholder="https://example.com/image.jpg"
+        onkeydown="if(event.key==='Enter')searchByUrl()">
+      <button class="btn-url" onclick="searchByUrl()">Search URL →</button>
+    </div>
+  </div>
+
+  <!-- PROGRESS -->
+  <div class="progress-wrap" id="progressWrap">
+    <div class="progress-step">
+      <div class="ps-dot dot-wait" id="dot-upload"></div>
+      <div class="ps-label" id="lbl-upload">Uploading image to analysis server</div>
+      <div class="ps-status" id="st-upload">Waiting</div>
+    </div>
+    <div class="progress-step">
+      <div class="ps-dot dot-wait" id="dot-saucenao"></div>
+      <div class="ps-label" id="lbl-saucenao">SauceNAO — searching 30+ databases for exact & similar matches</div>
+      <div class="ps-status" id="st-saucenao">Waiting</div>
+    </div>
+    <div class="progress-step">
+      <div class="ps-dot dot-wait" id="dot-prepare"></div>
+      <div class="ps-label" id="lbl-prepare">Preparing one-click search links for Google, Yandex, TinEye, Bing</div>
+      <div class="ps-status" id="st-prepare">Waiting</div>
+    </div>
+  </div>
+
+  <!-- RESULTS -->
+  <div class="results-section" id="resultsSection">
+
+    <!-- SauceNAO matches -->
+    <div class="section-hdr" style="margin-top:2px;">
+      SauceNAO Match Results
+      <span class="section-tag tag-live">Live results · 30+ databases</span>
+    </div>
+    <div id="saucenaoResults"></div>
+
+    <!-- Engine launchers -->
+    <div class="section-hdr" style="margin-top:2px;">
+      Search Further — Open in Engine
+      <span class="section-tag tag-launch">Opens pre-loaded in new tab</span>
+    </div>
+    <div class="launcher-grid" id="launcherGrid"></div>
+
+    <div class="how-box">
+      <div class="how-hdr">About These Results</div>
+      <div class="how-text">
+        <strong>SauceNAO</strong> searches 30+ image databases and returns actual match data
+        including similarity scores, source URLs and titles — directly in this page. Best for
+        finding the original source of photos, artwork, and media.<br><br>
+        <strong>Engine links</strong> open with your image pre-loaded so you don't have to
+        re-upload. Google Lens, Yandex, TinEye and Bing each index different parts of the web —
+        running all four gives the most complete picture. <strong>Yandex is the strongest for
+        faces and Eastern European sources.</strong> TinEye is best for finding all copies of
+        an exact image. Google Lens is best for objects, landmarks and products.
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">SauceNAO results via API · No images stored · For investigative use only</div>
+  </div>
+</div>
+
+<script>
+const API = 'https://intel-desk-api.onrender.com';
+let selectedFile = null;
+let objectUrl    = null;
+
+// ── FILE INPUT ────────────────────────────────────────────────────────────────
+window.addEventListener('load', function() {
+  const input = document.getElementById('fileInput');
+  const zone  = document.getElementById('uploadZone');
+
+  input.addEventListener('change', function() {
+    if (input.files[0]) setFile(input.files[0]);
+  });
+
+  // Drag and drop
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('drag'));
+  zone.addEventListener('drop', e => {
+    e.preventDefault();
+    zone.classList.remove('drag');
+    const f = e.dataTransfer.files[0];
+    if (f && f.type.startsWith('image/')) setFile(f);
+  });
+});
+
+function setFile(file) {
+  if (objectUrl) URL.revokeObjectURL(objectUrl);
+  selectedFile = file;
+  objectUrl    = URL.createObjectURL(file);
+
+  // Preview
+  const thumb = document.getElementById('previewThumb');
+  thumb.src = objectUrl;
+  document.getElementById('previewRow').classList.add('visible');
+  document.getElementById('previewName').textContent = file.name;
+  document.getElementById('previewMeta').textContent =
+    (file.size/1024).toFixed(0) + ' KB  ·  ' + file.type;
+  document.getElementById('uploadTitle').textContent = file.name;
+  document.getElementById('uploadZone').classList.add('has-file');
+
+  // File bar
+  const bar = document.getElementById('fileBar');
+  bar.classList.add('visible');
+  document.getElementById('fileBarName').textContent = file.name;
+}
+
+// ── SEARCH BY URL ─────────────────────────────────────────────────────────────
+async function searchByUrl() {
+  const url = (document.getElementById('urlInput').value || '').trim();
+  if (!url || !url.startsWith('http')) { alert('Enter a valid image URL starting with http://'); return; }
+
+  try {
+    setProgress('upload', 'run', 'Fetching...');
+    const r = await fetch(url);
+    if (!r.ok) throw new Error('Could not fetch image: HTTP ' + r.status);
+    const blob = await r.blob();
+    if (!blob.type.startsWith('image/')) throw new Error('URL does not point to an image');
+    const file = new File([blob], 'image.jpg', { type: blob.type });
+    setFile(file);
+    setProgress('upload', 'done', 'Fetched ✓');
+    await runSauceNAO(blob, url);
+  } catch(e) {
+    setProgress('upload', 'err', e.message.slice(0,40));
+    alert('Could not fetch: ' + e.message);
+  }
+}
+
+// ── MAIN SEARCH ───────────────────────────────────────────────────────────────
+async function runSearch() {
+  if (!selectedFile) { alert('Choose an image first.'); return; }
+
+  const btn = document.getElementById('btnAnalyze');
+  btn.disabled = true; btn.textContent = 'Searching…';
+
+  // Show progress
+  const prog = document.getElementById('progressWrap');
+  prog.classList.add('visible');
+  ['upload','saucenao','prepare'].forEach(id => setProgress(id, 'wait', 'Waiting'));
+
+  try {
+    setProgress('upload', 'run', 'Sending...');
+    await runSauceNAO(selectedFile, objectUrl);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Search Image →';
+  }
+}
+
+async function runSauceNAO(imageData, imgUrl) {
+  setProgress('upload', 'run', 'Sending...');
+
+  const fd = new FormData();
+  fd.append('image', imageData, selectedFile?.name || 'image.jpg');
+
+  try {
+    setProgress('upload', 'done', 'Sent ✓');
+    setProgress('saucenao', 'run', 'Searching 30+ databases...');
+
+    const r = await fetch(API + '/image-search/saucenao', {
+      method: 'POST',
+      body: fd,
+    });
+
+    if (!r.ok) {
+      const err = await r.json().catch(() => ({}));
+      throw new Error(err.error || 'HTTP ' + r.status);
+    }
+
+    const data = await r.json();
+    const results = data.results || data.header ? parseResults(data) : [];
+    setProgress('saucenao', 'done', results.length + ' matches found');
+
+    setProgress('prepare', 'run', 'Building search links...');
+    showResults(results, imgUrl || objectUrl);
+    setProgress('prepare', 'done', 'Ready ✓');
+
+  } catch(e) {
+    setProgress('saucenao', 'err', e.message.slice(0,40));
+    // Still show the launcher grid even if SauceNAO fails
+    showResults([], imgUrl || objectUrl);
+    setProgress('prepare', 'done', 'Ready ✓');
+  }
+}
+
+function parseResults(data) {
+  if (!data.results) return [];
+  return data.results
+    .filter(r => r.header && parseFloat(r.header.similarity) >= 50)
+    .sort((a,b) => parseFloat(b.header.similarity) - parseFloat(a.header.similarity))
+    .slice(0, 8)
+    .map(r => ({
+      similarity: parseFloat(r.header.similarity),
+      thumbnail:  r.header.thumbnail || '',
+      title:      r.data?.title || r.data?.source || '',
+      source:     r.header.index_name || 'Unknown source',
+      urls:       r.data?.ext_urls || [],
+    }));
+}
+
+function showResults(results, imgUrl) {
+  const section = document.getElementById('resultsSection');
+  section.classList.add('visible');
+
+  // SauceNAO results
+  const snEl = document.getElementById('saucenaoResults');
+  if (!results.length) {
+    snEl.innerHTML = '<div class="no-results">No matches found above 50% similarity.<br>Try the engine links below to search manually — Yandex and Google may still find results.</div>';
+  } else {
+    snEl.innerHTML = '<div class="match-grid">' + results.map(matchCard).join('') + '</div>';
+  }
+
+  // Engine launchers
+  buildLaunchers(imgUrl);
+
+  section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function matchCard(m) {
+  const simCls = m.similarity >= 85 ? 'high' : m.similarity >= 65 ? 'mid' : 'low';
+  const thumbHtml = m.thumbnail
+    ? `<img class="match-thumb" src="${esc(m.thumbnail)}" alt="" onerror="this.style.display='none'">`
+    : `<div class="match-thumb-placeholder">🖼</div>`;
+  const link = m.urls[0]
+    ? `<a class="match-link" href="${esc(m.urls[0])}" target="_blank" rel="noopener">View source →</a>`
+    : '';
+
+  return `<div class="match-card">
+    ${thumbHtml}
+    <div class="match-body">
+      <div class="match-sim ${simCls}">${m.similarity.toFixed(1)}%</div>
+      <div class="match-source">${esc(m.source)}</div>
+      ${m.title ? `<div class="match-title">${esc(m.title)}</div>` : ''}
+      ${link}
+    </div>
+  </div>`;
+}
+
+// ── ENGINE LAUNCHERS ──────────────────────────────────────────────────────────
+const ENGINES = [
+  {
+    id: 'google',
+    name: 'Google Lens',
+    logo: '🔍',
+    what: 'Best overall. Finds exact matches, news usage, products and landmarks across the entire web.',
+    strengths: ['Exact matches', 'News & media', 'Products'],
+    buildUrl: url => `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(url)}`,
+  },
+  {
+    id: 'yandex',
+    name: 'Yandex',
+    logo: '🔎',
+    what: 'Best for faces. Exceptional facial recognition, Eastern European sources, and Russian-language web.',
+    strengths: ['Faces', 'Eastern Europe', 'Russian sources'],
+    buildUrl: url => `https://yandex.com/images/search?url=${encodeURIComponent(url)}&rpt=imageview`,
+  },
+  {
+    id: 'tineye',
+    name: 'TinEye',
+    logo: '👁',
+    what: 'Best for tracking copies. Shows first appearance online and every site that has published the image.',
+    strengths: ['First appearance', 'All copies', 'Spread tracking'],
+    buildUrl: url => `https://tineye.com/search?url=${encodeURIComponent(url)}`,
+  },
+  {
+    id: 'bing',
+    name: 'Bing Visual',
+    logo: '🌐',
+    what: 'Good for objects and products. Complementary index — finds sources Google misses.',
+    strengths: ['Objects', 'Products', 'Complementary'],
+    buildUrl: url => `https://www.bing.com/images/search?view=detailv2&iss=sbi&q=imgurl:${encodeURIComponent(url)}`,
+  },
+];
+
+function buildLaunchers(imgUrl) {
+  const isBlob = imgUrl && imgUrl.startsWith('blob:');
+  document.getElementById('launcherGrid').innerHTML = ENGINES.map(e => {
+    const url = e.buildUrl(imgUrl || '');
+    const disabled = isBlob; // blob URLs don't work in external sites
+    const note = disabled ? 'Upload image directly on site' : '';
+
+    return `<div class="launcher-card">
+      <div class="lc-top">
+        <span class="lc-logo">${e.logo}</span>
+        <span class="lc-name">${e.name}</span>
+      </div>
+      <div class="lc-what">${e.what}</div>
+      <div class="lc-strength">
+        ${e.strengths.map(s => `<span class="strength-tag">${s}</span>`).join('')}
+      </div>
+      ${disabled
+        ? `<a class="btn-launch" href="${url}" target="_blank" rel="noopener" onclick="openEngine('${e.id}',event)">Open ${e.name} →</a>
+           <div style="font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.22);margin-top:4px;">⚠ For uploaded files, re-upload directly on the site</div>`
+        : `<a class="btn-launch" href="${url}" target="_blank" rel="noopener">Open with image →</a>`
+      }
+    </div>`;
+  }).join('');
+}
+
+function openEngine(id, e) {
+  // For blob URLs, open the engine homepage and show a tip
+  const engine = ENGINES.find(x => x.id === id);
+  if (!engine) return;
+  // Allow default (opens engine homepage)
+}
+
+// ── PROGRESS ──────────────────────────────────────────────────────────────────
+function setProgress(id, state, msg) {
+  const dot = document.getElementById('dot-' + id);
+  const lbl = document.getElementById('lbl-' + id);
+  const st  = document.getElementById('st-' + id);
+  if (!dot) return;
+
+  dot.className = 'ps-dot ' + {
+    wait: 'dot-wait', run: 'dot-run', done: 'dot-done', err: 'dot-err'
+  }[state];
+
+  if (lbl) lbl.className = 'ps-label' + (state === 'run' ? ' active' : '');
+  if (st)  {
+    st.textContent = msg;
+    st.className   = 'ps-status' + (state === 'done' ? ' done' : state === 'err' ? ' err' : '');
+  }
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+</body>
+</html>
