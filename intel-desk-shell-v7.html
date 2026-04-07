@@ -498,6 +498,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
   .shell{
     grid-template-columns:1fr;
+    grid-template-rows:var(--topbar-h) 1fr var(--ticker-h);
     grid-template-areas:"topbar" "workspace" "ticker";
   }
 
@@ -532,12 +533,23 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
   .topbar-nav a{padding:0 10px;font-size:8px;letter-spacing:0.10em;}
   .topbar-search{padding:0 12px;border-right:none;}
 
-  /* Workspace fills full height */
-  .workspace{min-height:0;}
+  /* Workspace fills full height and scrolls on mobile */
+  .workspace{
+    min-height:0;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+  }
 
   /* Tool iframe — allow scrolling inside */
   .tool-iframe{
     -webkit-overflow-scrolling:touch;
+    overflow-y:auto;
+  }
+
+  /* Welcome screen scrolls properly */
+  .welcome{
+    overflow-y:auto;
+    align-items:flex-start;
   }
 
   /* Welcome screen */
@@ -554,7 +566,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
     min-width:120px;
   }
   .ws-num{font-size:28px;}
-  .welcome-cats{display:none;}
+  .welcome-cat-grid{display:grid;grid-template-columns:1fr 1fr;}
   .welcome-eyebrow{margin-bottom:0;}
   .welcome-cta{font-size:9px;}
 
@@ -817,6 +829,14 @@ const CATEGORIES = [
         url:`${BASE}/metadata-extractor.html`,
         datasets: 0,
         seo:`PDF and Word documents carry hidden metadata — <strong>original author name</strong>, <strong>creator software</strong>, <strong>timestamps</strong>, and a full <strong>revision history timeline</strong>. Flags forensic anomalies including date paradoxes and software fingerprint conflicts.`,
+      },
+      {
+        id:'reverse-image', icon:'🔍', live:true,
+        name:'Reverse Image Search',
+        desc:'Google · Yandex · TinEye · Bing · Baidu',
+        url:`${BASE}/reverse-image-search.html`,
+        datasets: 5,
+        seo:`Run a reverse image search across Google Lens, Yandex Images, TinEye, Bing Visual Search, Baidu and Sogou simultaneously. Upload an image or paste a URL. Each engine opens in its own tab — cross-reference results to find where an image has appeared online, verify its origin, and identify faces or objects.`,
       },
     ],
   },
