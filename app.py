@@ -1160,30 +1160,45 @@ def hibp_breaches():
 @app.route("/image-search/saucenao", methods=["POST","OPTIONS"])
 @corsify
 def saucenao_search():
-    """Proxy SauceNAO reverse image search — returns actual match results."""
+    """Proxy SauceNAO reverse image search — requires SAUCENAO_API_KEY env var."""
+    if not SAUCENAO_KEY:
+        return jsonify({"error": "SAUCENAO_API_KEY not configured", "no_key": True}), 503
+
     if "image" not in request.files and not request.json:
         return jsonify({"error": "No image provided"}), 400
     try:
+        base_data = {
+            "output_type": 2,
+            "numres": 8,
+            "db": 999,
+            "api_key": SAUCENAO_KEY,
+        }
+        headers = {
+            "User-Agent": "Mozilla/5.0 (compatible; IntelDesk/1.0; +https://inteldesk.io)",
+        }
         if "image" in request.files:
             img_file  = request.files["image"]
             img_bytes = img_file.read()
-            # SauceNAO free API — 100 req/day, no key needed
             r = requests.post(
                 "https://saucenao.com/search.php",
-                data={"output_type": 2, "numres": 8, "db": 999},
+                data=base_data,
                 files={"file": ("image.jpg", img_bytes, img_file.content_type or "image/jpeg")},
-                timeout=20,
+                headers=headers,
+                timeout=25,
             )
         else:
-            url = request.json.get("url","")
+            url = request.json.get("url", "")
             r = requests.post(
                 "https://saucenao.com/search.php",
-                data={"output_type": 2, "numres": 8, "db": 999, "url": url},
-                timeout=20,
+                data={**base_data, "url": url},
+                headers=headers,
+                timeout=25,
             )
-        log.info(f"SauceNAO: {r.status_code}")
+        log.info(f"SauceNAO: {r.status_code}, {len(r.content)} bytes")
         if r.status_code == 200:
             return Response(r.content, status=200, mimetype="application/json")
+        if r.status_code == 429:
+            return jsonify({"error": "SauceNAO rate limit reached (200/day free tier). Try again tomorrow."}), 429
         return jsonify({"error": f"SauceNAO HTTP {r.status_code}"}), r.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 502
@@ -1379,6 +1394,7 @@ HIVE_KEY_ID  = os.environ.get("HIVE_KEY_ID", "")
 HIVE_SECRET  = os.environ.get("HIVE_SECRET", "")
 HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 CF_RADAR_TOKEN = os.environ.get("CLOUDFLARE_RADAR_TOKEN", "")
+SAUCENAO_KEY   = os.environ.get("SAUCENAO_API_KEY", "")
 HIBP_KEY       = os.environ.get("HIBP_API_KEY", "")
 
 @app.route("/deepfake/analyze", methods=["POST","OPTIONS"])
