@@ -1073,6 +1073,34 @@ def debug_hive():
 
 
 
+@app.route("/hibp/account/<path:email>", methods=["GET","OPTIONS"])
+@corsify
+def hibp_account(email):
+    """Proxy HIBP breachedaccount endpoint. Requires HIBP_API_KEY env var."""
+    if not HIBP_KEY:
+        return jsonify({"error": "HIBP_API_KEY not configured — email lookup requires a paid HIBP subscription ($3.50/mo at haveibeenpwned.com/API/Key)"}), 503
+    try:
+        r = requests.get(
+            f"https://haveibeenpwned.com/api/v3/breachedaccount/{email}",
+            headers={
+                "hibp-api-key": HIBP_KEY,
+                "User-Agent": "IntelDesk/1.0 (https://inteldesk.io)",
+            },
+            params={"truncateResponse": "false"},
+            timeout=15,
+        )
+        log.info(f"HIBP account {email}: {r.status_code}")
+        if r.status_code == 200:
+            return Response(r.content, status=200, mimetype="application/json")
+        elif r.status_code == 404:
+            return jsonify([]), 200  # not found = not pwned = empty array
+        elif r.status_code == 401:
+            return jsonify({"error": "Invalid HIBP API key"}), 401
+        return Response(r.content, status=r.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
 # ── CLOUDFLARE RADAR PROXY ─────────────────────────────────────────────────────
 # Proxies requests to Cloudflare Radar API so the token stays server-side
 
@@ -1123,6 +1151,98 @@ def hibp_breaches():
             return Response(r.content, status=200, mimetype="application/json",
                 headers={"X-Total-Breaches": str(len(r.json()))})
         return Response(r.content, status=r.status_code, mimetype="application/json")
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+# ── REVERSE IMAGE SEARCH PROXIES ──────────────────────────────────────────────
+
+@app.route("/image-search/saucenao", methods=["POST","OPTIONS"])
+@corsify
+def saucenao_search():
+    """Proxy SauceNAO reverse image search — returns actual match results."""
+    if "image" not in request.files and not request.json:
+        return jsonify({"error": "No image provided"}), 400
+    try:
+        if "image" in request.files:
+            img_file  = request.files["image"]
+            img_bytes = img_file.read()
+            # SauceNAO free API — 100 req/day, no key needed
+            r = requests.post(
+                "https://saucenao.com/search.php",
+                data={"output_type": 2, "numres": 8, "db": 999},
+                files={"file": ("image.jpg", img_bytes, img_file.content_type or "image/jpeg")},
+                timeout=20,
+            )
+        else:
+            url = request.json.get("url","")
+            r = requests.post(
+                "https://saucenao.com/search.php",
+                data={"output_type": 2, "numres": 8, "db": 999, "url": url},
+                timeout=20,
+            )
+        log.info(f"SauceNAO: {r.status_code}")
+        if r.status_code == 200:
+            return Response(r.content, status=200, mimetype="application/json")
+        return jsonify({"error": f"SauceNAO HTTP {r.status_code}"}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/image-search/iqdb", methods=["POST","OPTIONS"])
+@corsify
+def iqdb_search():
+    """Proxy IQDB reverse image search — best for anime/illustration."""
+    if "image" not in request.files:
+        return jsonify({"error": "No image provided"}), 400
+    try:
+        img_file  = request.files["image"]
+        img_bytes = img_file.read()
+        r = requests.post(
+            "https://iqdb.org/",
+            files={"file": ("image.jpg", img_bytes, img_file.content_type or "image/jpeg")},
+            data={"service[]": ["1","2","3","4","5","6","11","13"]},
+            timeout=20,
+        )
+        log.info(f"IQDB: {r.status_code}")
+        # IQDB returns HTML — parse it server-side
+        if r.status_code == 200:
+            from html.parser import HTMLParser
+            class IQDBParser(HTMLParser):
+                def __init__(self):
+                    super().__init__()
+                    self.results = []
+                    self.current = {}
+                    self.in_pages = False
+                    self.in_result = False
+                def handle_starttag(self, tag, attrs):
+                    attrs = dict(attrs)
+                    if tag == "div" and "pages" in attrs.get("id",""):
+                        self.in_pages = True
+                    if self.in_pages and tag == "div" and "result" in attrs.get("class",""):
+                        self.in_result = True
+                        self.current = {}
+                    if self.in_result and tag == "img":
+                        src = attrs.get("src","")
+                        if src and not src.startswith("//iqdb"):
+                            self.current["thumbnail"] = "https:" + src if src.startswith("//") else src
+                        alt = attrs.get("alt","")
+                        if alt: self.current["title"] = alt
+                    if self.in_result and tag == "a":
+                        href = attrs.get("href","")
+                        if href and href.startswith("//"):
+                            self.current["url"] = "https:" + href
+                def handle_endtag(self, tag):
+                    if tag == "div" and self.in_result:
+                        if self.current.get("url"):
+                            self.results.append(self.current)
+                        self.current = {}
+                        self.in_result = False
+
+            parser = IQDBParser()
+            parser.feed(r.text)
+            return jsonify({"results": parser.results[:8]})
+        return jsonify({"error": f"IQDB HTTP {r.status_code}"}), r.status_code
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 
@@ -1259,6 +1379,7 @@ HIVE_KEY_ID  = os.environ.get("HIVE_KEY_ID", "")
 HIVE_SECRET  = os.environ.get("HIVE_SECRET", "")
 HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 CF_RADAR_TOKEN = os.environ.get("CLOUDFLARE_RADAR_TOKEN", "")
+HIBP_KEY       = os.environ.get("HIBP_API_KEY", "")
 
 @app.route("/deepfake/analyze", methods=["POST","OPTIONS"])
 @corsify
