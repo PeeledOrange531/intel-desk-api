@@ -144,9 +144,9 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
       <div class="sc-desc">140+ jurisdictions worldwide. Searches open directly in OpenCorporates for full results.</div>
     </div>
     <div class="source-card">
-      <div class="sc-count">200+</div>
-      <div class="sc-name">Countries Covered</div>
-      <div class="sc-desc">From BVI to Bermuda, Cayman Islands to Luxembourg. Offshore and onshore registries.</div>
+      <div class="sc-count">800K+</div>
+      <div class="sc-name">US SEC EDGAR</div>
+      <div class="sc-desc">All US public companies. 10-K, 10-Q, 8-K filings. Google, Apple, Tesla and every NYSE/Nasdaq filer.</div>
     </div>
   </div>
 
@@ -165,6 +165,9 @@ h1 em{font-style:italic;color:#e8d5a3!important;}
     </button>
     <button class="source-btn active" data-src="ch"       onclick="toggleSource('ch',this)">
       <span class="src-dot" style="background:#c8a96e;"></span> UK Companies House
+    </button>
+    <button class="source-btn active"  data-src="sec"      onclick="toggleSource('sec',this)">
+      <span class="src-dot" style="background:#4ec994;"></span> US SEC EDGAR
     </button>
     <button class="source-btn"        data-src="oc"       onclick="toggleSource('oc',this)">
       <span class="src-dot" style="background:#7eb8e4;"></span> OpenCorporates ↗
@@ -205,7 +208,7 @@ const API       = 'https://intel-desk-api.onrender.com';
 
 const OC_SEARCH = 'https://opencorporates.com/companies?q=';
 
-let activeSources = new Set(['icij','ch']);
+let activeSources = new Set(['icij','ch','sec']);
 let lastQuery = '';
 
 function toggleSource(src, btn) {
@@ -239,6 +242,7 @@ async function runSearch() {
   const promises = [];
   if (activeSources.has('icij')) promises.push(searchICIJ(q));
   if (activeSources.has('ch'))   promises.push(searchCH(q));
+  if (activeSources.has('sec'))  promises.push(searchSEC(q));
 
   try {
     const results = await Promise.allSettled(promises);
@@ -268,24 +272,33 @@ async function searchCH(q) {
   };
 }
 
+async function searchSEC(q) {
+  const r    = await fetch(`${API}/sec/search?q=${encodeURIComponent(q)}`);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'SEC EDGAR HTTP ' + r.status);
+  return { source: 'sec', results: data.companies || [] };
+}
+
 // ── RENDER RESULTS ────────────────────────────────────────────────────────────
 function renderResults(q, settled) {
   const sec = document.getElementById('resultsSection');
 
   let icijResults = [];
   let chResults   = [];
+  let secResults  = [];
   let errors      = [];
 
   settled.forEach(s => {
     if (s.status === 'fulfilled') {
       if (s.value.source === 'icij') icijResults = s.value.results;
       if (s.value.source === 'ch')   { chResults = s.value.results; if (s.value.noKey) errors = []; }
+      if (s.value.source === 'sec')  secResults  = s.value.results;
     } else {
       errors.push(s.reason?.message || 'Unknown error');
     }
   });
 
-  const total = icijResults.length + chResults.length;
+  const total = icijResults.length + chResults.length + secResults.length;
 
   if (total === 0 && errors.length === 0) {
     sec.innerHTML = `<div class="empty-state">
@@ -336,6 +349,19 @@ function renderResults(q, settled) {
     html += `<div class="empty-state" style="margin-top:2px;color:#e87b4a!important;">
       ⚠ Some sources failed: ${errors.map(esc).join(' · ')}
     </div>`;
+  }
+
+  // SEC EDGAR results
+  if (secResults.length > 0) {
+    html += `<div class="results-hdr" style="margin-top:2px;">
+      US SEC EDGAR
+      <span class="results-count">${secResults.length} match${secResults.length!==1?'es':''}</span>
+    </div>
+    <div class="result-list">${secResults.map(r => renderSECCard(r)).join('')}</div>`;
+  } else if (activeSources.has('sec')) {
+    html += `<div class="results-hdr" style="margin-top:2px;">US SEC EDGAR
+      <span class="results-count">No matches</span></div>
+    <div class="empty-state" style="border-top:none;">Not found in SEC EDGAR. May be a private company not required to file with the SEC.</div>`;
   }
 
   // Always show OpenCorporates link
@@ -444,6 +470,30 @@ function getDatasetLabel(dataset) {
   if (d.includes('paradise')) return 'Paradise Papers';
   if (d.includes('bahamas'))  return 'Bahamas Leaks';
   return 'ICIJ Offshore Leaks';
+}
+
+function renderSECCard(r) {
+  const profileUrl = r.edgar_url || (r.cik ? `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${r.cik}&type=10-K&dateb=&owner=include&count=10` : null);
+  const opencoUrl  = r.cik ? `https://opencorporates.com/companies/us/${r.cik}` : null;
+
+  return `<div class="result-card">
+    <div class="rc-top">
+      <span class="rc-source-badge" style="color:#4ec994!important;border-color:rgba(78,201,148,.28);font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;padding:3px 8px;border:1px solid;flex-shrink:0;margin-top:2px;">SEC EDGAR</span>
+      <div>
+        <div class="rc-name">${esc(r.name)}</div>
+        <div class="rc-type">${r.sic_description ? esc(r.sic_description) : 'US Public Company'}${r.cik ? ' · CIK ' + esc(r.cik) : ''}</div>
+      </div>
+    </div>
+    <div class="rc-meta">
+      ${r.state ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Incorporated:</span> ${esc(r.state)}</div>` : ''}
+      ${r.location ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Location:</span> ${esc(r.location)}</div>` : ''}
+      ${r.filed_at ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Last filing:</span> ${esc(r.filed_at)}</div>` : ''}
+    </div>
+    <div class="rc-links">
+      ${profileUrl ? `<a class="rc-link" href="${esc(profileUrl)}" target="_blank" rel="noopener">SEC EDGAR →</a>` : ''}
+      ${opencoUrl  ? `<a class="rc-link" href="${esc(opencoUrl)}" target="_blank" rel="noopener">OpenCorporates →</a>` : ''}
+    </div>
+  </div>`;
 }
 
 function esc(s) {
