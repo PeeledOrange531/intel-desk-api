@@ -1313,6 +1313,57 @@ def iqdb_search():
     except Exception as e:
         return jsonify({"error": str(e)}), 502
 
+
+# ── COMPANIES HOUSE PROXY ──────────────────────────────────────────────────────
+CH_KEY = os.environ.get("COMPANIES_HOUSE_KEY", "")
+
+@app.route("/companies-house/search", methods=["GET","OPTIONS"])
+@corsify
+def companies_house_search():
+    """Proxy UK Companies House search — free, optional API key for higher limits."""
+    q = request.args.get("q","").strip()
+    if not q:
+        return jsonify({"error": "q parameter required"}), 400
+    try:
+        headers = {"Accept": "application/json"}
+        if CH_KEY:
+            import base64
+            headers["Authorization"] = "Basic " + base64.b64encode(f"{CH_KEY}:".encode()).decode()
+        r = requests.get(
+            "https://api.company-information.service.gov.uk/search/companies",
+            params={"q": q, "items_per_page": 10},
+            headers=headers,
+            timeout=10,
+        )
+        log.info(f"Companies House: {r.status_code}")
+        if r.status_code == 200:
+            return Response(r.content, status=200, mimetype="application/json")
+        return jsonify({"error": f"Companies House HTTP {r.status_code}"}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/icij/search", methods=["GET","OPTIONS"])
+@corsify
+def icij_search():
+    """Proxy ICIJ Offshore Leaks reconciliation API — free, no key."""
+    q = request.args.get("q","").strip()
+    if not q:
+        return jsonify({"error": "q parameter required"}), 400
+    try:
+        r = requests.post(
+            "https://offshoreleaks.icij.org/api/v1/reconcile",
+            json={"query": q, "limit": 15},
+            headers={"Accept": "application/json", "Content-Type": "application/json"},
+            timeout=10,
+        )
+        log.info(f"ICIJ: {r.status_code}")
+        if r.status_code == 200:
+            return Response(r.content, status=200, mimetype="application/json")
+        return jsonify({"error": f"ICIJ HTTP {r.status_code}"}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
