@@ -1320,26 +1320,111 @@ CH_KEY = os.environ.get("COMPANIES_HOUSE_KEY", "")
 @app.route("/companies-house/search", methods=["GET","OPTIONS"])
 @corsify
 def companies_house_search():
-    """Proxy UK Companies House search — free, optional API key for higher limits."""
+    """Search UK Companies House.
+    Strategy 1: Use API key if COMPANIES_HOUSE_KEY is set (structured JSON).
+    Strategy 2: Scrape the public website search (no key needed, always works).
+    """
     q = request.args.get("q","").strip()
     if not q:
         return jsonify({"error": "q parameter required"}), 400
-    try:
-        headers = {"Accept": "application/json"}
-        if CH_KEY:
+
+    # ── Strategy 1: API key (if configured) ──────────────────────────────────
+    if CH_KEY:
+        try:
             import base64
-            headers["Authorization"] = "Basic " + base64.b64encode(f"{CH_KEY}:".encode()).decode()
+            auth = base64.b64encode(f"{CH_KEY}:".encode()).decode()
+            r = requests.get(
+                "https://api.company-information.service.gov.uk/search/companies",
+                params={"q": q, "items_per_page": 10},
+                headers={"Accept": "application/json", "Authorization": f"Basic {auth}"},
+                timeout=10,
+            )
+            if r.status_code == 200:
+                return Response(r.content, status=200, mimetype="application/json")
+            log.warning(f"CH API key failed ({r.status_code}), falling back to scrape")
+        except Exception as e:
+            log.warning(f"CH API exception: {e}, falling back to scrape")
+
+    # ── Strategy 2: Scrape public website (no key needed) ────────────────────
+    try:
+        from html.parser import HTMLParser
+
         r = requests.get(
-            "https://api.company-information.service.gov.uk/search/companies",
-            params={"q": q, "items_per_page": 10},
-            headers=headers,
-            timeout=10,
+            "https://find-and-update.company-information.service.gov.uk/search",
+            params={"q": q},
+            headers={
+                "User-Agent": "Mozilla/5.0 (compatible; IntelDesk/1.0; +https://inteldesk.io)",
+                "Accept": "text/html,application/xhtml+xml",
+            },
+            timeout=15,
         )
-        log.info(f"Companies House: {r.status_code}")
-        if r.status_code == 200:
-            return Response(r.content, status=200, mimetype="application/json")
-        return jsonify({"error": f"Companies House HTTP {r.status_code}"}), r.status_code
+        log.info(f"CH scrape: {r.status_code}")
+        if r.status_code != 200:
+            return jsonify({"error": f"Companies House HTTP {r.status_code}"}), r.status_code
+
+        # Parse search results from HTML
+        import re as _re
+        items = []
+
+        # Find all company result blocks
+        # Each result has a link like /company/XXXXXXXX
+        company_blocks = _re.findall(
+            r'<li[^>]*class="[^"]*result[^"]*"[^>]*>(.*?)</li>',
+            r.text, _re.DOTALL
+        )
+
+        # Fallback: find all company links directly
+        if not company_blocks:
+            # Match company links and names from the search results page
+            matches = _re.findall(
+                r'href="/company/([A-Z0-9]+)"[^>]*>\s*<span[^>]*>([^<]+)</span>',
+                r.text
+            )
+            for number, name in matches[:10]:
+                items.append({
+                    "company_number": number,
+                    "title": name.strip(),
+                    "company_status": "",
+                    "company_type": "",
+                    "date_of_creation": "",
+                    "registered_office_address": {},
+                    "links": {"self": f"/company/{number}"}
+                })
+        else:
+            for block in company_blocks[:10]:
+                number_m = _re.search(r'/company/([A-Z0-9]+)', block)
+                name_m   = _re.search(r'<span[^>]*class="[^"]*name[^"]*"[^>]*>([^<]+)</span>', block)
+                status_m = _re.search(r'<strong[^>]*>([^<]*(?:Active|Dissolved|Liquidation|Struck off)[^<]*)</strong>', block, _re.I)
+                type_m   = _re.search(r'Company type[^<]*</[^>]+>\s*([^<]+)', block)
+                date_m   = _re.search(r'Incorporated on[^<]*</[^>]+>\s*([^<]+)', block)
+                addr_m   = _re.search(r'Registered office address[^<]*</[^>]+>\s*<[^>]+>\s*([^<]+)', block)
+
+                if not number_m:
+                    continue
+                items.append({
+                    "company_number": number_m.group(1),
+                    "title": (name_m.group(1) if name_m else "Unknown").strip(),
+                    "company_status": (status_m.group(1) if status_m else "").strip(),
+                    "company_type": (type_m.group(1) if type_m else "").strip(),
+                    "date_of_creation": (date_m.group(1) if date_m else "").strip(),
+                    "registered_office_address": {
+                        "address_line_1": (addr_m.group(1) if addr_m else "").strip()
+                    },
+                    "links": {"self": f"/company/{number_m.group(1)}"}
+                })
+
+        # If scraping got nothing, return a useful fallback with the search URL
+        if not items:
+            return jsonify({
+                "items": [],
+                "scrape_url": f"https://find-and-update.company-information.service.gov.uk/search?q={q}",
+                "message": "Could not parse results — open Companies House directly"
+            })
+
+        return jsonify({"items": items, "total_results": len(items)})
+
     except Exception as e:
+        log.error(f"CH scrape error: {e}")
         return jsonify({"error": str(e)}), 502
 
 
@@ -1362,6 +1447,56 @@ def icij_search():
             return Response(r.content, status=200, mimetype="application/json")
         return jsonify({"error": f"ICIJ HTTP {r.status_code}"}), r.status_code
     except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+# ── SUBDOMAIN DISCOVERY — crt.sh Certificate Transparency ─────────────────────
+@app.route("/crtsh", methods=["GET","OPTIONS"])
+@corsify
+def crtsh_search():
+    """Query crt.sh CT logs to enumerate subdomains. Free, no key."""
+    domain = request.args.get("domain","").strip().lower()
+    if not domain:
+        return jsonify({"error": "domain parameter required"}), 400
+    # Strip protocol and path
+    domain = domain.replace("https://","").replace("http://","").split("/")[0]
+    try:
+        r = requests.get(
+            "https://crt.sh/",
+            params={"q": f"%.{domain}", "output": "json"},
+            headers={"User-Agent": "Mozilla/5.0 (compatible; IntelDesk/1.0; +https://inteldesk.io)"},
+            timeout=20,
+        )
+        log.info(f"crt.sh {domain}: {r.status_code}, {len(r.content)} bytes")
+        if r.status_code != 200:
+            return jsonify({"error": f"crt.sh HTTP {r.status_code}"}), r.status_code
+
+        # Parse — deduplicate and clean
+        entries = r.json()
+        seen = set()
+        subdomains = []
+        for entry in entries:
+            # name_value can contain multiple names separated by newlines
+            names = entry.get("name_value","").split("\n")
+            for name in names:
+                name = name.strip().lower()
+                if not name or name in seen:
+                    continue
+                # Only include subdomains of the target domain
+                if name == domain or name.endswith("." + domain):
+                    seen.add(name)
+                    subdomains.append(name)
+
+        # Sort: exact match first, then alphabetically
+        subdomains.sort(key=lambda s: (s == domain, s))
+
+        return jsonify({
+            "domain": domain,
+            "count": len(subdomains),
+            "subdomains": subdomains,
+        })
+    except Exception as e:
+        log.error(f"crt.sh error: {e}")
         return jsonify({"error": str(e)}), 502
 
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
