@@ -1,0 +1,593 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Corporate Intelligence | The Intel Desk</title>
+<meta name="description" content="Search 810,000+ offshore entities from Panama Papers, Pandora Papers, Paradise Papers and Bahamas Leaks. Cross-reference with UK Companies House and OpenCorporates.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1100px;margin:0 auto;}
+
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,28px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* SEARCH */
+.search-row{display:flex;gap:0;margin-bottom:2px;}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:15px;padding:15px 20px;outline:none;transition:border-color .2s;letter-spacing:.02em;}
+.search-input:focus{border-color:rgba(200,169,110,.40);}
+.search-input::placeholder{color:rgba(240,236,228,.16)!important;font-size:13px;letter-spacing:0;}
+.btn-search{background:var(--adim);border:1px solid rgba(200,169,110,.35);border-left:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:15px 28px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.btn-search:hover{background:rgba(200,169,110,.26);color:#e8d5a3!important;}
+.btn-search:disabled{opacity:.40;cursor:not-allowed;}
+
+/* SOURCE TOGGLES */
+.source-row{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
+.source-btn{background:var(--bg2);border:1px solid var(--border);border-right:none;color:rgba(240,236,228,.35)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.09em;padding:9px 15px;cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:7px;}
+.source-btn:last-child{border-right:1px solid var(--border);}
+.source-btn.active{background:var(--adim);color:#c8a96e!important;border-color:rgba(200,169,110,.22);}
+.source-btn:hover{color:rgba(240,236,228,.60)!important;}
+.src-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+
+/* TABS */
+.tab-row{display:flex;gap:0;border-bottom:1px solid var(--border);}
+.tab-btn{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;padding:9px 18px;cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;color:rgba(240,236,228,.28)!important;transition:all .15s;}
+.tab-btn.active{color:#c8a96e!important;border-bottom-color:#c8a96e;}
+.tab-btn:hover{color:rgba(240,236,228,.55)!important;}
+.tab-count{font-size:9px;background:rgba(200,169,110,.18);padding:1px 6px;border-radius:10px;margin-left:4px;}
+
+/* SPINNER */
+.spinner-wrap{padding:48px 24px;text-align:center;}
+.spinner{width:28px;height:28px;border:2px solid rgba(200,169,110,.13);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.25)!important;}
+
+/* RESULT CARDS */
+.results-wrap{margin-top:2px;}
+.results-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;}
+.results-count{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.55)!important;}
+
+.result-list{border:1px solid var(--border);}
+.result-card{border-bottom:1px solid rgba(255,255,255,.04);padding:16px 18px;transition:background .15s;cursor:default;}
+.result-card:hover{background:rgba(200,169,110,.03);}
+.result-card:last-child{border-bottom:none;}
+
+.rc-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:8px;}
+.rc-source-badge{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;padding:3px 8px;border:1px solid;flex-shrink:0;white-space:nowrap;margin-top:2px;}
+.badge-panama{color:#e87b4a!important;border-color:rgba(232,123,74,.30);}
+.badge-pandora{color:#c0392b!important;border-color:rgba(192,57,43,.30);}
+.badge-paradise{color:#7eb8e4!important;border-color:rgba(126,184,228,.25);}
+.badge-bahamas{color:#4ec994!important;border-color:rgba(78,201,148,.25);}
+.badge-offshore{color:#c8a96e!important;border-color:rgba(200,169,110,.25);}
+.badge-ch{color:#c8a96e!important;border-color:rgba(200,169,110,.28);}
+
+.rc-name{font-family:var(--sans);font-size:14px;font-weight:600;color:#e8d5a3!important;line-height:1.3;flex:1;}
+.rc-type{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.35)!important;margin-top:3px;}
+
+.rc-meta{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;}
+.rc-meta-item{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.38)!important;display:flex;align-items:center;gap:4px;}
+.rc-meta-lbl{color:rgba(240,236,228,.22)!important;}
+
+.rc-tags{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:8px;}
+.rc-tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.07em;padding:2px 8px;border:1px solid rgba(255,255,255,.08);color:rgba(240,236,228,.35)!important;}
+
+.rc-links{display:flex;gap:6px;flex-wrap:wrap;}
+.rc-link{font-family:var(--mono);font-size:9px;color:#7eb8e4!important;border:1px solid rgba(126,184,228,.20);padding:3px 10px;text-decoration:none;transition:all .15s;}
+.rc-link:hover{background:rgba(126,184,228,.08);border-color:rgba(126,184,228,.40);}
+
+/* EMPTY / ERROR */
+.empty-state{background:var(--bg2);border:1px solid var(--border);padding:40px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.26)!important;line-height:2;}
+
+/* DISCLAIMER */
+.disclaimer{background:rgba(200,169,110,.04);border:1px solid rgba(200,169,110,.14);padding:14px 16px;margin-top:2px;}
+.disc-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(200,169,110,.50)!important;margin-bottom:7px;}
+.disc-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.35)!important;line-height:1.8;}
+
+/* DATA SOURCES INFO */
+.sources-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:2px;margin-bottom:2px;}
+.source-card{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;}
+.sc-name{font-family:var(--sans);font-size:12px;font-weight:600;color:#e8d5a3!important;margin-bottom:4px;}
+.sc-desc{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.30)!important;line-height:1.6;}
+.sc-count{font-family:var(--serif);font-size:20px;font-weight:300;color:#c8a96e!important;margin-bottom:2px;}
+
+.footer{margin-top:clamp(36px,5vw,60px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.26)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;}
+
+@media(max-width:768px){
+  .search-row{flex-direction:column;}
+  .btn-search{border-left:1px solid rgba(200,169,110,.35);border-top:none;}
+  .source-btn{border-right:1px solid var(--border);flex:1 1 auto;}
+  .sources-grid{grid-template-columns:1fr 1fr;}
+  .footer-r{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>Corporate Intelligence</span></div>
+    <h1>Corporate <em>Intelligence</em></h1>
+  </div>
+
+  <!-- DATA SOURCES -->
+  <div class="sources-grid" id="sourcesGrid">
+    <div class="source-card">
+      <div class="sc-count">810K+</div>
+      <div class="sc-name">ICIJ Offshore Leaks</div>
+      <div class="sc-desc">Panama Papers · Pandora Papers · Paradise Papers · Bahamas Leaks · Offshore Leaks. Covers 200+ countries.</div>
+    </div>
+    <div class="source-card">
+      <div class="sc-count">5M+</div>
+      <div class="sc-name">UK Companies House</div>
+      <div class="sc-desc">Every company registered in England, Wales, Scotland & Northern Ireland. Live register data.</div>
+    </div>
+    <div class="source-card">
+      <div class="sc-count">200M+</div>
+      <div class="sc-name">OpenCorporates</div>
+      <div class="sc-desc">140+ jurisdictions worldwide. Searches open directly in OpenCorporates for full results.</div>
+    </div>
+    <div class="source-card">
+      <div class="sc-count">200+</div>
+      <div class="sc-name">Countries Covered</div>
+      <div class="sc-desc">From BVI to Bermuda, Cayman Islands to Luxembourg. Offshore and onshore registries.</div>
+    </div>
+  </div>
+
+  <!-- SEARCH -->
+  <div class="search-row">
+    <input type="text" class="search-input" id="searchInput"
+      placeholder="Search company name, person, address, jurisdiction..."
+      onkeydown="if(event.key==='Enter')runSearch()">
+    <button class="btn-search" id="btnSearch" onclick="runSearch()">Search →</button>
+  </div>
+
+  <!-- SOURCE FILTERS -->
+  <div class="source-row">
+    <button class="source-btn active" data-src="icij"     onclick="toggleSource('icij',this)">
+      <span class="src-dot" style="background:#e87b4a;"></span> ICIJ Leaks
+    </button>
+    <button class="source-btn active" data-src="ch"       onclick="toggleSource('ch',this)">
+      <span class="src-dot" style="background:#c8a96e;"></span> UK Companies House
+    </button>
+    <button class="source-btn"        data-src="oc"       onclick="toggleSource('oc',this)">
+      <span class="src-dot" style="background:#7eb8e4;"></span> OpenCorporates ↗
+    </button>
+  </div>
+
+  <!-- RESULTS -->
+  <div id="resultsSection"></div>
+
+  <!-- GLOBAL REGISTRIES LAUNCHER -->
+  <div class="results-hdr" style="margin-top:2px;" id="registriesHdr">
+    Global Registry Launcher
+    <span class="results-count">Opens with search pre-filled</span>
+  </div>
+  <div id="registriesGrid" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:2px;border:1px solid var(--border);margin-bottom:2px;"></div>
+
+  <!-- DISCLAIMER -->
+  <div class="disclaimer" style="margin-top:2px;">
+    <div class="disc-hdr">Important Notice</div>
+    <div class="disc-text">
+      The ICIJ Offshore Leaks Database contains information on offshore entities from leaked documents.
+      <strong style="color:rgba(240,236,228,.60);">Inclusion in this database does not imply illegal or improper conduct.</strong>
+      There are legitimate uses for offshore companies and trusts. Always verify identities and confirm context
+      before drawing conclusions. Data sourced from ICIJ — cite ICIJ when using in published work.
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">
+      ICIJ Offshore Leaks · UK Companies House · OpenCorporates · For investigative use only
+    </div>
+  </div>
+</div>
+
+<script>
+const API       = 'https://intel-desk-api.onrender.com';
+
+const OC_SEARCH = 'https://opencorporates.com/companies?q=';
+
+let activeSources = new Set(['icij','ch']);
+let lastQuery = '';
+
+function toggleSource(src, btn) {
+  if (src === 'oc') {
+    // OpenCorporates just opens in new tab
+    const q = (document.getElementById('searchInput').value || '').trim();
+    if (q) window.open(OC_SEARCH + encodeURIComponent(q), '_blank', 'noopener');
+    else    window.open('https://opencorporates.com', '_blank', 'noopener');
+    return;
+  }
+  if (activeSources.has(src)) {
+    if (activeSources.size > 1) activeSources.delete(src);
+  } else {
+    activeSources.add(src);
+  }
+  btn.classList.toggle('active', activeSources.has(src));
+}
+
+async function runSearch() {
+  const q = (document.getElementById('searchInput').value || '').trim();
+  if (!q) { alert('Enter a company name, person, or address to search.'); return; }
+  if (q.length < 2) { alert('Enter at least 2 characters.'); return; }
+
+  lastQuery = q;
+  const btn = document.getElementById('btnSearch');
+  btn.disabled = true; btn.textContent = 'Searching…';
+
+  const sec = document.getElementById('resultsSection');
+  sec.innerHTML = '<div class="spinner-wrap"><div class="spinner"></div><div class="spin-lbl">Searching all selected sources...</div></div>';
+
+  const promises = [];
+  if (activeSources.has('icij')) promises.push(searchICIJ(q));
+  if (activeSources.has('ch'))   promises.push(searchCH(q));
+
+  try {
+    const results = await Promise.allSettled(promises);
+    renderResults(q, results);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Search →';
+  }
+}
+
+// ── ICIJ OFFSHORE LEAKS ───────────────────────────────────────────────────────
+async function searchICIJ(q) {
+  const r = await fetch(`${API}/icij/search?q=${encodeURIComponent(q)}`);
+  if (!r.ok) throw new Error('ICIJ API HTTP ' + r.status);
+  const data = await r.json();
+  return { source: 'icij', results: data.result || data.results || [] };
+}
+
+// ── UK COMPANIES HOUSE ────────────────────────────────────────────────────────
+async function searchCH(q) {
+  const r = await fetch(`${API}/companies-house/search?q=${encodeURIComponent(q)}`);
+  if (!r.ok) throw new Error('Companies House HTTP ' + r.status);
+  const data = await r.json();
+  return { source: 'ch', results: data.items || [] };
+}
+
+// ── RENDER RESULTS ────────────────────────────────────────────────────────────
+function renderResults(q, settled) {
+  const sec = document.getElementById('resultsSection');
+
+  let icijResults = [];
+  let chResults   = [];
+  let errors      = [];
+
+  settled.forEach(s => {
+    if (s.status === 'fulfilled') {
+      if (s.value.source === 'icij') icijResults = s.value.results;
+      if (s.value.source === 'ch')   chResults   = s.value.results;
+    } else {
+      errors.push(s.reason?.message || 'Unknown error');
+    }
+  });
+
+  const total = icijResults.length + chResults.length;
+
+  if (total === 0 && errors.length === 0) {
+    sec.innerHTML = `<div class="empty-state">
+      No results found for <strong style="color:#e8d5a3;">"${esc(q)}"</strong><br>
+      Try different spelling, abbreviations, or a partial name.<br>
+      <a href="${OC_SEARCH + encodeURIComponent(q)}" target="_blank" rel="noopener" style="color:#7eb8e4;">
+        Search OpenCorporates (200M+ companies) →
+      </a>
+    </div>`;
+    return;
+  }
+
+  let html = '';
+
+  // ICIJ results
+  if (icijResults.length > 0) {
+    html += `<div class="results-hdr" style="margin-top:2px;">
+      ICIJ Offshore Leaks
+      <span class="results-count">${icijResults.length} match${icijResults.length!==1?'es':''}</span>
+    </div>
+    <div class="result-list">${icijResults.map(r => renderICIJCard(r)).join('')}</div>`;
+  } else if (activeSources.has('icij')) {
+    html += `<div class="results-hdr" style="margin-top:2px;">ICIJ Offshore Leaks
+      <span class="results-count">No matches</span></div>
+    <div class="empty-state" style="border-top:none;">Not found in Panama Papers, Pandora Papers, Paradise Papers or Bahamas Leaks.</div>`;
+  }
+
+  // CH results
+  if (chResults.length > 0) {
+    html += `<div class="results-hdr" style="margin-top:2px;">
+      UK Companies House
+      <span class="results-count">${chResults.length} match${chResults.length!==1?'es':''}</span>
+    </div>
+    <div class="result-list">${chResults.map(r => renderCHCard(r)).join('')}</div>`;
+  } else if (activeSources.has('ch')) {
+    html += `<div class="results-hdr" style="margin-top:2px;">UK Companies House
+      <span class="results-count">No matches</span></div>
+    <div class="empty-state" style="border-top:none;">Not found in UK register.</div>`;
+  }
+
+  // Errors
+  if (errors.length) {
+    html += `<div class="empty-state" style="margin-top:2px;color:#e87b4a!important;">
+      ⚠ Some sources failed: ${errors.map(esc).join(' · ')}
+    </div>`;
+  }
+
+  // Always show OpenCorporates link
+  html += `<div style="padding:10px 0;font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.28);text-align:right;">
+    Also search:
+    <a href="${OC_SEARCH + encodeURIComponent(q)}" target="_blank" rel="noopener" style="color:#7eb8e4;margin-left:8px;">
+      OpenCorporates (200M+ worldwide) →
+    </a>
+  </div>`;
+
+  sec.innerHTML = html;
+}
+
+function renderICIJCard(r) {
+  // ICIJ reconciliation result format
+  const name    = r.name || r.id || 'Unknown entity';
+  const type    = r.type?.[0]?.name || r.description || '';
+  const score   = r.score ? Math.round(r.score * 100) : null;
+  const dataset = r.features?.find(f => f.id === 'dataset')?.value ||
+                  r.properties?.dataset?.[0] || '';
+  const jur     = r.features?.find(f => f.id === 'jurisdiction')?.value ||
+                  r.properties?.jurisdiction?.[0] || '';
+  const status  = r.properties?.status?.[0] || '';
+  const id      = r.id || '';
+
+  const badgeClass = getBadgeClass(dataset);
+  const badgeLabel = getDatasetLabel(dataset);
+  const profileUrl = id ? `https://offshoreleaks.icij.org/nodes/${id}` : null;
+
+  return `<div class="result-card">
+    <div class="rc-top">
+      <span class="rc-source-badge ${badgeClass}">${badgeLabel}</span>
+      <div>
+        <div class="rc-name">${esc(name)}</div>
+        ${type ? `<div class="rc-type">${esc(type)}</div>` : ''}
+      </div>
+      ${score !== null ? `<div style="font-family:var(--serif);font-size:22px;font-weight:300;color:${score>=80?'#4ec994':score>=60?'#c8a96e':'rgba(240,236,228,.35)'};margin-left:auto;flex-shrink:0;">${score}%</div>` : ''}
+    </div>
+    <div class="rc-meta">
+      ${jur ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Jurisdiction:</span> ${esc(jur)}</div>` : ''}
+      ${status ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Status:</span> ${esc(status)}</div>` : ''}
+      ${id ? `<div class="rc-meta-item"><span class="rc-meta-lbl">ICIJ ID:</span> ${esc(id)}</div>` : ''}
+    </div>
+    <div class="rc-links">
+      ${profileUrl ? `<a class="rc-link" href="${profileUrl}" target="_blank" rel="noopener">View in ICIJ Database →</a>` : ''}
+    </div>
+  </div>`;
+}
+
+function renderCHCard(r) {
+  const name    = r.title || r.company_name || 'Unknown';
+  const number  = r.company_number || '';
+  const type    = r.company_type || '';
+  const status  = r.company_status || '';
+  const date    = r.date_of_creation || '';
+  const addr    = r.registered_office_address;
+  const addrStr = addr
+    ? [addr.address_line_1, addr.locality, addr.postal_code, addr.country].filter(Boolean).join(', ')
+    : '';
+  const natWest = r.sic_codes ? r.sic_codes.join(', ') : '';
+  const profileUrl = number ? `https://find-and-update.company-information.service.gov.uk/company/${number}` : null;
+
+  const isActive  = (status||'').toLowerCase() === 'active';
+  const isDissolved = (status||'').toLowerCase().includes('dissolved');
+
+  return `<div class="result-card">
+    <div class="rc-top">
+      <span class="rc-source-badge badge-ch">UK Companies House</span>
+      <div>
+        <div class="rc-name">${esc(name)}</div>
+        <div class="rc-type">${esc(type)}${number ? ' · ' + number : ''}</div>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;padding:3px 9px;border:1px solid;margin-left:auto;flex-shrink:0;
+           color:${isActive?'#4ec994':isDissolved?'#c0392b':'rgba(240,236,228,.35)'}!important;
+           border-color:${isActive?'rgba(78,201,148,.28)':isDissolved?'rgba(192,57,43,.28)':'rgba(255,255,255,.10)'};">
+        ${status || '—'}
+      </div>
+    </div>
+    <div class="rc-meta">
+      ${date ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Incorporated:</span> ${esc(date)}</div>` : ''}
+      ${addrStr ? `<div class="rc-meta-item"><span class="rc-meta-lbl">Address:</span> ${esc(addrStr)}</div>` : ''}
+      ${natWest ? `<div class="rc-meta-item"><span class="rc-meta-lbl">SIC:</span> ${esc(natWest)}</div>` : ''}
+    </div>
+    <div class="rc-links">
+      ${profileUrl ? `<a class="rc-link" href="${profileUrl}" target="_blank" rel="noopener">Companies House →</a>` : ''}
+      ${number ? `<a class="rc-link" href="https://opencorporates.com/companies/gb/${number}" target="_blank" rel="noopener">OpenCorporates →</a>` : ''}
+    </div>
+  </div>`;
+}
+
+function getBadgeClass(dataset) {
+  if (!dataset) return 'badge-offshore';
+  const d = dataset.toLowerCase();
+  if (d.includes('panama'))   return 'badge-panama';
+  if (d.includes('pandora'))  return 'badge-pandora';
+  if (d.includes('paradise')) return 'badge-paradise';
+  if (d.includes('bahamas'))  return 'badge-bahamas';
+  return 'badge-offshore';
+}
+
+function getDatasetLabel(dataset) {
+  if (!dataset) return 'ICIJ Leaks';
+  const d = dataset.toLowerCase();
+  if (d.includes('panama'))   return 'Panama Papers';
+  if (d.includes('pandora'))  return 'Pandora Papers';
+  if (d.includes('paradise')) return 'Paradise Papers';
+  if (d.includes('bahamas'))  return 'Bahamas Leaks';
+  return 'ICIJ Offshore Leaks';
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── GLOBAL REGISTRIES ─────────────────────────────────────────────────────────
+const REGISTRIES = [
+  {
+    name: 'Russia — EGRUL',
+    flag: '🇷🇺',
+    desc: 'Federal Tax Service. All Russian legal entities. Russian-language.',
+    note: 'Searches in Russian — paste Cyrillic name for best results',
+    buildUrl: q => `https://egrul.nalog.ru/index.html`,
+    // EGRUL doesn't support URL-encoded search params — must search manually
+    manual: true,
+  },
+  {
+    name: 'Germany — Handelsregister',
+    flag: '🇩🇪',
+    desc: 'Official German commercial register. All GmbH, AG, and other entities.',
+    buildUrl: q => `https://www.handelsregister.de/rp_web/erweitertesuche.xhtml`,
+    manual: false,
+  },
+  {
+    name: 'Netherlands — KvK',
+    flag: '🇳🇱',
+    desc: 'Dutch Chamber of Commerce business register.',
+    buildUrl: q => `https://www.kvk.nl/zoeken/?source=all&q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Luxembourg — RCS',
+    flag: '🇱🇺',
+    desc: 'Luxembourg Trade & Companies Register. Major offshore/holding hub.',
+    buildUrl: q => `https://www.lbr.lu/mjrcs/jsp/ListeEntiteAction.action?ACTION=SEARCH&IDENT=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'UAE — MoEC',
+    flag: '🇦🇪',
+    desc: 'UAE Ministry of Economy company search. Dubai & Abu Dhabi entities.',
+    buildUrl: q => `https://services.economy.ae/search-business/?query=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'BVI — Registry',
+    flag: '🇻🇬',
+    desc: 'British Virgin Islands Financial Services Commission. Major offshore hub.',
+    buildUrl: q => `https://www.bvifsc.vg/regulated-entities?search=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Cayman — CIMA',
+    flag: '🇰🇾',
+    desc: 'Cayman Islands Monetary Authority. Key offshore jurisdiction.',
+    buildUrl: q => `https://www.cima.ky/regulated-entities-search?search=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Panama — Registro',
+    flag: '🇵🇦',
+    desc: 'Panama Public Registry. Search companies, foundations, corporations.',
+    buildUrl: q => `https://www.registro-publico.gob.pa/scripts/nwwisapi.dll/conweb/mesamenu?todos=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Switzerland — Zefix',
+    flag: '🇨🇭',
+    desc: 'Swiss Central Business Name Index. All cantonal registers unified.',
+    buildUrl: q => `https://www.zefix.admin.ch/en/search/entity/list?name=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Australia — ASIC',
+    flag: '🇦🇺',
+    desc: 'Australian Securities & Investments Commission.',
+    buildUrl: q => `https://connectonline.asic.gov.au/RegistrySearch/faces/landing/SearchRegisters.jspx?_adf.ctrl-state=jf5p9ry3d_4&searchText=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'China — SAMR',
+    flag: '🇨🇳',
+    desc: 'State Administration for Market Regulation. Chinese-language only.',
+    buildUrl: q => `https://www.gsxt.gov.cn/corp-query-homepage.html`,
+    manual: true,
+    note: 'Chinese-language registry — search manually at link',
+  },
+  {
+    name: 'Iran — UANI IBR',
+    flag: '🇮🇷',
+    desc: 'UANI Iran Business Registry. Reports of international business with Iran.',
+    buildUrl: q => `https://www.unitedagainstnucleariran.com/iran-business-registry?search=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'OCCRP Aleph',
+    flag: '🔍',
+    desc: '400M+ documents. Russia, Eastern Europe, Central Asia. Requires free account.',
+    buildUrl: q => `https://aleph.occrp.org/search?q=${encodeURIComponent(q)}`,
+    note: 'Free account required — apply at aleph.occrp.org',
+  },
+  {
+    name: 'OpenCorporates',
+    flag: '🌍',
+    desc: '200M+ companies across 140+ jurisdictions worldwide.',
+    buildUrl: q => `https://opencorporates.com/companies?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'OpenSanctions',
+    flag: '⚠️',
+    desc: 'Sanctions, PEPs, wanted persons. Cross-references all major lists.',
+    buildUrl: q => `https://www.opensanctions.org/search/?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'EU — EBR',
+    flag: '🇪🇺',
+    desc: 'European Business Register network. 30+ European country registers.',
+    buildUrl: q => `https://ebr.ie/Search.aspx?q=${encodeURIComponent(q)}`,
+  },
+];
+
+function buildRegistries() {
+  const q = (document.getElementById('searchInput').value || '').trim();
+  const grid = document.getElementById('registriesGrid');
+  if (!grid) return;
+
+  grid.innerHTML = REGISTRIES.map(r => {
+    const url = r.buildUrl(q);
+    const isManual = r.manual;
+    return `<div style="background:var(--bg2);border:1px solid var(--border);padding:13px 15px;display:flex;flex-direction:column;gap:7px;transition:border-color .15s;"
+      onmouseover="this.style.borderColor='rgba(200,169,110,.20)'"
+      onmouseout="this.style.borderColor='var(--border)'">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <span style="font-size:16px;">${r.flag}</span>
+        <span style="font-family:var(--sans);font-size:12px;font-weight:600;color:#e8d5a3;">${esc(r.name)}</span>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.30);line-height:1.5;">${esc(r.desc)}</div>
+      ${r.note ? `<div style="font-family:var(--mono);font-size:8px;color:#e87b4a;line-height:1.4;">⚠ ${esc(r.note)}</div>` : ''}
+      <a href="${esc(url)}" target="_blank" rel="noopener"
+        style="font-family:var(--mono);font-size:9px;color:#7eb8e4;border:1px solid rgba(126,184,228,.22);padding:4px 10px;text-decoration:none;text-align:center;transition:all .15s;margin-top:auto;"
+        onmouseover="this.style.background='rgba(126,184,228,.08)'"
+        onmouseout="this.style.background='transparent'">
+        ${isManual ? 'Open registry →' : (q ? 'Search "' + esc(q.slice(0,15)) + (q.length>15?'…':'') + '" →' : 'Open registry →')}
+      </a>
+    </div>`;
+  }).join('');
+}
+
+// Build registries on load and rebuild on search
+window.addEventListener('load', buildRegistries);
+const _origRunSearch = runSearch;
+window.runSearch = async function() {
+  await _origRunSearch.call(this);
+  buildRegistries();
+};
+// Also rebuild when Enter is pressed
+document.addEventListener('DOMContentLoaded', function() {
+  document.getElementById('searchInput').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') setTimeout(buildRegistries, 100);
+  });
+});
+</script>
+</body>
+</html>
