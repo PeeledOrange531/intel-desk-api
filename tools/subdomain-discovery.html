@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Subdomain Discovery | The Intel Desk</title>
+<meta name="description" content="Discover all subdomains of any domain using SSL certificate transparency logs. Powered by crt.sh — no scanning, no key required. Find hidden infrastructure, admin panels, staging environments.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1100px;margin:0 auto;}
+
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,28px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* SEARCH */
+.search-row{display:flex;gap:0;margin-bottom:2px;}
+.domain-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:15px;padding:15px 20px;outline:none;transition:border-color .2s;letter-spacing:.02em;}
+.domain-input:focus{border-color:rgba(200,169,110,.40);}
+.domain-input::placeholder{color:rgba(240,236,228,.16)!important;font-size:13px;letter-spacing:0;}
+.btn-search{background:var(--adim);border:1px solid rgba(200,169,110,.35);border-left:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:15px 28px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.btn-search:hover{background:rgba(200,169,110,.26);color:#e8d5a3!important;}
+.btn-search:disabled{opacity:.40;cursor:not-allowed;}
+.search-hint{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.22)!important;padding:8px 0;}
+
+/* STATS BAR */
+.stats-bar{display:grid;grid-template-columns:repeat(4,1fr);gap:2px;margin-bottom:2px;}
+.stat-cell{background:var(--bg2);border:1px solid var(--border);padding:13px 16px;}
+.stat-num{font-family:var(--serif);font-size:clamp(22px,3vw,30px);font-weight:300;color:#e8d5a3!important;line-height:1;}
+.stat-num.orange{color:#e87b4a!important;}
+.stat-num.blue{color:#7eb8e4!important;}
+.stat-num.green{color:#4ec994!important;}
+.stat-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.26)!important;margin-top:5px;}
+
+/* FILTER + EXPORT */
+.controls-row{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
+.filter-input-wrap{flex:1;min-width:180px;position:relative;}
+.filter-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:12px;opacity:.28;pointer-events:none;}
+.filter-input{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:10px 14px 10px 34px;outline:none;transition:border-color .2s;}
+.filter-input:focus{border-color:rgba(200,169,110,.35);}
+.filter-input::placeholder{color:rgba(240,236,228,.18)!important;}
+.tag-filter-btn{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(240,236,228,.35)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.09em;padding:10px 13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tag-filter-btn.active{background:var(--adim);color:#c8a96e!important;border-color:rgba(200,169,110,.22);}
+.tag-filter-btn:hover{color:rgba(240,236,228,.60)!important;}
+.export-btn{background:var(--bg2);border:1px solid var(--border);border-left:none;color:rgba(200,169,110,.45)!important;font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.10em;padding:10px 14px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.export-btn:hover{color:#c8a96e!important;}
+
+/* RESULTS TABLE */
+.results-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.18em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;}
+.results-count{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.55)!important;}
+
+.subdomain-list{border:1px solid var(--border);max-height:560px;overflow-y:auto;}
+.subdomain-row{display:flex;align-items:center;gap:0;border-bottom:1px solid rgba(255,255,255,.035);transition:background .12s;}
+.subdomain-row:hover{background:rgba(200,169,110,.04);}
+.subdomain-row:last-child{border-bottom:none;}
+
+.sd-prefix{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,.40)!important;padding:10px 0 10px 16px;min-width:0;}
+.sd-dot{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,.20)!important;}
+.sd-domain{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,.30)!important;padding:10px 0;}
+.sd-full{font-family:var(--mono);font-size:12px;color:#e8d5a3!important;flex:1;padding:10px 0 10px 16px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+.sd-tags{display:flex;gap:3px;padding:0 10px;flex-shrink:0;}
+.sd-tag{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border:1px solid;white-space:nowrap;}
+.tag-api  {color:#7eb8e4!important;border-color:rgba(126,184,228,.25);}
+.tag-admin{color:#c0392b!important;border-color:rgba(192,57,43,.28);}
+.tag-dev  {color:#e87b4a!important;border-color:rgba(232,123,74,.25);}
+.tag-mail {color:#4ec994!important;border-color:rgba(78,201,148,.25);}
+.tag-vpn  {color:#c8a96e!important;border-color:rgba(200,169,110,.25);}
+.tag-cdn  {color:rgba(240,236,228,.32)!important;border-color:rgba(255,255,255,.09);}
+
+.sd-links{display:flex;gap:0;padding:0 12px 0 0;flex-shrink:0;}
+.sd-link{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.40)!important;background:transparent;border:none;cursor:pointer;padding:2px 6px;transition:color .12s;text-decoration:none;}
+.sd-link:hover{color:#c8a96e!important;}
+
+/* CERT DETAILS PANEL */
+.cert-panel{background:var(--bg3);border:1px solid rgba(200,169,110,.15);padding:14px 16px;margin-top:2px;display:none;}
+.cert-panel.visible{display:block;}
+.cp-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:#c8a96e!important;margin-bottom:10px;}
+.cp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:8px;}
+.cp-item{display:flex;flex-direction:column;gap:3px;}
+.cp-lbl{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.22)!important;}
+.cp-val{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.60)!important;word-break:break-all;}
+
+/* SPINNER / EMPTY */
+.spinner-wrap{padding:48px 24px;text-align:center;background:var(--bg2);border:1px solid var(--border);}
+.spinner{width:28px;height:28px;border:2px solid rgba(200,169,110,.13);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.25)!important;}
+.empty{padding:40px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.24)!important;line-height:1.9;background:var(--bg2);border:1px solid var(--border);}
+
+/* HOW IT WORKS */
+.how-box{background:rgba(200,169,110,.04);border:1px solid rgba(200,169,110,.12);padding:14px 16px;margin-top:16px;}
+.how-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(200,169,110,.50)!important;margin-bottom:8px;}
+.how-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.38)!important;line-height:1.8;}
+.how-text strong{color:rgba(240,236,228,.60)!important;}
+
+.footer{margin-top:clamp(36px,5vw,60px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.26)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;}
+
+@media(max-width:768px){
+  .stats-bar{grid-template-columns:1fr 1fr;}
+  .search-row{flex-direction:column;}
+  .btn-search{border-left:1px solid rgba(200,169,110,.35);border-top:none;}
+  .controls-row{flex-direction:column;}
+  .tag-filter-btn,.export-btn{border-left:1px solid var(--border);border-top:none;}
+  .footer-r{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>IP, Domain & Network</span></div>
+    <h1>Subdomain <em>Discovery</em></h1>
+  </div>
+
+  <div class="search-row">
+    <input type="text" class="domain-input" id="domainInput"
+      placeholder="example.com"
+      onkeydown="if(event.key==='Enter')runSearch()">
+    <button class="btn-search" id="btnSearch" onclick="runSearch()">Discover →</button>
+  </div>
+  <div class="search-hint">
+    Searches SSL certificate transparency logs via crt.sh · Passive reconnaissance — no direct scanning of target
+  </div>
+
+  <div id="mainContent"></div>
+
+  <div class="how-box">
+    <div class="how-hdr">How This Works</div>
+    <div class="how-text">
+      Every SSL/TLS certificate issued by a Certificate Authority must be publicly logged in a
+      <strong>Certificate Transparency (CT) log</strong> — this is mandated by RFC 6962 and enforced
+      by all major browsers. These logs reveal every subdomain a certificate has ever been issued for,
+      including internal tools, staging environments, admin panels and API endpoints.<br><br>
+      This tool queries <strong>crt.sh</strong>, the largest public CT log aggregator, and returns all
+      matching subdomains deduplicated and tagged. Because this is a passive lookup of public records,
+      <strong>no traffic is sent to the target domain</strong>. The target organisation cannot detect
+      this search.
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">Certificate Transparency data via crt.sh · Passive · No scanning · Public records only</div>
+  </div>
+</div>
+
+<script>
+const API = 'https://intel-desk-api.onrender.com';
+let allSubdomains = [];
+let currentFilter = 'all';
+let filterQuery   = '';
+let currentDomain = '';
+
+// Tag classification
+const TAG_PATTERNS = [
+  { pattern: /^(api|apis|api-|rest|graphql|ws|grpc)/i,         tag: 'api',   cls: 'tag-api'   },
+  { pattern: /^(admin|administrator|backend|manage|portal|cpanel|panel|control|staff|internal|intranet|secure|auth|login|sso)/i, tag: 'admin', cls: 'tag-admin' },
+  { pattern: /^(dev|develop|development|test|testing|staging|sandbox|demo|preview|beta|qa|uat|stg|lab)/i, tag: 'dev', cls: 'tag-dev' },
+  { pattern: /^(mail|smtp|imap|pop3|mx|email|webmail)/i,        tag: 'mail',  cls: 'tag-mail'  },
+  { pattern: /^(vpn|remote|rdp|ssh|ftp|sftp|proxy|gateway)/i,  tag: 'vpn',   cls: 'tag-vpn'   },
+  { pattern: /^(cdn|static|assets|media|img|images|files|s3|storage|bucket)/i, tag: 'cdn', cls: 'tag-cdn' },
+];
+
+function getTag(subdomain) {
+  const prefix = subdomain.split('.')[0].toLowerCase();
+  for (const p of TAG_PATTERNS) {
+    if (p.pattern.test(prefix)) return { tag: p.tag, cls: p.cls };
+  }
+  return null;
+}
+
+function cleanDomain(raw) {
+  return raw.trim().toLowerCase()
+    .replace(/^https?:\/\//,'')
+    .replace(/^www\./,'')
+    .replace(/\/.*$/,'')
+    .trim();
+}
+
+async function runSearch() {
+  const raw = document.getElementById('domainInput').value.trim();
+  if (!raw) { alert('Enter a domain name.'); return; }
+
+  currentDomain = cleanDomain(raw);
+  if (!currentDomain.includes('.')) { alert('Enter a valid domain (e.g. example.com)'); return; }
+
+  document.getElementById('domainInput').value = currentDomain;
+
+  const btn = document.getElementById('btnSearch');
+  btn.disabled = true; btn.textContent = 'Searching…';
+
+  document.getElementById('mainContent').innerHTML =
+    '<div class="spinner-wrap"><div class="spinner"></div><div class="spin-lbl">Querying certificate transparency logs...</div></div>';
+
+  try {
+    const r = await fetch(`${API}/crtsh?domain=${encodeURIComponent(currentDomain)}`);
+    if (!r.ok) {
+      const e = await r.json().catch(()=>({}));
+      throw new Error(e.error || 'HTTP ' + r.status);
+    }
+    const data = await r.json();
+    allSubdomains = data.subdomains || [];
+    renderAll();
+  } catch(e) {
+    document.getElementById('mainContent').innerHTML =
+      `<div class="empty">⚠ ${esc(e.message)}<br><br>
+      crt.sh may be temporarily unavailable. Try again in a moment.</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Discover →';
+  }
+}
+
+function renderAll() {
+  if (!allSubdomains.length) {
+    document.getElementById('mainContent').innerHTML =
+      `<div class="empty">No subdomains found for <strong style="color:#e8d5a3;">${esc(currentDomain)}</strong><br>
+      This may mean no SSL certificates have been issued, or the domain uses wildcard certs only.</div>`;
+    return;
+  }
+
+  // Tag counts
+  const tagCounts = {};
+  allSubdomains.forEach(s => {
+    const t = getTag(s);
+    if (t) tagCounts[t.tag] = (tagCounts[t.tag]||0) + 1;
+  });
+
+  const interesting = Object.values(tagCounts).reduce((a,b)=>a+b,0);
+  const adminCount  = (tagCounts.admin||0) + (tagCounts.vpn||0);
+  const devCount    = tagCounts.dev||0;
+
+  const html = `
+    <div class="stats-bar">
+      <div class="stat-cell"><div class="stat-num">${allSubdomains.length.toLocaleString()}</div><div class="stat-lbl">Subdomains Found</div></div>
+      <div class="stat-cell"><div class="stat-num orange">${adminCount}</div><div class="stat-lbl">Admin / Sensitive</div></div>
+      <div class="stat-cell"><div class="stat-num blue">${devCount}</div><div class="stat-lbl">Dev / Staging</div></div>
+      <div class="stat-cell"><div class="stat-num green">${tagCounts.api||0}</div><div class="stat-lbl">API Endpoints</div></div>
+    </div>
+    <div class="controls-row">
+      <div class="filter-input-wrap">
+        <span class="filter-icon">⌕</span>
+        <input type="text" class="filter-input" id="filterInput" placeholder="Filter subdomains..." oninput="setFilter(this.value)">
+      </div>
+      <button class="tag-filter-btn ${currentFilter==='all'?'active':''}"   onclick="setTagFilter('all',this)">All</button>
+      <button class="tag-filter-btn ${currentFilter==='admin'?'active':''}" onclick="setTagFilter('admin',this)">Admin/Sensitive</button>
+      <button class="tag-filter-btn ${currentFilter==='dev'?'active':''}"   onclick="setTagFilter('dev',this)">Dev/Staging</button>
+      <button class="tag-filter-btn ${currentFilter==='api'?'active':''}"   onclick="setTagFilter('api',this)">API</button>
+      <button class="export-btn" onclick="exportCSV()">↓ CSV</button>
+      <button class="export-btn" onclick="copyAll()">⎘ Copy</button>
+    </div>
+    <div class="results-hdr" id="resultsHdr">
+      Subdomains — ${esc(currentDomain)}
+      <span class="results-count" id="resultsCount">${allSubdomains.length} found</span>
+    </div>
+    <div class="subdomain-list" id="subdomainList"></div>
+  `;
+  document.getElementById('mainContent').innerHTML = html;
+  renderList();
+}
+
+function setTagFilter(f, btn) {
+  currentFilter = f;
+  document.querySelectorAll('.tag-filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderList();
+}
+
+function setFilter(q) {
+  filterQuery = q.toLowerCase().trim();
+  renderList();
+}
+
+function renderList() {
+  const filtered = allSubdomains.filter(s => {
+    if (filterQuery && !s.toLowerCase().includes(filterQuery)) return false;
+    if (currentFilter !== 'all') {
+      const tag = getTag(s);
+      if (!tag || tag.tag !== currentFilter) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('resultsCount').textContent = filtered.length + ' shown';
+
+  if (!filtered.length) {
+    document.getElementById('subdomainList').innerHTML =
+      '<div class="empty" style="border:none;">No subdomains match this filter.</div>';
+    return;
+  }
+
+  document.getElementById('subdomainList').innerHTML = filtered.map(s => {
+    const parts   = s.split('.');
+    const tld     = parts.slice(-2).join('.');
+    const prefix  = parts.slice(0,-2).join('.');
+    const tag     = getTag(s);
+    const isWild  = s.startsWith('*.');
+
+    return `<div class="subdomain-row">
+      <div class="sd-full">${isWild ? '<span style="color:#e87b4a;opacity:.6;">*.</span>' : ''}${esc(prefix ? prefix + '.' : '')}${esc(tld)}</div>
+      <div class="sd-tags">${tag ? `<span class="sd-tag ${tag.cls}">${tag.tag}</span>` : ''}</div>
+      <div class="sd-links">
+        <a class="sd-link" href="https://${esc(s.replace(/^\*\./,''))}" target="_blank" rel="noopener" title="Open">↗</a>
+        <button class="sd-link" onclick="copyText('${esc(s)}')" title="Copy">⎘</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function copyText(txt) {
+  navigator.clipboard.writeText(txt).catch(()=>{});
+}
+
+function copyAll() {
+  const visible = getVisible();
+  navigator.clipboard.writeText(visible.join('\n')).then(() => {
+    const btn = event.target;
+    btn.textContent = '✓ Copied';
+    setTimeout(()=>btn.textContent='⎘ Copy', 1800);
+  });
+}
+
+function exportCSV() {
+  const visible = getVisible();
+  const csv = 'subdomain,tag\n' + visible.map(s => {
+    const tag = getTag(s);
+    return `"${s}","${tag?tag.tag:''}"`;
+  }).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = `subdomains-${currentDomain}.csv`;
+  a.click();
+}
+
+function getVisible() {
+  return allSubdomains.filter(s => {
+    if (filterQuery && !s.toLowerCase().includes(filterQuery)) return false;
+    if (currentFilter !== 'all') {
+      const tag = getTag(s);
+      if (!tag || tag.tag !== currentFilter) return false;
+    }
+    return true;
+  });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>
