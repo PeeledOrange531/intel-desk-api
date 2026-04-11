@@ -1160,47 +1160,99 @@ def hibp_breaches():
 @app.route("/image-search/saucenao", methods=["POST","OPTIONS"])
 @corsify
 def saucenao_search():
-    """Proxy SauceNAO reverse image search — requires SAUCENAO_API_KEY env var."""
+    """
+    Reverse image search via SauceNAO.
+    Accepts file upload (multipart) or JSON {"url": "..."}.
+    Requires SAUCENAO_API_KEY env var (free at saucenao.com).
+    If Render's IP is blocked by SauceNAO's WAF, set IMGUR_CLIENT_ID
+    as a fallback relay — image is uploaded to Imgur first to get a CDN URL.
+    """
     if not SAUCENAO_KEY:
         return jsonify({"error": "SAUCENAO_API_KEY not configured", "no_key": True}), 503
 
     if "image" not in request.files and not request.json:
         return jsonify({"error": "No image provided"}), 400
+
     try:
-        base_data = {
+        img_url   = None
+        img_bytes = None
+        img_type  = "image/jpeg"
+
+        if "image" in request.files:
+            img_file  = request.files["image"]
+            img_bytes = img_file.read()
+            img_type  = img_file.content_type or "image/jpeg"
+
+            # If IMGUR_CLIENT_ID is set, use Imgur as relay to get a CDN URL
+            # (bypasses SauceNAO WAF that blocks cloud server IPs)
+            if IMGUR_CLIENT_ID:
+                imgur_r = requests.post(
+                    "https://api.imgur.com/3/image",
+                    headers={
+                        "Authorization": f"Client-ID {IMGUR_CLIENT_ID}",
+                        "User-Agent": "IntelDesk/1.0 (https://inteldesk.io)",
+                    },
+                    files={"image": ("image.jpg", img_bytes, img_type)},
+                    timeout=20,
+                )
+                log.info(f"Imgur relay: {imgur_r.status_code}")
+                if imgur_r.ok:
+                    img_url = imgur_r.json()["data"]["link"]
+                    log.info(f"Imgur URL: {img_url}")
+                # If Imgur fails, fall through to direct file upload
+        else:
+            img_url = request.json.get("url", "").strip()
+            if not img_url:
+                return jsonify({"error": "No URL provided"}), 400
+
+        # Build SauceNAO request — prefer URL, fall back to file upload
+        sn_data = {
             "output_type": 2,
             "numres": 8,
             "db": 999,
             "api_key": SAUCENAO_KEY,
         }
-        headers = {
-            "User-Agent": "Mozilla/5.0 (compatible; IntelDesk/1.0; +https://inteldesk.io)",
+        sn_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         }
-        if "image" in request.files:
-            img_file  = request.files["image"]
-            img_bytes = img_file.read()
-            r = requests.post(
+
+        if img_url:
+            sn_data["url"] = img_url
+            sn_r = requests.post(
                 "https://saucenao.com/search.php",
-                data=base_data,
-                files={"file": ("image.jpg", img_bytes, img_file.content_type or "image/jpeg")},
-                headers=headers,
+                data=sn_data,
+                headers=sn_headers,
                 timeout=25,
             )
         else:
-            url = request.json.get("url", "")
-            r = requests.post(
+            # Direct file upload — works unless Render IP is blocked
+            sn_r = requests.post(
                 "https://saucenao.com/search.php",
-                data={**base_data, "url": url},
-                headers=headers,
+                data=sn_data,
+                files={"file": ("image.jpg", img_bytes, img_type)},
+                headers=sn_headers,
                 timeout=25,
             )
-        log.info(f"SauceNAO: {r.status_code}, {len(r.content)} bytes")
-        if r.status_code == 200:
-            return Response(r.content, status=200, mimetype="application/json")
-        if r.status_code == 429:
-            return jsonify({"error": "SauceNAO rate limit reached (200/day free tier). Try again tomorrow."}), 429
-        return jsonify({"error": f"SauceNAO HTTP {r.status_code}"}), r.status_code
+
+        log.info(f"SauceNAO: {sn_r.status_code}, {len(sn_r.content)} bytes")
+
+        if sn_r.status_code == 200:
+            result = sn_r.json()
+            if img_url:
+                result["_relay_url"] = img_url
+            return jsonify(result)
+        if sn_r.status_code == 403:
+            # IP blocked — tell client to retry with Imgur relay hint
+            return jsonify({
+                "error": "SauceNAO blocked request (403) — add IMGUR_CLIENT_ID to Render env to enable relay",
+                "blocked": True
+            }), 403
+        if sn_r.status_code == 429:
+            return jsonify({"error": "SauceNAO rate limit reached (200/day). Try again later."}), 429
+        return jsonify({"error": f"SauceNAO HTTP {sn_r.status_code}"}), sn_r.status_code
+
     except Exception as e:
+        log.error(f"SauceNAO error: {e}")
         return jsonify({"error": str(e)}), 502
 
 
@@ -1395,6 +1447,7 @@ HIVE_SECRET  = os.environ.get("HIVE_SECRET", "")
 HF_TOKEN     = os.environ.get("HF_TOKEN", "")
 CF_RADAR_TOKEN = os.environ.get("CLOUDFLARE_RADAR_TOKEN", "")
 SAUCENAO_KEY   = os.environ.get("SAUCENAO_API_KEY", "")
+IMGUR_CLIENT_ID = os.environ.get("IMGUR_CLIENT_ID", "")
 HIBP_KEY       = os.environ.get("HIBP_API_KEY", "")
 
 @app.route("/deepfake/analyze", methods=["POST","OPTIONS"])
