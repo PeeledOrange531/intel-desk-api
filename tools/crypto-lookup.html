@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Crypto Address Lookup | The Intel Desk</title>
+<meta name="description" content="Investigate cryptocurrency addresses. Look up Bitcoin and Ethereum wallets — balance, transaction history, total received/sent. Follow the money on-chain.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --btc:#f7931a;--eth:#627eea;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1100px;margin:0 auto;}
+
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,28px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* CHAIN SELECT */
+.chain-row{display:flex;gap:0;margin-bottom:2px;}
+.chain-btn{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:rgba(240,236,228,.35)!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.12em;padding:11px 14px;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;}
+.chain-btn:last-child{border-right:1px solid var(--border);}
+.chain-btn.active.btc{background:rgba(247,147,26,.10);color:#f7931a!important;border-color:rgba(247,147,26,.30);}
+.chain-btn.active.eth{background:rgba(98,126,234,.10);color:#627eea!important;border-color:rgba(98,126,234,.30);}
+.chain-btn:hover{color:rgba(240,236,228,.60)!important;}
+.chain-icon{font-size:16px;}
+
+/* INPUT */
+.input-row{display:flex;gap:0;margin-bottom:2px;}
+.addr-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:14px 18px;outline:none;transition:border-color .2s;letter-spacing:.03em;}
+.addr-input:focus{border-color:rgba(200,169,110,.38);}
+.addr-input::placeholder{color:rgba(240,236,228,.16)!important;}
+.btn-lookup{background:var(--adim);border:1px solid rgba(200,169,110,.32);border-left:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.13em;padding:14px 26px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.btn-lookup:hover{background:rgba(200,169,110,.24);color:#e8d5a3!important;}
+.btn-lookup:disabled{opacity:.40;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.22)!important;padding:8px 0 0;}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:2px;margin-bottom:2px;}
+.stat-card{background:var(--bg2);border:1px solid var(--border);padding:16px 18px;}
+.sc-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.26)!important;margin-bottom:8px;}
+.sc-value{font-family:var(--serif);font-size:clamp(20px,3vw,28px);font-weight:300;line-height:1;}
+.sc-sub{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.28)!important;margin-top:5px;}
+.btc-color{color:var(--btc)!important;}
+.eth-color{color:var(--eth)!important;}
+.green{color:var(--green)!important;}
+.red{color:var(--red)!important;}
+
+/* ADDRESS CARD */
+.addr-card{background:var(--bg2);border:1px solid var(--border);padding:14px 18px;margin-bottom:2px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;}
+.addr-icon{font-size:22px;flex-shrink:0;}
+.addr-text{font-family:var(--mono);font-size:12px;color:#e8d5a3!important;word-break:break-all;flex:1;}
+.addr-copy{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.40)!important;background:none;border:1px solid rgba(200,169,110,.18);padding:3px 9px;cursor:pointer;transition:all .15s;flex-shrink:0;}
+.addr-copy:hover{color:#c8a96e!important;border-color:rgba(200,169,110,.35);}
+.addr-explorer{font-family:var(--mono);font-size:9px;color:#7eb8e4!important;border:1px solid rgba(126,184,228,.20);padding:3px 9px;text-decoration:none;flex-shrink:0;transition:all .15s;}
+.addr-explorer:hover{background:rgba(126,184,228,.08);}
+
+/* TX LIST */
+.section-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.17em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;}
+.tx-count{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.55)!important;}
+.tx-list{border:1px solid var(--border);}
+.tx-row{display:grid;grid-template-columns:140px 1fr 1fr 120px;align-items:center;padding:11px 14px;border-bottom:1px solid rgba(255,255,255,.04);gap:12px;transition:background .12s;}
+.tx-row:hover{background:rgba(200,169,110,.03);}
+.tx-row:last-child{border-bottom:none;}
+.tx-hash{font-family:var(--mono);font-size:10px;color:#7eb8e4!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tx-hash a{color:#7eb8e4!important;text-decoration:none;}
+.tx-hash a:hover{text-decoration:underline;}
+.tx-addr{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.35)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tx-time{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.25)!important;}
+.tx-amount{font-family:var(--mono);font-size:11px;font-weight:500;text-align:right;}
+.tx-in{color:var(--green)!important;}
+.tx-out{color:var(--red)!important;}
+
+/* RISK FLAGS */
+.risk-section{margin-bottom:2px;}
+.risk-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.17em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;}
+.risk-box{background:var(--bg2);border:1px solid var(--border);padding:14px 18px;}
+.risk-clean{font-family:var(--mono);font-size:11px;color:var(--green)!important;display:flex;align-items:center;gap:8px;}
+.risk-flag{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.risk-flag:last-child{border-bottom:none;}
+.rf-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.rf-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.55)!important;line-height:1.6;}
+.rf-label{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;padding:2px 7px;border:1px solid;margin-left:8px;vertical-align:middle;}
+.flag-high{color:var(--red)!important;border-color:rgba(192,57,43,.35);}
+.flag-med{color:var(--orange)!important;border-color:rgba(232,123,74,.30);}
+.flag-info{color:var(--blue)!important;border-color:rgba(126,184,228,.25);}
+
+/* SPINNER / EMPTY */
+.spinner-wrap{padding:48px;text-align:center;background:var(--bg2);border:1px solid var(--border);}
+.spinner{width:28px;height:28px;border:2px solid rgba(200,169,110,.13);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 14px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.25)!important;}
+.empty{padding:36px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.24)!important;line-height:1.9;background:var(--bg2);border:1px solid var(--border);}
+
+/* NO KEY NOTE */
+.key-note{background:rgba(200,169,110,.05);border:1px solid rgba(200,169,110,.18);padding:14px 16px;margin-top:2px;}
+.kn-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.13em;color:#c8a96e!important;margin-bottom:7px;}
+.kn-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.38)!important;line-height:1.8;}
+.kn-text a{color:#7eb8e4!important;}
+
+.footer{margin-top:clamp(36px,5vw,60px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.26)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;}
+
+@media(max-width:768px){
+  .stats-grid{grid-template-columns:1fr 1fr;}
+  .tx-row{grid-template-columns:1fr 1fr;row-gap:4px;}
+  .tx-time{grid-column:1;font-size:9px;}
+  .tx-amount{grid-column:2;text-align:right;}
+  .input-row{flex-direction:column;}
+  .btn-lookup{border-left:1px solid rgba(200,169,110,.32);border-top:none;}
+  .footer-r{text-align:left;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>Financial Intelligence</span></div>
+    <h1>Crypto Address <em>Lookup</em></h1>
+  </div>
+
+  <!-- CHAIN SELECT -->
+  <div class="chain-row">
+    <button class="chain-btn btc active" data-chain="btc" onclick="setChain('btc',this)">
+      <span class="chain-icon">₿</span> Bitcoin (BTC)
+    </button>
+    <button class="chain-btn eth" data-chain="eth" onclick="setChain('eth',this)">
+      <span class="chain-icon">Ξ</span> Ethereum (ETH)
+    </button>
+  </div>
+
+  <!-- INPUT -->
+  <div class="input-row">
+    <input type="text" class="addr-input" id="addrInput"
+      placeholder="Enter Bitcoin or Ethereum address..."
+      onkeydown="if(event.key==='Enter')runLookup()">
+    <button class="btn-lookup" id="btnLookup" onclick="runLookup()">Look Up →</button>
+  </div>
+  <div class="input-hint" id="inputHint">
+    Bitcoin: starts with 1, 3, or bc1 · Ethereum: starts with 0x (42 chars)
+  </div>
+
+  <!-- RESULTS -->
+  <div id="results" style="margin-top:2px;"></div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">BTC via blockchain.info · ETH via Etherscan · For investigative use only</div>
+  </div>
+</div>
+
+<script>
+const API = 'https://intel-desk-api.onrender.com';
+let currentChain = 'btc';
+
+function setChain(chain, btn) {
+  currentChain = chain;
+  document.querySelectorAll('.chain-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const input = document.getElementById('addrInput');
+  input.placeholder = chain === 'btc'
+    ? 'Enter Bitcoin address (1..., 3..., bc1...)'
+    : 'Enter Ethereum address (0x...)';
+  document.getElementById('inputHint').textContent = chain === 'btc'
+    ? 'Bitcoin: starts with 1, 3, or bc1 · Data via blockchain.info'
+    : 'Ethereum: starts with 0x followed by 40 hex characters · Data via Etherscan';
+}
+
+function detectChain(addr) {
+  addr = addr.trim();
+  if (/^0x[0-9a-fA-F]{40}$/.test(addr)) return 'eth';
+  if (/^[13][a-km-zA-HJ-NP-Z1-9]{25,34}$/.test(addr)) return 'btc';
+  if (/^bc1[a-z0-9]{6,87}$/i.test(addr)) return 'btc';
+  return null;
+}
+
+async function runLookup() {
+  const addr = (document.getElementById('addrInput').value || '').trim();
+  if (!addr) { alert('Enter a crypto address.'); return; }
+
+  // Auto-detect chain
+  const detected = detectChain(addr);
+  if (detected && detected !== currentChain) {
+    currentChain = detected;
+    document.querySelectorAll('.chain-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.chain === detected);
+    });
+  }
+
+  const btn = document.getElementById('btnLookup');
+  btn.disabled = true; btn.textContent = 'Looking up…';
+  document.getElementById('results').innerHTML =
+    '<div class="spinner-wrap"><div class="spinner"></div><div class="spin-lbl">Fetching on-chain data...</div></div>';
+
+  try {
+    if (currentChain === 'btc') await lookupBTC(addr);
+    else await lookupETH(addr);
+  } catch(e) {
+    document.getElementById('results').innerHTML =
+      `<div class="empty">⚠ ${esc(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Look Up →';
+  }
+}
+
+// ── BITCOIN ───────────────────────────────────────────────────────────────────
+async function lookupBTC(addr) {
+  const r = await fetch(`${API}/crypto/btc/${encodeURIComponent(addr)}`);
+  const data = await r.json();
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+
+  const satToBTC = n => (n / 1e8).toFixed(8);
+  const bal = parseFloat(satToBTC(data.final_balance));
+  const rx  = parseFloat(satToBTC(data.total_received));
+  const snt = parseFloat(satToBTC(data.total_sent));
+
+  let html = `
+    <div class="addr-card">
+      <span class="addr-icon">₿</span>
+      <span class="addr-text">${esc(addr)}</span>
+      <button class="addr-copy" onclick="copyText('${esc(addr)}',this)">Copy</button>
+      <a class="addr-explorer" href="https://www.blockchain.com/btc/address/${esc(addr)}" target="_blank" rel="noopener">Blockchain.com →</a>
+      <a class="addr-explorer" href="https://blockchair.com/bitcoin/address/${esc(addr)}" target="_blank" rel="noopener">Blockchair →</a>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="sc-label">Current Balance</div>
+        <div class="sc-value btc-color">${bal.toFixed(8)}</div>
+        <div class="sc-sub">BTC · ${fmtUSD(bal, 'btc')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Total Received</div>
+        <div class="sc-value green">${rx.toFixed(8)}</div>
+        <div class="sc-sub">BTC lifetime</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Total Sent</div>
+        <div class="sc-value red">${snt.toFixed(8)}</div>
+        <div class="sc-sub">BTC lifetime</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Transactions</div>
+        <div class="sc-value">${(data.n_tx||0).toLocaleString()}</div>
+        <div class="sc-sub">Total tx count</div>
+      </div>
+    </div>`;
+
+  // Risk flags
+  const flags = analyzeBTC(data, addr, bal, rx);
+  html += renderFlags(flags);
+
+  // Transactions
+  const txs = (data.txs || []).slice(0, 20);
+  if (txs.length) {
+    html += `<div class="section-hdr">Recent Transactions <span class="tx-count">Latest ${txs.length} of ${data.n_tx}</span></div>
+    <div class="tx-list">${txs.map(tx => renderBTCTx(tx, addr)).join('')}</div>`;
+  }
+
+  document.getElementById('results').innerHTML = html;
+}
+
+function renderBTCTx(tx, myAddr) {
+  const satToBTC = n => (n / 1e8);
+  // Determine if incoming or outgoing
+  const myOutputs = (tx.out || []).filter(o => o.addr === myAddr);
+  const myInputs  = (tx.inputs || []).filter(i => i.prev_out?.addr === myAddr);
+  const isIn = myOutputs.length > 0 && myInputs.length === 0;
+  const isOut = myInputs.length > 0;
+
+  const amount = isIn
+    ? myOutputs.reduce((s,o) => s + (o.value||0), 0)
+    : myInputs.reduce((s,i) => s + (i.prev_out?.value||0), 0);
+
+  const counterparty = isIn
+    ? (tx.inputs?.[0]?.prev_out?.addr || 'Coinbase/Unknown')
+    : (myOutputs[0]?.addr || (tx.out?.[0]?.addr || 'Unknown'));
+
+  const time = tx.time ? new Date(tx.time * 1000).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'}) : '—';
+  const explorerUrl = `https://www.blockchain.com/btc/tx/${tx.hash}`;
+
+  return `<div class="tx-row">
+    <div class="tx-hash"><a href="${explorerUrl}" target="_blank" rel="noopener">${esc(tx.hash?.slice(0,16))}…</a></div>
+    <div class="tx-addr">${isIn ? '← ' : '→ '}${esc(counterparty?.slice(0,22))}…</div>
+    <div class="tx-time">${time}</div>
+    <div class="tx-amount ${isIn?'tx-in':'tx-out'}">${isIn?'+':'-'}${satToBTC(amount).toFixed(6)} BTC</div>
+  </div>`;
+}
+
+function analyzeBTC(data, addr, bal, rx) {
+  const flags = [];
+  if (data.n_tx === 0) flags.push({ icon:'ℹ', text:'No transaction history found. Address may be unused or very new.', cls:'flag-info' });
+  if (bal > 10) flags.push({ icon:'⚠', text:`Large balance: ${bal.toFixed(2)} BTC. High-value address — monitor for movements.`, cls:'flag-med' });
+  if (rx > 100) flags.push({ icon:'⚠', text:`Address has received over ${rx.toFixed(0)} BTC total over its lifetime. Significant volume.`, cls:'flag-med' });
+  if (data.n_tx > 1000) flags.push({ icon:'⚠', text:`Very high transaction count (${data.n_tx.toLocaleString()}). May be an exchange hot wallet or mixing service.`, cls:'flag-med' });
+  return flags;
+}
+
+// ── ETHEREUM ──────────────────────────────────────────────────────────────────
+async function lookupETH(addr) {
+  const r = await fetch(`${API}/crypto/eth/${encodeURIComponent(addr)}`);
+  const data = await r.json();
+
+  if (data.no_key) {
+    document.getElementById('results').innerHTML = renderNoKeyNote();
+    return;
+  }
+  if (!r.ok) throw new Error(data.error || 'HTTP ' + r.status);
+
+  const weiToETH = n => parseFloat(n) / 1e18;
+  const bal = weiToETH(data.balance || '0');
+  const txCount = parseInt(data.tx_count || '0');
+
+  let html = `
+    <div class="addr-card">
+      <span class="addr-icon">Ξ</span>
+      <span class="addr-text">${esc(addr)}</span>
+      <button class="addr-copy" onclick="copyText('${esc(addr)}',this)">Copy</button>
+      <a class="addr-explorer" href="https://etherscan.io/address/${esc(addr)}" target="_blank" rel="noopener">Etherscan →</a>
+      <a class="addr-explorer" href="https://blockchair.com/ethereum/address/${esc(addr)}" target="_blank" rel="noopener">Blockchair →</a>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="sc-label">Current Balance</div>
+        <div class="sc-value eth-color">${bal.toFixed(6)}</div>
+        <div class="sc-sub">ETH · ${fmtUSD(bal, 'eth')}</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Transactions</div>
+        <div class="sc-value">${txCount.toLocaleString()}</div>
+        <div class="sc-sub">Total tx count</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Contract?</div>
+        <div class="sc-value">${data.is_contract ? 'Yes' : 'No'}</div>
+        <div class="sc-sub">${data.is_contract ? 'Smart contract address' : 'Externally owned account'}</div>
+      </div>
+      <div class="stat-card">
+        <div class="sc-label">Token Holdings</div>
+        <div class="sc-value">${(data.token_count||0).toLocaleString()}</div>
+        <div class="sc-sub">ERC-20 tokens held</div>
+      </div>
+    </div>`;
+
+  const flags = analyzeETH(data, addr, bal, txCount);
+  html += renderFlags(flags);
+
+  // Transactions
+  const txs = data.txs || [];
+  if (txs.length) {
+    html += `<div class="section-hdr">Recent Transactions <span class="tx-count">Latest ${txs.length}</span></div>
+    <div class="tx-list">${txs.map(tx => renderETHTx(tx, addr)).join('')}</div>`;
+  }
+
+  document.getElementById('results').innerHTML = html;
+}
+
+function renderETHTx(tx, myAddr) {
+  const isIn = tx.to?.toLowerCase() === myAddr.toLowerCase();
+  const weiToETH = n => (parseFloat(n||'0') / 1e18).toFixed(6);
+  const counterparty = isIn ? tx.from : tx.to;
+  const time = tx.timeStamp ? new Date(parseInt(tx.timeStamp)*1000).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—';
+  const explorerUrl = `https://etherscan.io/tx/${tx.hash}`;
+
+  return `<div class="tx-row">
+    <div class="tx-hash"><a href="${explorerUrl}" target="_blank" rel="noopener">${esc(tx.hash?.slice(0,16))}…</a></div>
+    <div class="tx-addr">${isIn?'← ':'→ '}${esc(counterparty?.slice(0,22))}…</div>
+    <div class="tx-time">${time}</div>
+    <div class="tx-amount ${isIn?'tx-in':'tx-out'}">${isIn?'+':'-'}${weiToETH(tx.value)} ETH</div>
+  </div>`;
+}
+
+function analyzeETH(data, addr, bal, txCount) {
+  const flags = [];
+  if (data.is_contract) flags.push({ icon:'ℹ', text:'This is a smart contract address, not a personal wallet. May be a token contract, DEX, or protocol.', cls:'flag-info' });
+  if (bal > 10) flags.push({ icon:'⚠', text:`Large ETH balance: ${bal.toFixed(2)} ETH. High-value address.`, cls:'flag-med' });
+  if (txCount > 5000) flags.push({ icon:'⚠', text:`Very high transaction volume (${txCount.toLocaleString()} txs). Possible exchange, mixer, or high-frequency trader.`, cls:'flag-med' });
+  return flags;
+}
+
+function analyzeFlags(flags) { return flags; }
+
+function renderFlags(flags) {
+  const html = `<div class="risk-hdr">Analytical Notes</div>
+  <div class="risk-box">
+    ${!flags.length
+      ? '<div class="risk-clean"><span>✓</span> No significant patterns detected at this time.</div>'
+      : flags.map(f => `<div class="risk-flag">
+          <span class="rf-icon">${f.icon}</span>
+          <span class="rf-text">${esc(f.text)}</span>
+        </div>`).join('')
+    }
+  </div>`;
+  return html;
+}
+
+function renderNoKeyNote() {
+  return `<div class="key-note">
+    <div class="kn-hdr">⚙ Etherscan API Key Required for ETH</div>
+    <div class="kn-text">
+      Ethereum lookups require a free Etherscan API key.<br>
+      1. Register free at <a href="https://etherscan.io/register" target="_blank">etherscan.io/register</a><br>
+      2. Go to <a href="https://etherscan.io/myapikey" target="_blank">etherscan.io/myapikey</a> → Add<br>
+      3. Add to Render as <code style="background:rgba(255,255,255,.06);padding:1px 5px;">ETHERSCAN_API_KEY</code><br><br>
+      In the meantime, view this address directly on
+      <a href="https://etherscan.io/address/${document.getElementById('addrInput').value}" target="_blank">Etherscan →</a>
+    </div>
+  </div>`;
+}
+
+function fmtUSD(amount, chain) {
+  // Approximate prices — shown as estimates only
+  const prices = { btc: 83000, eth: 3200 };
+  const usd = amount * (prices[chain] || 0);
+  if (usd < 0.01) return '< $0.01 USD est.';
+  if (usd > 1e6) return '$' + (usd/1e6).toFixed(2) + 'M USD est.';
+  if (usd > 1e3) return '$' + (usd/1e3).toFixed(1) + 'K USD est.';
+  return '$' + usd.toFixed(2) + ' USD est.';
+}
+
+function copyText(val, btn) {
+  navigator.clipboard.writeText(val).then(() => {
+    const orig = btn.textContent;
+    btn.textContent = '✓';
+    setTimeout(() => btn.textContent = orig, 1500);
+  });
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Auto-detect chain on input
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('addrInput').addEventListener('input', function() {
+    const detected = detectChain(this.value);
+    if (detected) {
+      document.querySelectorAll('.chain-btn').forEach(b => {
+        b.classList.toggle('active', b.dataset.chain === detected);
+      });
+      currentChain = detected;
+    }
+  });
+});
+</script>
+</body>
+</html>

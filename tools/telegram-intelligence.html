@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Telegram Intelligence | The Intel Desk</title>
+<meta name="description" content="Investigate Telegram channels, groups and users. Look up any public channel by username, search across Telegram databases, and access OSINT research resources.">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --tg:#2AABEE;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1100px;margin:0 auto;}
+
+.hero{padding:clamp(36px,6vw,60px) 0 clamp(20px,3vw,28px);border-bottom:1px solid var(--border);margin-bottom:clamp(24px,3vw,36px);}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:14px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(30px,5vw,56px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* MODE TABS */
+.mode-tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:clamp(20px,3vw,32px);}
+.mode-tab{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:11px 20px;cursor:pointer;border:none;background:transparent;border-bottom:2px solid transparent;color:rgba(240,236,228,.32)!important;transition:all .2s;}
+.mode-tab.active{color:#c8a96e!important;border-bottom-color:#c8a96e;}
+.mode-tab:hover{color:rgba(240,236,228,.60)!important;}
+
+/* LOOKUP MODE */
+.lookup-section{}
+.section-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.26)!important;margin-bottom:10px;}
+.input-row{display:flex;gap:0;margin-bottom:2px;}
+.tg-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:14px;padding:14px 18px;outline:none;transition:border-color .2s;}
+.tg-input:focus{border-color:rgba(200,169,110,.38);}
+.tg-input::placeholder{color:rgba(240,236,228,.16)!important;}
+.btn-run{background:var(--adim);border:1px solid rgba(200,169,110,.32);border-left:none;color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.13em;padding:14px 26px;cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;}
+.btn-run:hover{background:rgba(200,169,110,.24);color:#e8d5a3!important;}
+.btn-run:disabled{opacity:.40;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.22)!important;margin-top:8px;}
+
+/* CHANNEL RESULT */
+.channel-card{background:var(--bg2);border:1px solid rgba(42,171,238,.20);padding:20px 22px;margin-top:2px;}
+.cc-header{display:flex;align-items:flex-start;gap:16px;margin-bottom:14px;}
+.cc-avatar{width:56px;height:56px;border-radius:50%;background:rgba(42,171,238,.15);border:2px solid rgba(42,171,238,.30);display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;overflow:hidden;}
+.cc-avatar img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+.cc-meta{flex:1;}
+.cc-name{font-family:var(--sans);font-size:18px;font-weight:600;color:#e8d5a3!important;margin-bottom:4px;}
+.cc-username{font-family:var(--mono);font-size:11px;color:rgba(42,171,238,.70)!important;margin-bottom:6px;}
+.cc-desc{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.45)!important;line-height:1.7;max-width:600px;}
+.cc-type{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;padding:3px 9px;border:1px solid rgba(42,171,238,.30);color:rgba(42,171,238,.70)!important;display:inline-block;margin-top:6px;}
+.cc-stats{display:flex;gap:20px;flex-wrap:wrap;padding:14px 0;border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:14px 0;}
+.cc-stat{text-align:center;}
+.cs-num{font-family:var(--serif);font-size:22px;font-weight:300;color:#e8d5a3!important;line-height:1;}
+.cs-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.28)!important;margin-top:3px;}
+.cc-links{display:flex;gap:6px;flex-wrap:wrap;}
+.cc-link{font-family:var(--mono);font-size:10px;color:#7eb8e4!important;border:1px solid rgba(126,184,228,.22);padding:5px 14px;text-decoration:none;transition:all .15s;}
+.cc-link:hover{background:rgba(126,184,228,.08);}
+.cc-link.primary{background:rgba(42,171,238,.10);border-color:rgba(42,171,238,.30);color:#2AABEE!important;}
+.cc-link.primary:hover{background:rgba(42,171,238,.20);}
+
+/* NOT FOUND */
+.not-found{background:var(--bg2);border:1px solid var(--border);padding:32px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.28)!important;line-height:2;margin-top:2px;}
+
+/* SEARCH MODE */
+.search-section{}
+.search-row{display:flex;gap:0;margin-bottom:2px;}
+.search-input{flex:1;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:14px;padding:14px 18px;outline:none;transition:border-color .2s;}
+.search-input:focus{border-color:rgba(200,169,110,.38);}
+.search-input::placeholder{color:rgba(240,236,228,.16)!important;}
+
+/* SEARCH ENGINES GRID */
+.engines-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.17em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;}
+.engines-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:0;border:1px solid var(--border);background:var(--border);}
+.engine-card{background:var(--bg2);padding:15px 16px;display:flex;flex-direction:column;gap:7px;transition:background .15s;}
+.engine-card:hover{background:rgba(200,169,110,.04);}
+.ec-top{display:flex;align-items:center;gap:9px;}
+.ec-icon{font-size:18px;flex-shrink:0;}
+.ec-name{font-family:var(--sans);font-size:13px;font-weight:600;color:#e8d5a3!important;}
+.ec-desc{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.30)!important;line-height:1.5;}
+.ec-btn{font-family:var(--mono);font-size:10px;color:#7eb8e4!important;border:1px solid rgba(126,184,228,.22);background:transparent;padding:6px 12px;cursor:pointer;text-align:center;text-decoration:none;display:block;margin-top:auto;transition:all .15s;}
+.ec-btn:hover{background:rgba(126,184,228,.08);border-color:rgba(126,184,238,.40);}
+
+/* ANALYSIS TIPS */
+.tips-section{margin-top:2px;}
+.tips-hdr{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.17em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;}
+.tips-list{border:1px solid var(--border);background:var(--bg2);}
+.tip-item{padding:13px 16px;border-bottom:1px solid rgba(255,255,255,.04);display:flex;gap:12px;}
+.tip-item:last-child{border-bottom:none;}
+.tip-icon{font-size:16px;flex-shrink:0;margin-top:1px;}
+.tip-body{}
+.tip-title{font-family:var(--mono);font-size:11px;font-weight:500;color:#e8d5a3!important;margin-bottom:3px;}
+.tip-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.38)!important;line-height:1.6;}
+.tip-text code{background:rgba(255,255,255,.06);padding:1px 5px;font-size:10px;}
+
+/* SPINNER */
+.spinner-wrap{padding:40px;text-align:center;background:var(--bg2);border:1px solid var(--border);margin-top:2px;}
+.spinner{width:28px;height:28px;border:2px solid rgba(200,169,110,.13);border-top-color:#c8a96e;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.spin-lbl{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.25)!important;}
+
+.footer{margin-top:clamp(36px,5vw,60px);padding:18px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.26)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+.footer-r{text-align:right;}
+
+@media(max-width:768px){
+  .engines-grid{grid-template-columns:1fr 1fr;}
+  .mode-tab{padding:9px 13px;font-size:10px;}
+  .footer-r{text-align:left;}
+}
+@media(max-width:480px){
+  .engines-grid{grid-template-columns:1fr;}
+  .input-row,.search-row{flex-direction:column;}
+  .btn-run{border-left:1px solid rgba(200,169,110,.32);border-top:none;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>Identity Intelligence</span></div>
+    <h1>Telegram <em>Intelligence</em></h1>
+  </div>
+
+  <div class="mode-tabs">
+    <button class="mode-tab active" onclick="switchMode('lookup',this)">Channel / User Lookup</button>
+    <button class="mode-tab" onclick="switchMode('search',this)">Search & Discover</button>
+    <button class="mode-tab" onclick="switchMode('tips',this)">Investigation Tips</button>
+  </div>
+
+  <!-- LOOKUP MODE -->
+  <div id="mode-lookup">
+    <div class="section-label">Enter Telegram username or channel link</div>
+    <div class="input-row">
+      <input type="text" class="tg-input" id="lookupInput"
+        placeholder="@username  or  t.me/channelname  or  channelname"
+        onkeydown="if(event.key==='Enter')runLookup()">
+      <button class="btn-run" id="btnLookup" onclick="runLookup()">Look Up →</button>
+    </div>
+    <div class="input-hint">
+      Works for public channels, groups, and users · Fetches publicly visible metadata from Telegram's preview endpoint
+    </div>
+    <div id="lookupResult"></div>
+  </div>
+
+  <!-- SEARCH MODE -->
+  <div id="mode-search" style="display:none;">
+    <div class="section-label">Search keyword</div>
+    <div class="search-row">
+      <input type="text" class="search-input" id="searchInput"
+        placeholder="Enter keywords, topic, or username to search..."
+        oninput="updateSearchLinks()">
+      <button class="btn-run" onclick="openAll()">Open All →</button>
+    </div>
+
+    <div style="margin-top:2px;">
+      <div class="engines-hdr">Search Engines — Opens with your keyword pre-filled</div>
+      <div class="engines-grid" id="enginesGrid"></div>
+    </div>
+  </div>
+
+  <!-- TIPS MODE -->
+  <div id="mode-tips" style="display:none;">
+    <div class="tips-hdr">Telegram OSINT — Investigation Techniques</div>
+    <div class="tips-list">
+
+      <div class="tip-item">
+        <span class="tip-icon">🔍</span>
+        <div class="tip-body">
+          <div class="tip-title">Finding a Channel's Numeric ID</div>
+          <div class="tip-text">Forward any message from a channel to <a href="https://t.me/userinfobot" target="_blank" style="color:#7eb8e4;">@userinfobot</a> or <a href="https://t.me/getidsbot" target="_blank" style="color:#7eb8e4;">@getidsbot</a> to retrieve the permanent numeric ID. Unlike usernames, this ID never changes and is useful for tracking entities that rename themselves. Channel IDs typically start with <code>-100</code>.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">🕰</span>
+        <div class="tip-body">
+          <div class="tip-title">Account Creation Date from ID</div>
+          <div class="tip-text">Telegram user IDs are sequential — lower numbers indicate older accounts. Use <a href="https://t.me/tgdb_bot" target="_blank" style="color:#7eb8e4;">@tgdb_bot</a> or <a href="https://t.me/creationdatebot" target="_blank" style="color:#7eb8e4;">@creationdatebot</a> to estimate when an account was created from its numeric ID. Pre-2013 IDs (below ~10M) are very early adopter accounts.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">🌐</span>
+        <div class="tip-body">
+          <div class="tip-title">Google Dorking for Telegram Content</div>
+          <div class="tip-text">Use <code>site:t.me "keyword"</code> in Google to find public Telegram content indexed by search engines. Combine with <code>inurl:t.me</code> for channel links. Try <code>site:t.me/s/ "phrase"</code> to search within channel message previews that Telegram exposes publicly.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">📸</span>
+        <div class="tip-body">
+          <div class="tip-title">Profile Photo Intelligence</div>
+          <div class="tip-text">Profile photos can be downloaded from any public account. Run them through Reverse Image Search (another Intel Desk tool) — particularly Yandex, which excels at finding Russian-language sources. Profile photos are often reused across platforms and can link identities together.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">🔗</span>
+        <div class="tip-body">
+          <div class="tip-title">Forward Chain Analysis</div>
+          <div class="tip-text">When a channel forwards messages, the original source is preserved and linked. Building a forward map — which channels forward to/from which others — reveals networks and relationships. Tools like <a href="https://t.me/forwardmapbot" target="_blank" style="color:#7eb8e4;">@forwardmapbot</a> automate this. The Telepathy framework on GitHub does this at scale.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">📍</span>
+        <div class="tip-body">
+          <div class="tip-title">Geolocation via Nearby Feature</div>
+          <div class="tip-text">Telegram's "People Nearby" feature exposes users and groups within a radius. This feature has been partially restricted since 2024, but archived data from tools like Geogramint may still be useful for historical investigations. Always check the date of any location-based data.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">⚠</span>
+        <div class="tip-body">
+          <div class="tip-title">Account Takeover & Impersonation Indicators</div>
+          <div class="tip-text">Sudden change in posting language, tone shift, or content pivot may indicate account takeover or sale. Check TGStat for historical subscriber counts and posting frequency. A sudden spike in subscribers combined with a content change is a strong impersonation indicator.</div>
+        </div>
+      </div>
+
+      <div class="tip-item">
+        <span class="tip-icon">📊</span>
+        <div class="tip-body">
+          <div class="tip-title">Key OSINT Resources</div>
+          <div class="tip-text">
+            <a href="https://tgstat.com" target="_blank" style="color:#7eb8e4;">TGStat</a> — analytics, subscriber history, post statistics<br>
+            <a href="https://telemetr.io" target="_blank" style="color:#7eb8e4;">Telemetr.io</a> — channel rankings, growth tracking<br>
+            <a href="https://lyzem.com" target="_blank" style="color:#7eb8e4;">Lyzem</a> — full-text search across public channels<br>
+            <a href="https://github.com/sockysec/Telerecon" target="_blank" style="color:#7eb8e4;">Telerecon</a> — comprehensive OSINT framework (requires Telegram account)<br>
+            <a href="https://intelx.io/?d=telegram" target="_blank" style="color:#7eb8e4;">Intelligence X</a> — archived Telegram data including deleted content
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">Public Telegram data only · Metadata via t.me preview · For investigative use only</div>
+  </div>
+</div>
+
+<script>
+const API = 'https://intel-desk-api.onrender.com';
+
+// ── MODES ─────────────────────────────────────────────────────────────────────
+function switchMode(mode, btn) {
+  ['lookup','search','tips'].forEach(m => {
+    document.getElementById('mode-' + m).style.display = m === mode ? 'block' : 'none';
+  });
+  document.querySelectorAll('.mode-tab').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+}
+
+// ── CHANNEL LOOKUP ────────────────────────────────────────────────────────────
+async function runLookup() {
+  let raw = (document.getElementById('lookupInput').value || '').trim();
+  if (!raw) { alert('Enter a Telegram username or link.'); return; }
+
+  // Normalise
+  raw = raw.replace(/^https?:\/\/t\.me\//i,'').replace(/^@/,'').trim();
+  if (!raw) { alert('Invalid Telegram link.'); return; }
+
+  const btn = document.getElementById('btnLookup');
+  btn.disabled = true; btn.textContent = 'Looking up…';
+  document.getElementById('lookupResult').innerHTML =
+    '<div class="spinner-wrap"><div class="spinner"></div><div class="spin-lbl">Fetching Telegram metadata...</div></div>';
+
+  try {
+    const r = await fetch(`${API}/telegram/lookup?username=${encodeURIComponent(raw)}`);
+    const data = await r.json();
+    if (!r.ok || data.error) {
+      showNotFound(raw, data.error);
+    } else {
+      renderChannel(data, raw);
+    }
+  } catch(e) {
+    showNotFound(raw, e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Look Up →';
+  }
+}
+
+function renderChannel(d, username) {
+  const avatarHtml = d.photo_url
+    ? `<img src="${esc(d.photo_url)}" alt="" onerror="this.parentNode.textContent='✈'">`
+    : (d.type === 'channel' ? '📢' : d.type === 'group' ? '👥' : '👤');
+
+  const typeLabel = d.type === 'channel' ? 'Channel' :
+                   d.type === 'group'   ? 'Group'   :
+                   d.type === 'bot'     ? 'Bot'      : 'User/Account';
+
+  document.getElementById('lookupResult').innerHTML = `
+    <div class="channel-card">
+      <div class="cc-header">
+        <div class="cc-avatar">${avatarHtml}</div>
+        <div class="cc-meta">
+          <div class="cc-name">${esc(d.title || d.username || username)}</div>
+          <div class="cc-username">@${esc(username)}</div>
+          ${d.description ? `<div class="cc-desc">${esc(d.description.slice(0,200))}${d.description.length>200?'…':''}</div>` : ''}
+          <span class="cc-type">${typeLabel}</span>
+        </div>
+      </div>
+
+      ${d.member_count ? `<div class="cc-stats">
+        <div class="cc-stat">
+          <div class="cs-num">${fmtNum(d.member_count)}</div>
+          <div class="cs-lbl">${d.type === 'channel' ? 'Subscribers' : 'Members'}</div>
+        </div>
+        ${d.online_count ? `<div class="cc-stat">
+          <div class="cs-num" style="color:var(--green)">${fmtNum(d.online_count)}</div>
+          <div class="cs-lbl">Online Now</div>
+        </div>` : ''}
+      </div>` : ''}
+
+      <div class="cc-links">
+        <a class="cc-link primary" href="https://t.me/${esc(username)}" target="_blank" rel="noopener">Open in Telegram →</a>
+        <a class="cc-link" href="https://t.me/s/${esc(username)}" target="_blank" rel="noopener">View Messages (web) →</a>
+        <a class="cc-link" href="https://tgstat.com/channel/@${esc(username)}" target="_blank" rel="noopener">TGStat Analytics →</a>
+        <a class="cc-link" href="https://telemetr.io/en/channels/${esc(username)}" target="_blank" rel="noopener">Telemetr.io →</a>
+        <a class="cc-link" href="https://lyzem.com/search?q=%40${esc(username)}" target="_blank" rel="noopener">Lyzem Search →</a>
+      </div>
+    </div>`;
+}
+
+function showNotFound(username, msg) {
+  document.getElementById('lookupResult').innerHTML = `
+    <div class="not-found">
+      <strong style="color:#e8d5a3;">@${esc(username)}</strong> — not found or private<br>
+      ${msg ? `<span style="color:#e87b4a;">${esc(msg)}</span><br>` : ''}
+      This may be a private channel, a deleted account, or the username may have changed.<br><br>
+      <a href="https://t.me/${esc(username)}" target="_blank" style="color:#7eb8e4;">Try opening directly in Telegram →</a>
+      &nbsp;·&nbsp;
+      <a href="https://tgstat.com/search?q=${esc(username)}" target="_blank" style="color:#7eb8e4;">Search TGStat →</a>
+    </div>`;
+}
+
+// ── SEARCH ENGINES ────────────────────────────────────────────────────────────
+const ENGINES = [
+  {
+    name: 'TGStat',
+    icon: '📊',
+    desc: 'Largest Telegram analytics platform. Subscriber history, post stats, growth trends. Best for channel research.',
+    buildUrl: q => `https://tgstat.com/search?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Lyzem',
+    icon: '🔍',
+    desc: 'Full-text search across public Telegram channels. Searches within message content, not just channel names.',
+    buildUrl: q => `https://lyzem.com/search?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Telemetr.io',
+    icon: '📈',
+    desc: 'Channel rankings, audience analytics, mention tracking and related channel discovery.',
+    buildUrl: q => `https://telemetr.io/en/channels?search=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Telegago',
+    icon: '🌐',
+    desc: 'Google Custom Search Engine for Telegram. Searches publicly indexed Telegram content via Google.',
+    buildUrl: q => `https://cse.google.com/cse?cx=006368593537057042503:efxu7xprihg&q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Google Dork',
+    icon: '🔎',
+    desc: 'Direct Google search restricted to t.me. Finds public channels and messages indexed by Google.',
+    buildUrl: q => `https://www.google.com/search?q=site%3At.me+${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Intelligence X',
+    icon: '🗄',
+    desc: 'Archived Telegram data including deleted channels and messages. Requires free account for full access.',
+    buildUrl: q => `https://intelx.io/?d=telegram&q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Telegram Search',
+    icon: '✈',
+    desc: 'Telegram\'s own search. Opens in web app — best for finding channels and groups by keyword.',
+    buildUrl: q => `https://web.telegram.org/k/#?q=${encodeURIComponent(q)}`,
+  },
+  {
+    name: 'Mention.io',
+    icon: '📣',
+    desc: 'Track mentions of keywords, brands, or people across Telegram and other platforms.',
+    buildUrl: q => `https://mention.com/en/search/?q=${encodeURIComponent(q)}&source=telegram`,
+  },
+];
+
+function buildEnginesGrid(q) {
+  return ENGINES.map(e => {
+    const url = e.buildUrl(q || '');
+    return `<div class="engine-card">
+      <div class="ec-top">
+        <span class="ec-icon">${e.icon}</span>
+        <span class="ec-name">${esc(e.name)}</span>
+      </div>
+      <div class="ec-desc">${esc(e.desc)}</div>
+      <a class="ec-btn" href="${esc(url)}" target="_blank" rel="noopener" data-engine="${esc(e.name)}">
+        ${q ? `Search "${esc(q.slice(0,18))}${q.length>18?'…':''}" →` : 'Open →'}
+      </a>
+    </div>`;
+  }).join('');
+}
+
+function updateSearchLinks() {
+  const q = (document.getElementById('searchInput').value || '').trim();
+  document.getElementById('enginesGrid').innerHTML = buildEnginesGrid(q);
+}
+
+function openAll() {
+  const q = (document.getElementById('searchInput').value || '').trim();
+  if (!q) { alert('Enter a search keyword first.'); return; }
+  const selected = ENGINES.slice(0,4); // Open first 4 to avoid too many tabs
+  selected.forEach((e, i) => setTimeout(() => window.open(e.buildUrl(q), '_blank', 'noopener'), i * 400));
+}
+
+function fmtNum(n) {
+  if (!n) return '—';
+  if (n >= 1e6) return (n/1e6).toFixed(1) + 'M';
+  if (n >= 1e3) return (n/1e3).toFixed(0) + 'K';
+  return n.toLocaleString();
+}
+
+function esc(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// Init search grid
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('enginesGrid').innerHTML = buildEnginesGrid('');
+});
+</script>
+</body>
+</html>
