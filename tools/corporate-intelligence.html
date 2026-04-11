@@ -258,10 +258,14 @@ async function searchICIJ(q) {
 
 // ── UK COMPANIES HOUSE ────────────────────────────────────────────────────────
 async function searchCH(q) {
-  const r = await fetch(`${API}/companies-house/search?q=${encodeURIComponent(q)}`);
-  if (!r.ok) throw new Error('Companies House HTTP ' + r.status);
-  const data = await r.json();
-  return { source: 'ch', results: data.items || [] };
+  const r    = await fetch(`${API}/companies-house/search?q=${encodeURIComponent(q)}`);
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data.error || 'Companies House HTTP ' + r.status);
+  return {
+    source:    'ch',
+    results:   data.items || [],
+    scrapeUrl: data.scrape_url || null,
+  };
 }
 
 // ── RENDER RESULTS ────────────────────────────────────────────────────────────
@@ -275,7 +279,7 @@ function renderResults(q, settled) {
   settled.forEach(s => {
     if (s.status === 'fulfilled') {
       if (s.value.source === 'icij') icijResults = s.value.results;
-      if (s.value.source === 'ch')   chResults   = s.value.results;
+      if (s.value.source === 'ch')   { chResults = s.value.results; if (s.value.noKey) errors = []; }
     } else {
       errors.push(s.reason?.message || 'Unknown error');
     }
@@ -317,9 +321,14 @@ function renderResults(q, settled) {
     </div>
     <div class="result-list">${chResults.map(r => renderCHCard(r)).join('')}</div>`;
   } else if (activeSources.has('ch')) {
+    const chResult   = settled.find(s => s.status === 'fulfilled' && s.value?.source === 'ch');
+    const scrapeUrl  = chResult?.value?.scrapeUrl;
     html += `<div class="results-hdr" style="margin-top:2px;">UK Companies House
       <span class="results-count">No matches</span></div>
-    <div class="empty-state" style="border-top:none;">Not found in UK register.</div>`;
+    <div class="empty-state" style="border-top:none;">
+      Not found in UK register.
+      ${scrapeUrl ? `<br><a href="${scrapeUrl}" target="_blank" style="color:#7eb8e4;">Search directly on Companies House →</a>` : ''}
+    </div>`;
   }
 
   // Errors
