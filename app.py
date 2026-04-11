@@ -1499,6 +1499,140 @@ def crtsh_search():
         log.error(f"crt.sh error: {e}")
         return jsonify({"error": str(e)}), 502
 
+
+# ── SEC EDGAR — US Company Search (no key needed) ─────────────────────────────
+@app.route("/sec/search", methods=["GET","OPTIONS"])
+@corsify
+def sec_search():
+    """Search SEC EDGAR for US public companies. No API key required."""
+    q = request.args.get("q","").strip()
+    if not q:
+        return jsonify({"error": "q parameter required"}), 400
+    try:
+        # EDGAR full-text search API — free, no key, covers 800k+ filers
+        r = requests.get(
+            "https://efts.sec.gov/LATEST/search-index",
+            params={
+                "q": f'"{q}"',
+                "dateRange": "custom",
+                "startdt": "2020-01-01",
+                "forms": "10-K,10-Q,8-K",
+                "hits.hits.total.value": 10,
+                "_source": "period_of_report,entity_name,file_num,period_of_report,biz_location,inc_states",
+            },
+            headers={"User-Agent": "IntelDesk/1.0 (https://inteldesk.io; contact@inteldesk.io)"},
+            timeout=10,
+        )
+        # Also search company names via EDGAR company search
+        r2 = requests.get(
+            "https://efts.sec.gov/LATEST/search-index",
+            params={
+                "q": q,
+                "entity": q,
+                "hits.hits._source": "period_of_report,entity_name,file_num",
+                "hits.hits.total.value": 10,
+            },
+            headers={"User-Agent": "IntelDesk/1.0 (https://inteldesk.io; contact@inteldesk.io)"},
+            timeout=10,
+        )
+
+        # Better: use the EDGAR company concept API to search by name
+        r3 = requests.get(
+            "https://efts.sec.gov/LATEST/search-index",
+            params={"q": q, "dateRange": "custom", "startdt": "2023-01-01"},
+            headers={"User-Agent": "IntelDesk/1.0 (https://inteldesk.io; contact@inteldesk.io)"},
+            timeout=10,
+        )
+
+        # Use the company search endpoint specifically
+        r4 = requests.get(
+            "https://www.sec.gov/cgi-bin/browse-edgar",
+            params={
+                "company": q,
+                "CIK": "",
+                "type": "10-K",
+                "dateb": "",
+                "owner": "include",
+                "count": "10",
+                "search_text": "",
+                "action": "getcompany",
+                "output": "atom",
+            },
+            headers={"User-Agent": "IntelDesk/1.0 (https://inteldesk.io; contact@inteldesk.io)"},
+            timeout=10,
+        )
+
+        log.info(f"SEC EDGAR company search '{q}': {r4.status_code}")
+
+        # Parse Atom feed
+        import xml.etree.ElementTree as ET
+        companies = []
+        if r4.status_code == 200:
+            try:
+                ns = {"atom": "http://www.w3.org/2005/Atom"}
+                root = ET.fromstring(r4.text)
+                for entry in root.findall("atom:entry", ns)[:10]:
+                    name_el    = entry.find("atom:company-info/atom:conformed-name", ns) or entry.find(".//conformed-name")
+                    cik_el     = entry.find("atom:company-info/atom:cik", ns) or entry.find(".//CIK")
+                    state_el   = entry.find("atom:company-info/atom:state-of-incorporation", ns) or entry.find(".//state-of-incorporation")
+                    sic_el     = entry.find("atom:company-info/atom:assigned-sic-desc", ns) or entry.find(".//assigned-sic-desc")
+                    loc_el     = entry.find("atom:company-info/atom:business-address/atom:state", ns) or entry.find(".//business-address/state")
+
+                    # Fallback: parse from entry content directly
+                    content_el = entry.find("atom:content", ns)
+                    content    = content_el.text if content_el is not None else ""
+
+                    # Try to get name from title
+                    title_el = entry.find("atom:title", ns)
+                    name = (name_el.text if name_el is not None else
+                            title_el.text if title_el is not None else "Unknown")
+
+                    cik = cik_el.text.strip().lstrip("0") if cik_el is not None else ""
+                    companies.append({
+                        "name":           name.strip(),
+                        "cik":            cik,
+                        "state":          state_el.text.strip() if state_el is not None else "",
+                        "sic_description":sic_el.text.strip() if sic_el is not None else "",
+                        "location":       loc_el.text.strip() if loc_el is not None else "",
+                        "edgar_url":      f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=10-K&dateb=&owner=include&count=10" if cik else "",
+                    })
+            except Exception as parse_err:
+                log.warning(f"EDGAR XML parse error: {parse_err}")
+
+        # If XML parsing got nothing, try the JSON-based EDGAR company search
+        if not companies:
+            r5 = requests.get(
+                "https://efts.sec.gov/LATEST/search-index",
+                params={"q": q, "dateRange": "custom", "startdt": "2020-01-01",
+                        "hits.hits.total.value": 10},
+                headers={"User-Agent": "IntelDesk/1.0 (https://inteldesk.io)"},
+                timeout=10,
+            )
+            if r5.status_code == 200:
+                data = r5.json()
+                seen_ciks = set()
+                for hit in (data.get("hits",{}).get("hits",[]) or [])[:10]:
+                    src = hit.get("_source", {})
+                    cik = str(src.get("entity_id","")).lstrip("0")
+                    if cik in seen_ciks: continue
+                    seen_ciks.add(cik)
+                    companies.append({
+                        "name":            src.get("display_names", [src.get("entity_name","")])[0] if src.get("display_names") else src.get("entity_name",""),
+                        "cik":             cik,
+                        "state":           src.get("inc_states",""),
+                        "sic_description": src.get("category",""),
+                        "location":        src.get("biz_location",""),
+                        "edgar_url":       f"https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK={cik}&type=10-K" if cik else "",
+                        "form_type":       src.get("form_type",""),
+                        "filed_at":        src.get("period_of_report",""),
+                    })
+
+        return jsonify({"companies": companies, "total": len(companies)})
+
+    except Exception as e:
+        log.error(f"SEC search error: {e}")
+        return jsonify({"error": str(e)}), 502
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
