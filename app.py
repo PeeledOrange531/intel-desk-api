@@ -1633,6 +1633,102 @@ def sec_search():
         log.error(f"SEC search error: {e}")
         return jsonify({"error": str(e)}), 502
 
+
+# ── CRYPTO ADDRESS LOOKUP ──────────────────────────────────────────────────────
+ETHERSCAN_KEY = os.environ.get("ETHERSCAN_API_KEY", "")
+
+@app.route("/crypto/btc/<address>", methods=["GET","OPTIONS"])
+@corsify
+def btc_lookup(address):
+    """Bitcoin address lookup via blockchain.info — free, no key."""
+    address = address.strip()
+    if not address:
+        return jsonify({"error": "address required"}), 400
+    try:
+        r = requests.get(
+            f"https://blockchain.info/rawaddr/{address}",
+            params={"limit": 20},
+            headers={"User-Agent": "IntelDesk/1.0 (https://inteldesk.io)"},
+            timeout=15,
+        )
+        log.info(f"BTC lookup {address}: {r.status_code}")
+        if r.status_code == 200:
+            return Response(r.content, status=200, mimetype="application/json")
+        if r.status_code == 404:
+            return jsonify({"error": "Address not found or has no transactions"}), 404
+        return jsonify({"error": f"blockchain.info HTTP {r.status_code}"}), r.status_code
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
+@app.route("/crypto/eth/<address>", methods=["GET","OPTIONS"])
+@corsify
+def eth_lookup(address):
+    """Ethereum address lookup via Etherscan — requires ETHERSCAN_API_KEY."""
+    address = address.strip()
+    if not address:
+        return jsonify({"error": "address required"}), 400
+
+    if not ETHERSCAN_KEY:
+        return jsonify({"error": "ETHERSCAN_API_KEY not configured", "no_key": True}), 503
+
+    try:
+        base = "https://api.etherscan.io/api"
+        headers = {"User-Agent": "IntelDesk/1.0 (https://inteldesk.io)"}
+
+        # Get balance
+        bal_r = requests.get(base, params={
+            "module": "account", "action": "balance",
+            "address": address, "tag": "latest", "apikey": ETHERSCAN_KEY,
+        }, headers=headers, timeout=10)
+        bal_data = bal_r.json() if bal_r.ok else {}
+
+        # Get tx count
+        cnt_r = requests.get(base, params={
+            "module": "proxy", "action": "eth_getTransactionCount",
+            "address": address, "tag": "latest", "apikey": ETHERSCAN_KEY,
+        }, headers=headers, timeout=10)
+        cnt_data = cnt_r.json() if cnt_r.ok else {}
+
+        # Get recent txs
+        tx_r = requests.get(base, params={
+            "module": "account", "action": "txlist",
+            "address": address, "startblock": 0, "endblock": 99999999,
+            "page": 1, "offset": 15, "sort": "desc", "apikey": ETHERSCAN_KEY,
+        }, headers=headers, timeout=10)
+        tx_data = tx_r.json() if tx_r.ok else {}
+
+        # Check if contract
+        code_r = requests.get(base, params={
+            "module": "proxy", "action": "eth_getCode",
+            "address": address, "tag": "latest", "apikey": ETHERSCAN_KEY,
+        }, headers=headers, timeout=10)
+        code_data = code_r.json() if code_r.ok else {}
+        is_contract = code_data.get("result","0x") not in ("0x","0x0","")
+
+        # Token count
+        tok_r = requests.get(base, params={
+            "module": "account", "action": "tokentx",
+            "address": address, "page": 1, "offset": 1, "apikey": ETHERSCAN_KEY,
+        }, headers=headers, timeout=10)
+        tok_data = tok_r.json() if tok_r.ok else {}
+
+        tx_count_hex = cnt_data.get("result","0x0")
+        tx_count = int(tx_count_hex, 16) if tx_count_hex.startswith("0x") else 0
+
+        log.info(f"ETH lookup {address}: bal={bal_data.get('result')}")
+        return jsonify({
+            "address":     address,
+            "balance":     bal_data.get("result","0"),
+            "tx_count":    tx_count,
+            "is_contract": is_contract,
+            "token_count": len(tok_data.get("result") or []),
+            "txs":         tx_data.get("result") or [],
+        })
+    except Exception as e:
+        return jsonify({"error": str(e)}), 502
+
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
