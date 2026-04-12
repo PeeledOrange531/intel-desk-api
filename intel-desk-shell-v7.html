@@ -660,7 +660,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
   <!-- TOPBAR -->
   <header class="topbar">
-    <div class="topbar-logo">
+    <div class="topbar-logo" onclick="goHome()" style="cursor:pointer;" title="Home">
       <span class="topbar-logo-text">The <em>Intel</em> Desk</span>
       <span class="topbar-badge">OSINT Suite</span>
     </div>
@@ -1000,6 +1000,21 @@ const CATEGORIES = [
     ],
   },
 
+  {
+    id: 'financial',
+    label: 'Financial Intelligence',
+    tools: [
+      {
+        id:'crypto', icon:'₿', live:true,
+        name:'Crypto Address Lookup',
+        desc:'Bitcoin · Ethereum · Balance · Transactions',
+        url:`${BASE}/crypto-lookup.html`,
+        datasets: 2,
+        seo:`Investigate Bitcoin and Ethereum wallet addresses. Look up balance, total received, total sent and full transaction history. Auto-detects BTC vs ETH. Powered by blockchain.info and Etherscan. Used by journalists following illicit money flows.`,
+      },
+    ],
+  },
+
 ];
 
 // Flatten live tools for search
@@ -1150,6 +1165,20 @@ function buildTicker() {
 }
 
 // ── LOAD TOOL ─────────────────────────────────────────────────────────────────
+function goHome() {
+  // Clear active tool and show welcome screen
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tool-iframe').forEach(f => f.classList.remove('visible'));
+  const welcome = document.getElementById('welcomeScreen');
+  if (welcome) welcome.style.display = '';
+  // Close sidebar on mobile
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.querySelector('.sidebar-overlay');
+  if (sidebar) sidebar.classList.remove('open');
+  if (overlay) overlay.classList.remove('visible');
+  document.body.classList.remove('sidebar-open');
+}
+
 function loadTool(id) {
   const t = ALL_TOOLS.find(t => t.id === id);
   if (!t || !t.live) return;
