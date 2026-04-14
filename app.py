@@ -1729,6 +1729,82 @@ def eth_lookup(address):
         return jsonify({"error": str(e)}), 502
 
 
+
+# ── PERSONA FACE PROXY ────────────────────────────────────────────────────────
+@app.route("/persona/face", methods=["GET","OPTIONS"])
+@corsify
+def persona_face():
+    """
+    Proxy for this-person-does-not-exist.com face generation.
+    Accepts: ?gender=male|female&age=25-35&ethnicity=white|black|asian|indian|middle-eastern|latino
+    Returns: JSON with image_url pointing to the face image
+    Falls back gracefully if the service is unavailable.
+    """
+    gender    = request.args.get("gender", "").strip().lower()
+    age       = request.args.get("age", "").strip()
+    ethnicity = request.args.get("ethnicity", "").strip().lower()
+
+    # Map our params to this-person-does-not-exist.com query format
+    # Their API: /new?gender=male&age=19-25&etnic=white
+    gender_map = {
+        "male": "male", "female": "female",
+        "nonbinary": "",  # no nonbinary option — omit for random
+    }
+    age_map = {
+        "18-25":  "19-25",
+        "26-35":  "26-35",
+        "36-45":  "35-50",
+        "46-60":  "35-50",
+        "60+":    "50+",
+    }
+    # Note: their param is "etnic" (sic)
+    ethnicity_map = {
+        "white":          "white",
+        "black":          "black",
+        "asian":          "asian",
+        "indian":         "indian",
+        "middle-eastern": "middle-eastern",
+        "latino":         "latino",
+    }
+
+    params = {}
+    if gender and gender in gender_map and gender_map[gender]:
+        params["gender"] = gender_map[gender]
+    if age and age in age_map:
+        params["age"] = age_map[age]
+    if ethnicity and ethnicity in ethnicity_map:
+        params["etnic"] = ethnicity_map[ethnicity]
+
+    try:
+        r = requests.get(
+            "https://this-person-does-not-exist.com/new",
+            params=params,
+            headers={
+                "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36",
+                "Referer": "https://this-person-does-not-exist.com/en",
+                "Accept": "application/json, text/plain, */*",
+            },
+            timeout=12,
+        )
+        log.info(f"TPDNE face: {r.status_code} params={params}")
+
+        if r.status_code == 200:
+            data = r.json()
+            # Response is typically: {"src": "/img/avatar-genXXX.jpg", "name": "..."}
+            src = data.get("src", "")
+            if src:
+                full_url = f"https://this-person-does-not-exist.com{src}"
+                return jsonify({
+                    "image_url": full_url,
+                    "src": src,
+                    "source": "this-person-does-not-exist.com",
+                })
+        return jsonify({"error": f"Face service HTTP {r.status_code}"}), r.status_code
+
+    except Exception as e:
+        log.error(f"Face proxy error: {e}")
+        return jsonify({"error": str(e)}), 502
+
 # ── AIS STREAM — vessel positions cache ───────────────────────────────────────
 import threading
 import json
