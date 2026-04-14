@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Analysis of Competing Hypotheses | The Intel Desk</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--purple:#b088f9;
+  --cc:#4ec994;--c:#a8d8a8;--n:rgba(240,236,228,.20);--i:#e8a87c;--ii:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(12px,3vw,40px);max-width:1400px;margin:0 auto;padding-bottom:60px;}
+
+/* HERO */
+.hero{padding:clamp(28px,4vw,44px) 0 clamp(14px,2vw,20px);border-bottom:1px solid var(--border);margin-bottom:16px;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:10px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(26px,4vw,48px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* HOW-TO BANNER */
+.howto-banner{background:rgba(126,184,228,.05);border:1px solid rgba(126,184,228,.18);margin-bottom:2px;overflow:hidden;}
+.howto-hdr{display:flex;align-items:center;justify-content:space-between;padding:11px 16px;cursor:pointer;user-select:none;}
+.howto-hdr-l{display:flex;align-items:center;gap:10px;}
+.howto-icon{font-size:14px;}
+.howto-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;color:rgba(126,184,228,.70)!important;}
+.howto-badge{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;padding:2px 8px;border:1px solid rgba(126,184,228,.25);color:rgba(126,184,228,.55)!important;}
+.howto-toggle{font-family:var(--mono);font-size:10px;color:rgba(126,184,228,.40)!important;transition:transform .2s;}
+.howto-banner.open .howto-toggle{transform:rotate(180deg);}
+.howto-body{display:none;padding:0 16px 16px;border-top:1px solid rgba(126,184,228,.10);}
+.howto-banner.open .howto-body{display:block;}
+.howto-steps{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:14px;}
+.howto-step{display:flex;gap:10px;}
+.step-num{font-family:var(--serif);font-size:20px;font-weight:300;color:rgba(126,184,228,.35)!important;line-height:1;flex-shrink:0;min-width:20px;}
+.step-body{}
+.step-title{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.10em;color:rgba(126,184,228,.60)!important;margin-bottom:3px;}
+.step-text{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.35)!important;line-height:1.6;}
+.howto-why{margin-top:14px;padding-top:12px;border-top:1px solid rgba(126,184,228,.08);}
+.why-lbl{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:rgba(126,184,228,.40)!important;margin-bottom:5px;}
+.why-text{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.32)!important;line-height:1.7;}
+.cia-cite{font-family:var(--mono);font-size:8px;color:rgba(126,184,228,.30)!important;margin-top:6px;}
+
+/* LEGEND */
+.score-legend{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
+.sl-item{background:var(--bg2);border:1px solid var(--border);border-right:none;padding:8px 14px;display:flex;align-items:center;gap:8px;flex:1;}
+.sl-item:last-child{border-right:1px solid var(--border);}
+.sl-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.sl-cc{background:var(--cc);}
+.sl-c{background:var(--c);}
+.sl-n{background:rgba(240,236,228,.15);}
+.sl-i{background:var(--i);}
+.sl-ii{background:var(--ii);}
+.sl-label{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.35)!important;}
+.sl-label strong{color:rgba(240,236,228,.60)!important;}
+
+/* SETUP ROW */
+.setup-row{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-bottom:2px;}
+.setup-block{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;}
+.sb-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.26)!important;margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;}
+.sb-count{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.45)!important;}
+.item-list{display:flex;flex-direction:column;gap:3px;margin-bottom:8px;max-height:200px;overflow-y:auto;}
+.item-row{display:flex;align-items:center;gap:6px;}
+.item-num{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,.35)!important;min-width:16px;flex-shrink:0;}
+.item-input{flex:1;background:var(--bg3);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:11px;padding:7px 10px;outline:none;transition:border-color .15s;}
+.item-input:focus{border-color:rgba(200,169,110,.35);}
+.item-input::placeholder{color:rgba(240,236,228,.14)!important;}
+.item-del{background:none;border:none;color:rgba(240,236,228,.18)!important;font-size:14px;cursor:pointer;padding:2px 4px;flex-shrink:0;transition:color .12s;line-height:1;}
+.item-del:hover{color:var(--red)!important;}
+.add-btn{background:var(--bg3);border:1px solid var(--border);color:rgba(200,169,110,.45)!important;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.10em;padding:7px 12px;cursor:pointer;transition:all .15s;width:100%;}
+.add-btn:hover{border-color:rgba(200,169,110,.25);color:#c8a96e!important;}
+
+/* CASE NAME */
+.case-row{background:var(--bg2);border:1px solid var(--border);padding:12px 16px;margin-bottom:2px;display:flex;align-items:center;gap:12px;}
+.case-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.26)!important;white-space:nowrap;}
+.case-input{flex:1;background:var(--bg3);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:8px 12px;outline:none;transition:border-color .15s;}
+.case-input:focus{border-color:rgba(200,169,110,.35);}
+.case-input::placeholder{color:rgba(240,236,228,.14)!important;}
+
+/* MATRIX */
+.matrix-wrap{overflow-x:auto;margin-bottom:2px;}
+.matrix{border-collapse:collapse;width:100%;min-width:600px;}
+.matrix th,.matrix td{border:1px solid var(--border);}
+.matrix th{background:var(--bg3);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.10em;color:rgba(240,236,228,.30)!important;padding:8px 10px;white-space:nowrap;}
+.col-hyp{background:rgba(200,169,110,.04)!important;font-family:var(--mono);font-size:10px;color:#e8d5a3!important;max-width:160px;text-align:center;}
+.row-evidence{background:var(--bg2);padding:9px 12px;min-width:220px;}
+.ev-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.55)!important;line-height:1.4;}
+.ev-num{font-family:var(--mono);font-size:8px;color:rgba(200,169,110,.30)!important;margin-bottom:2px;}
+.score-cell{text-align:center;padding:0;cursor:pointer;transition:background .12s;min-width:80px;}
+.score-cell:hover{background:rgba(200,169,110,.06)!important;}
+.score-select{background:transparent;border:none;color:inherit;font-family:var(--mono);font-size:11px;font-weight:600;cursor:pointer;outline:none;width:100%;height:100%;padding:10px 6px;text-align:center;-webkit-appearance:none;appearance:none;}
+.score-cc{background:rgba(78,201,148,.12)!important;color:var(--cc)!important;}
+.score-c{background:rgba(168,216,168,.08)!important;color:var(--c)!important;}
+.score-n{background:transparent!important;color:rgba(240,236,228,.25)!important;}
+.score-i{background:rgba(232,168,124,.10)!important;color:var(--i)!important;}
+.score-ii{background:rgba(192,57,43,.12)!important;color:var(--ii)!important;}
+
+/* RESULTS */
+.results-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:2px;margin-bottom:2px;}
+.result-card{background:var(--bg2);border:1px solid var(--border);padding:16px 18px;transition:border-color .15s;}
+.result-card.winner{background:rgba(78,201,148,.06);border-color:rgba(78,201,148,.25);}
+.result-card.runner{background:rgba(200,169,110,.04);border-color:rgba(200,169,110,.15);}
+.rc-rank{font-family:var(--serif);font-size:32px;font-weight:300;color:rgba(240,236,228,.12)!important;line-height:1;margin-bottom:4px;}
+.result-card.winner .rc-rank{color:rgba(78,201,148,.25)!important;}
+.rc-name{font-family:var(--mono);font-size:11px;font-weight:500;color:#e8d5a3!important;line-height:1.4;margin-bottom:8px;}
+.rc-score-row{display:flex;align-items:baseline;gap:6px;margin-bottom:4px;}
+.rc-score{font-family:var(--serif);font-size:26px;font-weight:300;line-height:1;}
+.result-card.winner .rc-score{color:var(--green)!important;}
+.rc-score-lbl{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;color:rgba(240,236,228,.25)!important;}
+.rc-bar-wrap{background:rgba(255,255,255,.05);height:3px;border-radius:0;margin-bottom:8px;overflow:hidden;}
+.rc-bar{height:100%;background:var(--border);transition:width .4s ease,background .4s;}
+.result-card.winner .rc-bar{background:var(--green);}
+.result-card.runner .rc-bar{background:var(--accent);}
+.rc-verdict{font-family:var(--mono);font-size:9px;line-height:1.5;}
+.verdict-best{color:rgba(78,201,148,.65)!important;}
+.verdict-ok{color:rgba(200,169,110,.50)!important;}
+.verdict-poor{color:rgba(192,57,43,.55)!important;}
+
+/* DIAGNOSTICS */
+.diag-section{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;margin-bottom:2px;}
+.diag-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:rgba(240,236,228,.26)!important;margin-bottom:10px;}
+.diag-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.04);}
+.diag-row:last-child{border-bottom:none;}
+.diag-num{font-family:var(--mono);font-size:8px;color:rgba(200,169,110,.30)!important;min-width:18px;}
+.diag-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.50)!important;flex:1;line-height:1.4;}
+.diag-score{font-family:var(--mono);font-size:10px;font-weight:500;flex-shrink:0;}
+.diag-high{color:var(--green)!important;}
+.diag-med{color:var(--accent)!important;}
+.diag-low{color:rgba(240,236,228,.25)!important;}
+.diag-tag{font-family:var(--mono);font-size:7px;text-transform:uppercase;letter-spacing:.08em;padding:2px 6px;border:1px solid;flex-shrink:0;}
+.tag-diagnostic{color:var(--green)!important;border-color:rgba(78,201,148,.25);}
+.tag-redundant{color:rgba(240,236,228,.25)!important;border-color:rgba(255,255,255,.08);}
+
+/* ACTION BAR */
+.action-bar{display:flex;gap:0;margin-bottom:2px;}
+.action-btn{flex:1;background:var(--bg2);border:1px solid var(--border);border-right:none;color:rgba(240,236,228,.30)!important;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.10em;padding:11px;cursor:pointer;transition:all .15s;}
+.action-btn:last-child{border-right:1px solid var(--border);}
+.action-btn:hover{color:#c8a96e!important;background:var(--adim);}
+.action-btn.primary{background:var(--adim);border-color:rgba(200,169,110,.30);color:#c8a96e!important;}
+.action-btn.primary:hover{background:rgba(200,169,110,.26);}
+
+/* EMPTY STATE */
+.empty-state{background:var(--bg2);border:1px solid var(--border);padding:40px 24px;text-align:center;}
+.es-icon{font-size:32px;margin-bottom:12px;}
+.es-title{font-family:var(--serif);font-size:20px;font-weight:300;color:#e8d5a3!important;margin-bottom:6px;}
+.es-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.28)!important;line-height:1.8;}
+
+.footer{margin-top:32px;padding:14px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.22)!important;}
+.footer-l strong{color:#c8a96e!important;}
+
+@media(max-width:700px){
+  .setup-row{grid-template-columns:1fr;}
+  .score-legend{flex-direction:column;}
+  .sl-item{border-right:1px solid var(--border);}
+}
+@media print{
+  .howto-banner,.action-bar,.add-btn,.item-del,.score-select{display:none!important;}
+  body{background:white!important;color:black!important;}
+  .matrix th,.matrix td{border-color:#ccc!important;}
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <div class="eyebrow"><span>Analytical Tools</span></div>
+    <h1>Analysis of Competing <em>Hypotheses</em></h1>
+  </div>
+
+  <!-- HOW-TO BANNER -->
+  <div class="howto-banner" id="howtoBanner">
+    <div class="howto-hdr" onclick="toggleHowto()">
+      <div class="howto-hdr-l">
+        <span class="howto-icon">📖</span>
+        <span class="howto-title">How to use ACH — CIA Structured Analytical Technique</span>
+        <span class="howto-badge">Richards J. Heuer Jr. · Psychology of Intelligence Analysis (1999)</span>
+      </div>
+      <span class="howto-toggle">▾</span>
+    </div>
+    <div class="howto-body">
+      <div class="howto-steps">
+        <div class="howto-step"><div class="step-num">1</div><div class="step-body"><div class="step-title">Hypotheses</div><div class="step-text">List all plausible explanations. Do not dismiss any possibility early — ACH requires you to challenge your own assumptions.</div></div></div>
+        <div class="howto-step"><div class="step-num">2</div><div class="step-body"><div class="step-title">Evidence</div><div class="step-text">List every piece of evidence, assumption, or argument as a single factual statement. Include things that seem obvious.</div></div></div>
+        <div class="howto-step"><div class="step-num">3</div><div class="step-body"><div class="step-title">Score the matrix</div><div class="step-text">For each evidence × hypothesis pair, ask: "If this hypothesis were true, would I expect to see this evidence?" Score accordingly.</div></div></div>
+        <div class="howto-step"><div class="step-num">4</div><div class="step-body"><div class="step-title">Read the results</div><div class="step-text">The hypothesis with the lowest inconsistency score best fits the evidence. Focus on eliminating hypotheses, not confirming one.</div></div></div>
+        <div class="howto-step"><div class="step-num">5</div><div class="step-body"><div class="step-title">Check diagnostics</div><div class="step-text">Diagnostic evidence items discriminate between hypotheses — these are your most valuable pieces of evidence.</div></div></div>
+        <div class="howto-step"><div class="step-num">6</div><div class="step-body"><div class="step-title">Revisit & iterate</div><div class="step-text">ACH is not a one-time exercise. As new evidence emerges, update the matrix and re-examine your conclusions.</div></div></div>
+      </div>
+      <div class="howto-why">
+        <div class="why-lbl">Why ACH matters</div>
+        <div class="why-text">Human analysts naturally seek evidence that confirms their existing beliefs — a cognitive bias called <strong style="color:rgba(240,236,228,.55);">confirmation bias</strong>. ACH inverts this: instead of building a case for your preferred hypothesis, you systematically attempt to <em>disprove</em> each one. The hypothesis that <em>cannot be eliminated</em> by the evidence is the one that best fits reality. This technique was developed by Richards J. Heuer Jr. at the CIA and is now standard practice in intelligence analysis, law enforcement, and competitive intelligence worldwide.</div>
+        <div class="cia-cite">Source: Heuer, R.J. (1999). Psychology of Intelligence Analysis. CIA Center for the Study of Intelligence. Chapter 8.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCORE LEGEND -->
+  <div class="score-legend">
+    <div class="sl-item"><span class="sl-dot sl-cc"></span><span class="sl-label"><strong>CC</strong> — Strongly Consistent</span></div>
+    <div class="sl-item"><span class="sl-dot sl-c"></span><span class="sl-label"><strong>C</strong> — Consistent</span></div>
+    <div class="sl-item"><span class="sl-dot sl-n"></span><span class="sl-label"><strong>N</strong> — Neutral / Irrelevant</span></div>
+    <div class="sl-item"><span class="sl-dot sl-i"></span><span class="sl-label"><strong>I</strong> — Inconsistent</span></div>
+    <div class="sl-item"><span class="sl-dot sl-ii"></span><span class="sl-label"><strong>II</strong> — Strongly Inconsistent</span></div>
+  </div>
+
+  <!-- CASE NAME -->
+  <div class="case-row">
+    <span class="case-lbl">Case / Investigation</span>
+    <input type="text" class="case-input" id="caseName" placeholder="e.g. Source credibility assessment, Attribution of cyberattack, …" oninput="saveState()">
+  </div>
+
+  <!-- SETUP -->
+  <div class="setup-row">
+    <div class="setup-block">
+      <div class="sb-hdr">
+        Hypotheses
+        <span class="sb-count" id="hypCount">0</span>
+      </div>
+      <div class="item-list" id="hypList"></div>
+      <button class="add-btn" onclick="addHypothesis()">+ Add Hypothesis</button>
+    </div>
+    <div class="setup-block">
+      <div class="sb-hdr">
+        Evidence / Arguments
+        <span class="sb-count" id="evCount">0</span>
+      </div>
+      <div class="item-list" id="evList"></div>
+      <button class="add-btn" onclick="addEvidence()">+ Add Evidence</button>
+    </div>
+  </div>
+
+  <!-- ACTION BAR -->
+  <div class="action-bar">
+    <button class="action-btn primary" onclick="buildMatrix()">Build Matrix →</button>
+    <button class="action-btn" onclick="clearAll()">✕ Clear All</button>
+    <button class="action-btn" onclick="loadExample()">⊞ Load Example</button>
+    <button class="action-btn" onclick="exportPDF()">↓ Export PDF</button>
+    <button class="action-btn" onclick="exportCSV()">↓ Export CSV</button>
+  </div>
+
+  <!-- MATRIX + RESULTS -->
+  <div id="matrixSection"></div>
+
+  <div class="footer">
+    <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-r">Based on CIA ACH methodology · Heuer (1999) · No data leaves your browser</div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════════════════
+let hypotheses = [];  // [{id, text}]
+let evidence   = [];  // [{id, text}]
+let scores     = {};  // {evId_hypId: 'CC'|'C'|'N'|'I'|'II'}
+let nextHypId  = 1;
+let nextEvId   = 1;
+
+// Score weights for inconsistency calculation
+// Lower score = MORE consistent with hypothesis (better fit)
+const WEIGHTS = { 'CC': -2, 'C': -1, 'N': 0, 'I': 2, 'II': 4 };
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HOW-TO BANNER
+// ═══════════════════════════════════════════════════════════════════════════════
+function toggleHowto() {
+  document.getElementById('howtoBanner').classList.toggle('open');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HYPOTHESIS MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+function addHypothesis(text='') {
+  const id = nextHypId++;
+  hypotheses.push({ id, text });
+  renderHypList();
+  saveState();
+  setTimeout(() => {
+    const input = document.getElementById(`hyp-${id}`);
+    if (input) input.focus();
+  }, 50);
+}
+
+function deleteHypothesis(id) {
+  hypotheses = hypotheses.filter(h => h.id !== id);
+  // Remove scores for this hypothesis
+  Object.keys(scores).forEach(k => { if (k.endsWith('_'+id)) delete scores[k]; });
+  renderHypList();
+  saveState();
+}
+
+function renderHypList() {
+  const list = document.getElementById('hypList');
+  list.innerHTML = hypotheses.map((h, i) => `
+    <div class="item-row">
+      <span class="item-num">H${i+1}</span>
+      <input type="text" class="item-input" id="hyp-${h.id}"
+        value="${esc(h.text)}"
+        placeholder="e.g. Nation-state actor responsible"
+        oninput="hypotheses[${i}].text=this.value;saveState()">
+      <button class="item-del" onclick="deleteHypothesis(${h.id})" title="Remove">×</button>
+    </div>`).join('');
+  document.getElementById('hypCount').textContent = hypotheses.length;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EVIDENCE MANAGEMENT
+// ═══════════════════════════════════════════════════════════════════════════════
+function addEvidence(text='') {
+  const id = nextEvId++;
+  evidence.push({ id, text });
+  renderEvList();
+  saveState();
+  setTimeout(() => {
+    const input = document.getElementById(`ev-${id}`);
+    if (input) input.focus();
+  }, 50);
+}
+
+function deleteEvidence(id) {
+  evidence = evidence.filter(e => e.id !== id);
+  Object.keys(scores).forEach(k => { if (k.startsWith(id+'_')) delete scores[k]; });
+  renderEvList();
+  saveState();
+}
+
+function renderEvList() {
+  const list = document.getElementById('evList');
+  list.innerHTML = evidence.map((e, i) => `
+    <div class="item-row">
+      <span class="item-num">E${i+1}</span>
+      <input type="text" class="item-input" id="ev-${e.id}"
+        value="${esc(e.text)}"
+        placeholder="e.g. Malware signature matches known APT group"
+        oninput="evidence[${i}].text=this.value;saveState()">
+      <button class="item-del" onclick="deleteEvidence(${e.id})" title="Remove">×</button>
+    </div>`).join('');
+  document.getElementById('evCount').textContent = evidence.length;
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// MATRIX BUILD & RENDER
+// ═══════════════════════════════════════════════════════════════════════════════
+function buildMatrix() {
+  if (hypotheses.length < 2) { alert('Add at least 2 hypotheses.'); return; }
+  if (evidence.length < 1)   { alert('Add at least 1 piece of evidence.'); return; }
+  // Ensure all text is synced from inputs
+  hypotheses.forEach((h, i) => {
+    const el = document.getElementById(`hyp-${h.id}`);
+    if (el) h.text = el.value;
+  });
+  evidence.forEach((e, i) => {
+    const el = document.getElementById(`ev-${e.id}`);
+    if (el) e.text = el.value;
+  });
+  renderMatrix();
+  saveState();
+}
+
+function renderMatrix() {
+  if (hypotheses.length < 2 || evidence.length < 1) {
+    document.getElementById('matrixSection').innerHTML = '';
+    return;
+  }
+
+  const scores_copy = {...scores};
+  let matrixHtml = `
+  <div class="matrix-wrap">
+    <table class="matrix">
+      <thead>
+        <tr>
+          <th style="min-width:240px;text-align:left;">Evidence / Arguments</th>
+          ${hypotheses.map((h,i) => `<th class="col-hyp" title="${esc(h.text)}">H${i+1}: ${esc(truncate(h.text,28))}</th>`).join('')}
+        </tr>
+      </thead>
+      <tbody>
+        ${evidence.map((e, ei) => `
+        <tr>
+          <td class="row-evidence">
+            <div class="ev-num">E${ei+1}</div>
+            <div class="ev-text">${esc(e.text) || '<span style="opacity:.3">—</span>'}</div>
+          </td>
+          ${hypotheses.map((h, hi) => {
+            const key = `${e.id}_${h.id}`;
+            const val = scores[key] || 'N';
+            const cls = scoreClass(val);
+            return `<td class="score-cell ${cls}">
+              <select class="score-select ${cls}" onchange="setScore('${key}',this.value,this)" title="E${ei+1} vs H${hi+1}">
+                <option value="CC" ${val==='CC'?'selected':''}>CC</option>
+                <option value="C"  ${val==='C' ?'selected':''}>C</option>
+                <option value="N"  ${val==='N' ?'selected':''}>N</option>
+                <option value="I"  ${val==='I' ?'selected':''}>I</option>
+                <option value="II" ${val==='II'?'selected':''}>II</option>
+              </select>
+            </td>`;
+          }).join('')}
+        </tr>`).join('')}
+        <tr>
+          <td style="background:var(--bg3);padding:9px 12px;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:rgba(240,236,228,.26);">
+            Inconsistency Score ↓ lower = better fit
+          </td>
+          ${hypotheses.map((h, hi) => {
+            const score = calcScore(h.id);
+            return `<td id="score-total-${h.id}" style="text-align:center;background:var(--bg3);font-family:var(--serif);font-size:20px;font-weight:300;padding:10px;color:${scoreColor(score)}!important;">${score}</td>`;
+          }).join('')}
+        </tr>
+      </tbody>
+    </table>
+  </div>`;
+
+  const results = calcResults();
+  const maxScore = Math.max(...results.map(r => r.score));
+  const minScore = Math.min(...results.map(r => r.score));
+  const range = maxScore - minScore || 1;
+
+  let resultsHtml = `<div class="results-grid">` +
+    results.map((r, i) => {
+      const pct = maxScore > 0 ? Math.round(((maxScore - r.score) / range) * 100) : 50;
+      const cls = i === 0 ? 'winner' : i === 1 ? 'runner' : '';
+      const verdict = i === 0
+        ? `<span class="verdict-best">Best fit — most consistent with evidence</span>`
+        : r.score === results[0].score
+          ? `<span class="verdict-best">Tied for best fit</span>`
+          : r.score > results[0].score + 4
+            ? `<span class="verdict-poor">Poor fit — significant inconsistencies</span>`
+            : `<span class="verdict-ok">Possible — inconsistencies present</span>`;
+      return `<div class="result-card ${cls}">
+        <div class="rc-rank">#${i+1}</div>
+        <div class="rc-name">H${r.hIdx+1}: ${esc(r.text)}</div>
+        <div class="rc-score-row">
+          <span class="rc-score">${r.score}</span>
+          <span class="rc-score-lbl">inconsistency score</span>
+        </div>
+        <div class="rc-bar-wrap"><div class="rc-bar" style="width:${pct}%"></div></div>
+        <div class="rc-verdict">${verdict}</div>
+      </div>`;
+    }).join('') + `</div>`;
+
+  // Diagnostics
+  const diags = calcDiagnostics();
+  let diagHtml = `<div class="diag-section">
+    <div class="diag-hdr">Evidence Diagnostics — which items best discriminate between hypotheses</div>
+    ${diags.map((d, i) => `
+    <div class="diag-row">
+      <span class="diag-num">E${d.evIdx+1}</span>
+      <span class="diag-text">${esc(d.text)}</span>
+      <span class="diag-score ${d.variance > 2 ? 'diag-high' : d.variance > 0 ? 'diag-med' : 'diag-low'}">
+        Δ${d.variance.toFixed(1)}
+      </span>
+      <span class="diag-tag ${d.variance > 2 ? 'tag-diagnostic' : 'tag-redundant'}">
+        ${d.variance > 2 ? 'Diagnostic' : d.variance > 0 ? 'Useful' : 'Redundant'}
+      </span>
+    </div>`).join('')}
+  </div>`;
+
+  document.getElementById('matrixSection').innerHTML = matrixHtml + resultsHtml + diagHtml;
+}
+
+function setScore(key, val, selectEl) {
+  scores[key] = val;
+  // Update cell and select styling
+  const cell = selectEl.closest('.score-cell');
+  const cls = scoreClass(val);
+  // Remove old score classes
+  cell.className = `score-cell ${cls}`;
+  selectEl.className = `score-select ${cls}`;
+  // Update totals
+  hypotheses.forEach(h => {
+    const totalEl = document.getElementById(`score-total-${h.id}`);
+    if (totalEl) {
+      const s = calcScore(h.id);
+      totalEl.textContent = s;
+      totalEl.style.color = scoreColor(s) + '!important';
+    }
+  });
+  // Re-render results and diagnostics
+  updateResultsOnly();
+  saveState();
+}
+
+function updateResultsOnly() {
+  const results = calcResults();
+  const maxScore = Math.max(...results.map(r => r.score));
+  const minScore = Math.min(...results.map(r => r.score));
+  const range = maxScore - minScore || 1;
+  results.forEach((r, i) => {
+    const card = document.querySelector(`.result-card:nth-child(${i+1})`);
+    if (!card) return;
+    const pct = maxScore > 0 ? Math.round(((maxScore - r.score) / range) * 100) : 50;
+    const scoreEl = card.querySelector('.rc-score');
+    const barEl   = card.querySelector('.rc-bar');
+    if (scoreEl) scoreEl.textContent = r.score;
+    if (barEl)   barEl.style.width = pct + '%';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CALCULATIONS
+// ═══════════════════════════════════════════════════════════════════════════════
+function calcScore(hypId) {
+  return evidence.reduce((sum, e) => {
+    const key = `${e.id}_${hypId}`;
+    return sum + (WEIGHTS[scores[key] || 'N'] || 0);
+  }, 0);
+}
+
+function calcResults() {
+  return hypotheses
+    .map((h, i) => ({ id: h.id, text: h.text, score: calcScore(h.id), hIdx: i }))
+    .sort((a, b) => a.score - b.score);
+}
+
+function calcDiagnostics() {
+  return evidence.map((e, ei) => {
+    const vals = hypotheses.map(h => WEIGHTS[scores[`${e.id}_${h.id}`] || 'N'] || 0);
+    const mean = vals.reduce((a,b) => a+b, 0) / vals.length;
+    const variance = Math.sqrt(vals.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / vals.length);
+    return { evIdx: ei, text: e.text, variance };
+  }).sort((a, b) => b.variance - a.variance);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════════════════
+function scoreClass(v) {
+  return v==='CC'?'score-cc':v==='C'?'score-c':v==='I'?'score-i':v==='II'?'score-ii':'score-n';
+}
+function scoreColor(s) {
+  if (s <= -2) return 'rgba(78,201,148,.80)';
+  if (s <= 0)  return 'rgba(78,201,148,.50)';
+  if (s <= 4)  return 'rgba(232,123,74,.70)';
+  return 'rgba(192,57,43,.80)';
+}
+function truncate(s, n) { return s && s.length > n ? s.slice(0, n) + '…' : s; }
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// EXAMPLE
+// ═══════════════════════════════════════════════════════════════════════════════
+function loadExample() {
+  if (hypotheses.length || evidence.length) {
+    if (!confirm('Load the example? This will clear your current work.')) return;
+  }
+  clearAll(true);
+  document.getElementById('caseName').value = 'Cyberattack Attribution — Example';
+  ['Nation-state actor (APT group)', 'Cybercriminal / ransomware group', 'Insider threat / disgruntled employee', 'Hacktivist collective'].forEach(t => addHypothesis(t));
+  ['Malware code contains strings matching known APT28 tooling', 'Attack occurred during business hours in UTC+3 timezone', 'Exfiltrated data had no apparent financial value — only IP', 'Ransom demand was left on encrypted systems', 'Attacker had valid VPN credentials from the start', 'Targets selected match adversary\'s known geopolitical interests', 'No evidence of financial motivation or cryptocurrency demand', 'Techniques match documented TTPs from public threat intelligence reports'].forEach(t => addEvidence(t));
+  // Pre-fill some scores
+  const sMap = {
+    '1_1':'CC','1_2':'I', '1_3':'N', '1_4':'C',
+    '2_1':'C', '2_2':'N', '2_3':'I', '2_4':'N',
+    '3_1':'CC','3_2':'I', '3_3':'N', '3_4':'N',
+    '4_1':'I', '4_2':'CC','4_3':'N', '4_4':'I',
+    '5_1':'I', '5_2':'N', '5_3':'CC','5_4':'I',
+    '6_1':'CC','6_2':'I', '6_3':'I', '6_4':'C',
+    '7_1':'CC','7_2':'I', '7_3':'N', '7_4':'CC',
+    '8_1':'CC','8_2':'I', '8_3':'N', '8_4':'I',
+  };
+  Object.assign(scores, sMap);
+  renderHypList();
+  renderEvList();
+  renderMatrix();
+  saveState();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// CLEAR / EXPORT
+// ═══════════════════════════════════════════════════════════════════════════════
+function clearAll(silent=false) {
+  if (!silent && (hypotheses.length || evidence.length)) {
+    if (!confirm('Clear everything?')) return;
+  }
+  hypotheses = []; evidence = []; scores = {};
+  nextHypId = 1; nextEvId = 1;
+  document.getElementById('caseName').value = '';
+  renderHypList(); renderEvList();
+  document.getElementById('matrixSection').innerHTML = '';
+  saveState();
+}
+
+function exportPDF() { window.print(); }
+
+function exportCSV() {
+  if (!hypotheses.length || !evidence.length) { alert('Build the matrix first.'); return; }
+  let csv = 'Evidence,' + hypotheses.map((h,i) => `H${i+1}: ${h.text.replace(/,/g,' ')}`).join(',') + '\n';
+  evidence.forEach((e, ei) => {
+    csv += `E${ei+1}: ${e.text.replace(/,/g,' ')},`;
+    csv += hypotheses.map(h => scores[`${e.id}_${h.id}`] || 'N').join(',');
+    csv += '\n';
+  });
+  csv += '\nInconsistency Score,' + hypotheses.map(h => calcScore(h.id)).join(',') + '\n';
+  const a = document.createElement('a');
+  const name = document.getElementById('caseName').value || 'ach-matrix';
+  a.href = 'data:text/csv;charset=utf-8,' + encodeURIComponent(csv);
+  a.download = name.replace(/\s+/g,'-').toLowerCase() + '.csv';
+  a.click();
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// PERSISTENCE — localStorage
+// ═══════════════════════════════════════════════════════════════════════════════
+function saveState() {
+  try {
+    localStorage.setItem('ach_state', JSON.stringify({
+      caseName: document.getElementById('caseName').value,
+      hypotheses, evidence, scores, nextHypId, nextEvId
+    }));
+  } catch(e) {}
+}
+
+function loadState() {
+  try {
+    const s = JSON.parse(localStorage.getItem('ach_state') || 'null');
+    if (!s) return false;
+    document.getElementById('caseName').value = s.caseName || '';
+    hypotheses = s.hypotheses || [];
+    evidence   = s.evidence   || [];
+    scores     = s.scores     || {};
+    nextHypId  = s.nextHypId  || (hypotheses.length + 1);
+    nextEvId   = s.nextEvId   || (evidence.length + 1);
+    renderHypList();
+    renderEvList();
+    if (hypotheses.length >= 2 && evidence.length >= 1) renderMatrix();
+    return true;
+  } catch(e) { return false; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════════════════
+window.addEventListener('load', () => {
+  if (!loadState()) {
+    // Default state — open banner so user reads the instructions
+    document.getElementById('howtoBanner').classList.add('open');
+  }
+});
+</script>
+
+<style>
+@media print {
+  .howto-banner,.action-bar,.add-btn,.item-del{display:none!important;}
+  body{background:white!important;color:#111!important;}
+  .matrix th,.matrix td{border-color:#ddd!important;}
+  .col-hyp,.row-evidence{background:#f5f5f5!important;}
+  h1,.rc-name{color:#111!important;}
+  .why-text,.step-text,.ev-text,.diag-text{color:#444!important;}
+}
+</style>
+</body>
+</html>
