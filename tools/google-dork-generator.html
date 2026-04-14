@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Google Dork Generator | The Intel Desk</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111;
+  --border:rgba(255,255,255,0.07);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--adim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--purple:#b088f9;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;}
+body *{color:inherit;}
+.wrap{padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+.hero{padding:clamp(32px,5vw,52px) 0 clamp(18px,2vw,24px);border-bottom:1px solid var(--border);margin-bottom:24px;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:12px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);}
+.eyebrow span{font-family:var(--mono);font-size:11px;text-transform:uppercase;letter-spacing:.20em;color:#c8a96e!important;}
+h1{font-family:var(--serif);font-size:clamp(28px,4.5vw,52px);font-weight:300;line-height:.95;}
+h1 em{font-style:italic;color:#e8d5a3!important;}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:300px 1fr;gap:2px;align-items:start;}
+.left-panel{display:flex;flex-direction:column;gap:2px;position:sticky;top:16px;max-height:calc(100vh - 32px);overflow-y:auto;}
+.panel-block{background:var(--bg2);border:1px solid var(--border);padding:14px 16px;flex-shrink:0;}
+.panel-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.15em;color:rgba(240,236,228,.26)!important;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;}
+.label-note{font-size:8px;color:rgba(200,169,110,.45)!important;text-transform:none;letter-spacing:0;}
+.text-input{width:100%;background:var(--bg3);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:9px 12px;outline:none;transition:border-color .2s;margin-bottom:2px;}
+.text-input:focus{border-color:rgba(200,169,110,.40);}
+.text-input:last-child{margin-bottom:0;}
+.text-input::placeholder{color:rgba(240,236,228,.16)!important;}
+
+/* TYPES */
+.type-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.type-btn{background:var(--bg3);border:1px solid var(--border);padding:9px 10px;cursor:pointer;transition:all .15s;text-align:left;}
+.type-btn:hover{border-color:rgba(200,169,110,.15);}
+.type-btn.active{background:var(--adim);border-color:rgba(200,169,110,.28);}
+.tb-icon{font-size:14px;display:block;margin-bottom:3px;}
+.tb-name{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:.09em;color:rgba(240,236,228,.40)!important;display:block;}
+.type-btn.active .tb-name{color:#c8a96e!important;}
+
+/* NAME CHIPS */
+.name-chips{display:flex;flex-wrap:wrap;gap:3px;max-height:150px;overflow-y:auto;}
+.name-chip{font-family:var(--mono);font-size:9px;padding:3px 8px;background:rgba(200,169,110,.06);border:1px solid rgba(200,169,110,.14);color:rgba(240,236,228,.40)!important;cursor:pointer;transition:all .12s;user-select:none;}
+.name-chip:hover{background:rgba(200,169,110,.14);color:#c8a96e!important;}
+.name-chip.selected{background:var(--adim);border-color:rgba(200,169,110,.38);color:#c8a96e!important;}
+.name-chip.high{border-color:rgba(78,201,148,.22);}
+.name-chip.selected.high{background:rgba(78,201,148,.08);color:var(--green)!important;border-color:rgba(78,201,148,.35);}
+.chip-actions{display:flex;gap:3px;margin-top:7px;}
+.chip-btn{flex:1;background:var(--bg3);border:1px solid var(--border);color:rgba(240,236,228,.28)!important;font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.09em;padding:5px;cursor:pointer;transition:all .12s;}
+.chip-btn:hover{color:#c8a96e!important;border-color:rgba(200,169,110,.20);}
+
+/* GEN BUTTON */
+.btn-gen{width:100%;background:var(--adim);border:1px solid rgba(200,169,110,.35);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:.14em;padding:13px;cursor:pointer;transition:all .2s;}
+.btn-gen:hover{background:rgba(200,169,110,.26);color:#e8d5a3!important;}
+
+/* MINI STATS */
+.mini-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:2px;}
+.ms{background:var(--bg3);border:1px solid var(--border);padding:9px 10px;text-align:center;}
+.ms-n{font-family:var(--serif);font-size:20px;font-weight:300;color:#e8d5a3!important;line-height:1;}
+.ms-l{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.10em;color:rgba(240,236,228,.22)!important;margin-top:3px;}
+
+/* RIGHT PANEL */
+.right-panel{}
+.toolbar{display:flex;gap:0;margin-bottom:2px;flex-wrap:wrap;}
+.tb-btn{background:var(--bg2);border:1px solid var(--border);border-right:none;color:rgba(240,236,228,.30)!important;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.10em;padding:9px 13px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tb-btn:last-child{border-right:1px solid var(--border);}
+.tb-btn:hover{color:rgba(240,236,228,.65)!important;}
+.tb-btn.active{background:var(--adim);color:#c8a96e!important;border-color:rgba(200,169,110,.22);}
+.tb-spacer{flex:1;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+
+/* DORK GROUPS */
+.dork-group{margin-bottom:2px;}
+.group-hdr{font-family:var(--mono);font-size:8px;font-weight:500;text-transform:uppercase;letter-spacing:.16em;color:rgba(240,236,228,.22)!important;padding:7px 12px;background:rgba(200,169,110,.04);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;}
+.group-hdr:hover{background:rgba(200,169,110,.07);}
+.gh-l{display:flex;align-items:center;gap:7px;}
+.gh-r{display:flex;align-items:center;gap:8px;}
+.gh-toggle{transition:transform .15s;color:rgba(240,236,228,.22)!important;}
+.group-hdr.collapsed .gh-toggle{transform:rotate(-90deg);}
+.dork-list{border:1px solid var(--border);}
+.dork-list.collapsed{display:none;}
+
+/* DORK ROW */
+.dork-row{display:grid;grid-template-columns:18px 1fr auto;align-items:stretch;border-bottom:1px solid rgba(255,255,255,.04);transition:background .12s;}
+.dork-row:hover{background:rgba(200,169,110,.025);}
+.dork-row:last-child{border-bottom:none;}
+.dork-row.sel{background:rgba(200,169,110,.055);}
+.prio-bar{width:3px;height:100%;border-radius:0;}
+.prio-col{display:flex;align-items:center;padding:0 5px 0 7px;}
+.prio-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
+.pd-high{background:var(--green);}
+.pd-med{background:var(--accent);}
+.pd-low{background:rgba(255,255,255,.12);}
+.dork-main{padding:10px 12px;min-width:0;}
+.dork-query{font-family:var(--mono);font-size:11px;line-height:1.55;word-break:break-all;outline:none;white-space:pre-wrap;margin-bottom:4px;}
+.dork-query[contenteditable="true"]:focus{outline:1px solid rgba(200,169,110,.25);padding:2px 4px;margin:-2px -4px;}
+.op{color:#c8a96e!important;}
+.val{color:#7eb8e4!important;}
+.str{color:var(--green)!important;}
+.neg{color:var(--red)!important;}
+.dork-foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.dork-exp{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.27)!important;line-height:1.4;flex:1;}
+.dtag{font-family:var(--mono);font-size:7px;text-transform:uppercase;letter-spacing:.08em;padding:2px 5px;border:1px solid;flex-shrink:0;}
+.dtag-name{color:var(--purple)!important;border-color:rgba(176,136,249,.25);}
+.dtag-file{color:var(--blue)!important;border-color:rgba(126,184,228,.25);}
+.dtag-site{color:var(--orange)!important;border-color:rgba(232,123,74,.25);}
+.dork-actions{display:flex;border-left:1px solid var(--border);flex-shrink:0;}
+.da-btn{display:flex;align-items:center;justify-content:center;padding:0 10px;cursor:pointer;font-family:var(--mono);font-size:9px;border:none;background:transparent;border-left:1px solid var(--border);transition:background .12s;white-space:nowrap;text-decoration:none;}
+.da-btn:first-child{border-left:none;}
+.da-btn.sel-btn{color:rgba(240,236,228,.18)!important;font-size:12px;min-width:32px;}
+.da-btn.sel-btn:hover{color:rgba(240,236,228,.50)!important;}
+.da-btn.sel-btn.on{color:var(--green)!important;}
+.da-btn.srch{color:rgba(200,169,110,.55)!important;}
+.da-btn.srch:hover{background:var(--adim);color:#c8a96e!important;}
+.da-btn.cpy{color:rgba(240,236,228,.22)!important;}
+.da-btn.cpy:hover{background:rgba(255,255,255,.04);color:rgba(240,236,228,.55)!important;}
+
+/* WELCOME */
+.welcome{background:var(--bg2);border:1px solid var(--border);padding:48px 32px;text-align:center;}
+.wc-icon{font-size:34px;margin-bottom:14px;}
+.wc-title{font-family:var(--serif);font-size:22px;font-weight:300;color:#e8d5a3!important;margin-bottom:8px;}
+.wc-text{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.28)!important;line-height:1.9;}
+
+/* VARIANT SUBGROUPS */
+.variant-subgroup{border-bottom:1px solid rgba(255,255,255,.04);}
+.variant-subgroup:last-child{border-bottom:none;}
+.variant-hdr{display:flex;align-items:center;justify-content:space-between;padding:8px 12px 8px 20px;cursor:pointer;user-select:none;background:rgba(176,136,249,.04);transition:background .12s;}
+.variant-hdr:hover{background:rgba(176,136,249,.08);}
+.variant-hdr.collapsed+.variant-rows{display:none;}
+.vh-name{font-family:var(--mono);font-size:10px;color:rgba(176,136,249,.75)!important;font-weight:500;}
+.vh-meta{display:flex;align-items:center;gap:7px;}
+.vh-high{font-family:var(--mono);font-size:8px;color:rgba(78,201,148,.50)!important;}
+.vh-count{font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.25)!important;}
+.vh-toggle{font-size:9px;color:rgba(240,236,228,.22)!important;transition:transform .15s;}
+.variant-hdr.collapsed .vh-toggle{transform:rotate(-90deg);}
+.variant-rows .dork-row{padding-left:8px;}
+
+/* Also update filter tab for variants */
+.tb-btn.variants-active{background:rgba(176,136,249,.10)!important;color:rgba(176,136,249,.80)!important;border-color:rgba(176,136,249,.22)!important;}
+
+/* REF */
+.ref-section{margin-top:16px;grid-column:1/-1;}
+.ref-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.17em;color:rgba(240,236,228,.26)!important;padding:9px 14px;background:var(--bg3);border:1px solid var(--border);border-bottom:none;display:flex;align-items:center;justify-content:space-between;cursor:pointer;}
+.ref-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));border:1px solid var(--border);}
+.ref-grid.hide{display:none;}
+.ref-item{background:var(--bg2);padding:10px 12px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);}
+.ref-op{font-family:var(--mono);font-size:11px;color:#c8a96e!important;margin-bottom:3px;}
+.ref-desc{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,.30)!important;line-height:1.4;}
+.ref-ex{font-family:var(--mono);font-size:8px;color:rgba(240,236,228,.17)!important;margin-top:3px;}
+
+.footer{margin-top:40px;padding:16px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:8px;grid-column:1/-1;}
+.footer-l,.footer-r{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,.24)!important;line-height:1.7;}
+.footer-l strong{color:#c8a96e!important;}
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr;}
+  .left-panel{position:static;max-height:none;}
+  .type-grid{grid-template-columns:repeat(4,1fr);}
+}
+@media(max-width:560px){.type-grid{grid-template-columns:repeat(2,1fr);}
+  .toolbar{flex-wrap:wrap;}.tb-spacer{display:none;}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="eyebrow"><span>Search Intelligence</span></div>
+    <h1>Google Dork <em>Generator</em></h1>
+  </div>
+  <div class="layout">
+
+    <!-- LEFT -->
+    <div class="left-panel">
+      <div class="panel-block">
+        <div class="panel-label">Primary Target</div>
+        <input id="t1" class="text-input" placeholder='Full name, domain, or email…' oninput="onT1()">
+        <input id="t2" class="text-input" placeholder='Company, domain, or location (optional)' oninput="schedGen()">
+      </div>
+
+      <div class="panel-block" id="enumBlock" style="display:none;">
+        <div class="panel-label">Name Variations <span class="label-note" id="enumNote">0 found</span></div>
+        <div class="name-chips" id="nameChips"></div>
+        <div class="chip-actions">
+          <button class="chip-btn" onclick="selAll()">All</button>
+          <button class="chip-btn" onclick="selHigh()">High Priority</button>
+          <button class="chip-btn" onclick="selNone()">None</button>
+        </div>
+      </div>
+
+      <div class="panel-block">
+        <div class="panel-label">Investigation Type</div>
+        <div class="type-grid" id="typeGrid"></div>
+      </div>
+
+      <button class="btn-gen" onclick="generate()">Generate Dorks →</button>
+
+      <div class="mini-stats" id="mStats" style="display:none;">
+        <div class="ms"><div class="ms-n" id="sTotal">0</div><div class="ms-l">Queries</div></div>
+        <div class="ms"><div class="ms-n" id="sHigh">0</div><div class="ms-l">High Pri</div></div>
+        <div class="ms"><div class="ms-n" id="sSel">0</div><div class="ms-l">Selected</div></div>
+      </div>
+    </div>
+
+    <!-- RIGHT -->
+    <div class="right-panel">
+      <div class="toolbar" id="toolbar" style="display:none;">
+        <button class="tb-btn active" onclick="setFilter('all',this)">All</button>
+        <button class="tb-btn" onclick="setFilter('high',this)">⬤ High Priority</button>
+        <button class="tb-btn" onclick="setFilter('variants',this)">Name Variants</button>
+        <button class="tb-btn" onclick="setFilter('file',this)">Documents</button>
+        <div class="tb-spacer"></div>
+        <button class="tb-btn" onclick="expandAll()">⊞ Expand All</button>
+        <button class="tb-btn" onclick="collapseAll()">⊟ Collapse All</button>
+        <button class="tb-btn" onclick="openSel()">Open Selected →</button>
+        <button class="tb-btn" onclick="copySel()">⎘ Copy</button>
+        <button class="tb-btn" onclick="doExport()">↓ CSV</button>
+      </div>
+      <div id="body">
+        <div class="welcome">
+          <div class="wc-icon">🔎</div>
+          <div class="wc-title">Enter a target to begin</div>
+          <div class="wc-text">
+            Type a person's full name, domain, email, or company name.<br>
+            Select an investigation type and click Generate.<br><br>
+            For people: full names automatically expand into every<br>
+            searchable variation — initials, reversed names, username<br>
+            patterns, acronyms, and more. Pick which to include.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- OPERATOR REFERENCE -->
+    <div class="ref-section">
+      <div class="ref-hdr" onclick="toggleRef()">Operator Reference <span id="refArrow">▾</span></div>
+      <div class="ref-grid hide" id="refGrid"></div>
+    </div>
+    <div class="footer">
+      <div class="footer-l">© 2025 <strong>The Intel Desk</strong></div>
+      <div class="footer-r">All queries open in Google · For investigative use only</div>
+    </div>
+  </div>
+</div>
+<script>
+// ═══════ NAME ENUMERATION ENGINE ═══════════════════════════════════════════════
+function parseName(s){
+  const parts=s.trim().replace(/\s+/g,' ').split(' ').filter(Boolean);
+  if(parts.length<2)return null;
+  const first=parts[0].replace(/\.$/,'');
+  const last=parts[parts.length-1].replace(/\.$/,'');
+  const mids=parts.slice(1,-1).map(p=>p.replace(/\./g,''));
+  return{first,last,mids,fi:first[0]||'',li:last[0]||'',mi:mids[0]?mids[0][0]:'',mid0:mids[0]||''};
+}
+
+function enumerate(input){
+  const p=parseName(input);
+  if(!p)return[];
+  const{first,last,fi,li,mi,mid0}=p;
+  const fl=first.toLowerCase(),ll=last.toLowerCase(),mil=mi.toLowerCase();
+  const variants=new Map();
+  const add=(q,label,priority)=>{
+    q=q.trim().replace(/\s+/g,' ');
+    if(q&&!variants.has(q))variants.set(q,{label,priority});
+  };
+  // Full name
+  add(`"${first} ${last}"`,                    'Full name',                   'high');
+  if(mi){
+    add(`"${first} ${mi}. ${last}"`,            'Full + middle initial',       'high');
+    add(`"${first} ${mid0} ${last}"`,            'Full + middle name',          'high');
+    add(`"${first} ${mi} ${last}"`,              'Full + initial (no dot)',     'med');
+  }
+  // Initial combos
+  add(`"${fi}. ${last}"`,                       'First initial + last',        'high');
+  add(`"${fi} ${last}"`,                        'Initial + last (no dot)',     'med');
+  if(mi){
+    add(`"${fi}.${mi}. ${last}"`,               'Double initial + last',       'high');
+    add(`"${fi}. ${mi}. ${last}"`,              'Double initial spaced',       'med');
+    add(`"${fi}${mi} ${last}"`,                 'Double initial no dots',      'low');
+  }
+  // Reversed
+  add(`"${last} ${first}"`,                     'Last First (reversed)',       'med');
+  add(`"${last}, ${first}"`,                    'Last, First (comma)',         'med');
+  if(mi) add(`"${last}, ${first} ${mi}."`,      'Last, First M.',              'low');
+  // Acronym
+  const acro=[fi,mi,li].filter(Boolean).join('').toUpperCase();
+  if(acro.length>=2){
+    add(acro,                                   'Initials acronym',            'low');
+    add([fi,mi?mi+'.':'',li+'.'].filter(Boolean).join('').toUpperCase(),'Initials with dots','low');
+  }
+  // Username patterns
+  add(`"${fl}${ll}"`,    'Username: firstlast',  'high');
+  add(`"${fl}.${ll}"`,   'Username: first.last',  'high');
+  add(`"${fi}${ll}"`,    'Username: flast',       'high');
+  add(`"${fl}_${ll}"`,   'Username: first_last',  'med');
+  add(`"${fi}.${ll}"`,   'Username: f.last',      'med');
+  add(`"${fi}_${ll}"`,   'Username: f_last',      'low');
+  add(`"${ll}${fi}"`,    'Username: lastF',       'low');
+  add(`"${ll}.${fi}"`,   'Username: last.f',      'low');
+  add(`"${ll}${fl}"`,    'Username: lastfirst',   'low');
+  if(mi){
+    add(`"${fl}${mil}${ll}"`, 'Username: firstmidlast', 'low');
+    add(`"${fi}${mil}${ll}"`, 'Username: fmidlast',     'low');
+  }
+  // Partial
+  add(`"${last}"`,       'Last name only',         'low');
+  return Array.from(variants.entries()).map(([q,v])=>({q,...v}));
+}
+
+function isName(s){
+  if(!s||s.includes('@')||/\.[a-z]{2,4}$/i.test(s))return false;
+  return s.trim().split(/\s+/).length>=2;
+}
+
+// ═══════ TEMPLATES ══════════════════════════════════════════════════════════════
+const TYPES=[
+  {id:'person',icon:'👤',name:'Person'},
+  {id:'company',icon:'🏢',name:'Company'},
+  {id:'email',icon:'📧',name:'Email'},
+  {id:'domain',icon:'🌐',name:'Domain'},
+  {id:'document',icon:'📄',name:'Documents'},
+  {id:'social',icon:'💬',name:'Social'},
+  {id:'login',icon:'🔑',name:'Login'},
+  {id:'breach',icon:'⚠',name:'Exposure'},
+];
+
+function tpls(t1r,t2r,nameVars){
+  const q=(s)=>s.trim().replace(/\s+/g,' ');
+  const t1=t1r.includes('"')?t1r:(isName(t1r)?`"${t1r}"`:t1r);
+  const t2=t2r?`"${t2r}"`:'';
+  const dom=t2r.match(/^[\w.-]+\.[a-z]{2,}$/)?t2r:(t1r.match(/^[\w.-]+\.[a-z]{2,}$/)?t1r:'target.com');
+  const emailDom=t1r.includes('@')?t1r.split('@')[1]:'';
+  const topN=nameVars.filter(v=>v.sel).map(v=>v.q).slice(0,8);
+
+  const all={
+    person:[
+      {group:'Core Identity',items:[
+        {q:q(`${t1}`),                                              e:'Exact name — broadest starting point.',                      p:'high',tags:['name']},
+        {q:q(`${t1} email OR "contact" OR "@"`),                    e:'Contact details and email addresses.',                      p:'high',tags:['name']},
+        {q:q(`site:linkedin.com "${t1r}"`),                         e:'LinkedIn — highest-confidence professional source.',        p:'high',tags:['site']},
+        {q:q(`${t1} ${t2} site:linkedin.com`),                      e:'LinkedIn scoped to organisation'+(t2r?` "${t2r}"`:'')+'.', p:'high',tags:['site']},
+        {q:q(`${t1} "phone" OR "address" OR "born" OR "age"`),      e:'Personal details — DOB, location, contact.',               p:'med', tags:['name']},
+      ]},
+      {group:'Professional',items:[
+        {q:q(`${t1} resume OR "curriculum vitae" filetype:pdf`),    e:'Publicly indexed CVs and résumés.',                         p:'high',tags:['name','file']},
+        {q:q(`${t1} ${t2} "director" OR "officer" OR "founder"`),   e:'Corporate leadership roles.',                              p:'high',tags:['name']},
+        {q:q(`${t1} "speaker" OR "keynote" OR "author" OR "panelist"`), e:'Conference appearances, publications.',               p:'med', tags:['name']},
+        {q:q(`${t1} site:github.com OR site:gitlab.com`),           e:'Developer profiles and code.',                             p:'med', tags:['site']},
+        {q:q(`${t1} filetype:pdf ${t2}`),                           e:'PDF mentions — reports, filings, publications.',           p:'med', tags:['file']},
+      ]},
+      {group:'Legal & Financial',items:[
+        {q:q(`${t1} court OR lawsuit OR litigation OR indictment`), e:'Court records and legal proceedings.',                     p:'med', tags:['name']},
+        {q:q(`${t1} site:sec.gov`),                                 e:'SEC filings — for executives and insiders.',               p:'med', tags:['site']},
+        {q:q(`${t1} sanction OR OFAC OR "restricted party"`),       e:'Sanctions screening.',                                     p:'high',tags:['name']},
+        {q:q(`${t1} arrest OR "charged with" OR convicted`),        e:'Criminal proceedings.',                                    p:'med', tags:['name']},
+      ]},
+      ...(topN.length>1?[{group:'Name Variant Searches',items:topN.map(n=>({
+        q:n, e:`Name variation: ${n}`, p:'med', tags:['name']
+      }))}]:[]),
+      {group:'Social Presence',items:[
+        {q:q(`${t1} site:twitter.com OR site:x.com`),               e:'Twitter/X.',                                               p:'med', tags:['site']},
+        {q:q(`${t1} site:facebook.com OR site:instagram.com`),      e:'Facebook and Instagram.',                                  p:'med', tags:['site']},
+        {q:q(`${t1} site:reddit.com`),                              e:'Reddit.',                                                  p:'low', tags:['site']},
+        {q:q(`${t1} inurl:about OR inurl:team OR inurl:staff`),     e:'Team pages — confirms employment.',                        p:'low', tags:['site']},
+      ]},
+    ],
+    company:[
+      {group:'Corporate Records',items:[
+        {q:q(`${t1} site:opencorporates.com`),                       e:'OpenCorporates — 200M+ companies, 140 jurisdictions.',    p:'high',tags:['site']},
+        {q:q(`${t1} site:sec.gov OR site:edgar.sec.gov`),            e:'SEC EDGAR — US public companies.',                       p:'high',tags:['site']},
+        {q:q(`${t1} site:companieshouse.gov.uk`),                    e:'UK Companies House.',                                    p:'high',tags:['site']},
+        {q:q(`${t1} "annual report" OR "10-K" filetype:pdf`),        e:'Published financial reports.',                           p:'high',tags:['file']},
+        {q:q(`${t1} "board of directors" OR "C-suite" OR "leadership"`), e:'Named leadership.',                                 p:'med', tags:[]},
+      ]},
+      {group:'Risk & Relationships',items:[
+        {q:q(`${t1} ${t2} contract OR partnership OR "joint venture"`), e:'Business relationships and agreements.',              p:'med', tags:[]},
+        {q:q(`${t1} lawsuit OR litigation OR settlement`),            e:'Legal proceedings.',                                    p:'high',tags:[]},
+        {q:q(`${t1} sanction OR OFAC OR "restricted party" OR SDN`), e:'Sanctions screening.',                                   p:'high',tags:[]},
+        {q:q(`${t1} breach OR hack OR "data leak"`),                  e:'Reported security incidents.',                         p:'med', tags:[]},
+        {q:q(`${t1} "shell company" OR "beneficial owner" OR nominee`), e:'Ownership obfuscation indicators.',                  p:'med', tags:[]},
+      ]},
+      {group:'Infrastructure',items:[
+        {q:q(`site:${dom} filetype:pdf OR filetype:xlsx OR filetype:csv`), e:'Documents on their domain.',                      p:'high',tags:['site','file']},
+        {q:q(`site:${dom} inurl:admin OR inurl:login OR inurl:portal`), e:'Admin panels on their domain.',                     p:'med', tags:['site']},
+        {q:q(`"${t1r}" email "@${dom}"`),                            e:'Email addresses at their domain.',                      p:'med', tags:[]},
+        {q:q(`site:${dom} "index of /"`),                            e:'Open directory listings.',                              p:'high',tags:['site']},
+      ]},
+    ],
+    email:[
+      {group:'Direct Exposure',items:[
+        {q:q(`"${t1r}"`),                                            e:'Direct address search.',                                 p:'high',tags:[]},
+        {q:q(`"${t1r}" -site:${emailDom||dom}`),                     e:'Email on sites other than the home domain.',            p:'high',tags:['site']},
+        {q:q(`"${t1r}" site:pastebin.com OR site:paste.ee`),         e:'Paste sites — primary credential dump location.',       p:'high',tags:['site']},
+        {q:q(`"${t1r}" site:github.com OR site:gitlab.com`),         e:'Code commits and config files.',                       p:'high',tags:['site']},
+        {q:q(`"${t1r}" password OR passwd OR credentials`),          e:'Password-related exposure.',                           p:'med', tags:[]},
+      ]},
+      {group:'Domain Intel',items:[
+        {q:q(`"@${emailDom||t1r}" email`),                           e:'Other addresses at the same domain.',                   p:'high',tags:[]},
+        {q:q(`site:${emailDom||dom} contact OR email`),              e:'Contact pages on the associated domain.',              p:'med', tags:['site']},
+        {q:q(`"${emailDom||t1r}" "MX record" OR SPF OR DMARC`),      e:'Mail infrastructure configuration.',                   p:'low', tags:[]},
+        {q:q(`"${t1r}" linkedin.com OR "about.me"`),                 e:'Professional profiles linked to this email.',          p:'med', tags:['site']},
+      ]},
+    ],
+    domain:[
+      {group:'Surface Exposure',items:[
+        {q:q(`site:${t1r}`),                                         e:'All indexed pages.',                                    p:'high',tags:['site']},
+        {q:q(`site:${t1r} filetype:pdf OR filetype:xlsx OR filetype:csv OR filetype:docx`), e:'Indexed documents.',           p:'high',tags:['site','file']},
+        {q:q(`site:${t1r} "index of /" OR "parent directory"`),      e:'Open directory listings.',                             p:'high',tags:['site']},
+        {q:q(`site:${t1r} inurl:admin OR inurl:login OR inurl:portal OR inurl:wp-admin`), e:'Admin panels.',                  p:'high',tags:['site']},
+        {q:q(`site:${t1r} "error" OR "exception" OR "stack trace"`), e:'Error messages revealing stack or paths.',            p:'med', tags:['site']},
+      ]},
+      {group:'Config & Secrets',items:[
+        {q:q(`site:${t1r} ext:xml OR ext:conf OR ext:config OR ext:env`), e:'Configuration files.',                           p:'high',tags:['site','file']},
+        {q:q(`site:${t1r} "api_key" OR "api key" OR "secret_key"`), e:'Exposed secrets.',                                     p:'high',tags:['site']},
+        {q:q(`site:${t1r} inurl:.git OR "composer.json" OR "package.json"`), e:'Source code exposure.',                       p:'high',tags:['site']},
+        {q:q(`site:${t1r} filetype:sql OR filetype:bak OR filetype:log`), e:'Databases, backups, logs.',                     p:'high',tags:['site','file']},
+        {q:q(`site:${t1r} inurl:robots.txt`),                        e:'robots.txt — reveals hidden paths.',                  p:'med', tags:['site']},
+      ]},
+      {group:'Cross-Reference',items:[
+        {q:q(`"${t1r}" -site:${t1r}`),                               e:'Mentions on other sites.',                             p:'med', tags:['site']},
+        {q:q(`related:${t1r}`),                                      e:'Google\'s related domains.',                           p:'low', tags:['site']},
+        {q:q(`cache:${t1r}`),                                        e:'Google\'s cached homepage.',                           p:'low', tags:['site']},
+        {q:q(`site:github.com "${t1r}"`),                            e:'GitHub repos mentioning this domain.',                 p:'med', tags:['site']},
+      ]},
+    ],
+    document:[
+      {group:'File Types',items:[
+        {q:q(`${t1} filetype:pdf`),                                  e:'PDF documents.',                                        p:'high',tags:['file']},
+        {q:q(`${t1} filetype:xlsx OR filetype:xls OR filetype:csv`), e:'Spreadsheets — financial, contact lists.',             p:'high',tags:['file']},
+        {q:q(`${t1} filetype:docx OR filetype:doc`),                 e:'Word documents.',                                      p:'high',tags:['file']},
+        {q:q(`${t1} filetype:pptx OR filetype:ppt`),                 e:'Presentations.',                                       p:'med', tags:['file']},
+        {q:q(`${t1} filetype:txt OR filetype:log`),                  e:'Text files and logs.',                                  p:'med', tags:['file']},
+        {q:q(`${t1} filetype:sql`),                                  e:'SQL dumps — raw database records.',                    p:'high',tags:['file']},
+      ]},
+      {group:'Sensitive Content',items:[
+        {q:q(`${t1} "confidential" OR "internal use only" OR "do not distribute" filetype:pdf`), e:'Marked confidential.',    p:'high',tags:['file']},
+        {q:q(`${t1} "invoice" OR "purchase order" filetype:pdf OR filetype:xlsx`), e:'Financial documents.',                  p:'med', tags:['file']},
+        {q:q(`${t1} "NDA" OR "non-disclosure" OR "agreement" filetype:pdf`), e:'Legal agreements.',                           p:'med', tags:['file']},
+        {q:q(`${t1} "password" OR "credentials" filetype:txt OR filetype:csv`), e:'Credentials in plain files.',              p:'high',tags:['file']},
+      ]},
+      {group:'Platforms',items:[
+        {q:q(`${t1} site:docs.google.com`),                          e:'Public Google Docs.',                                  p:'med', tags:['site']},
+        {q:q(`${t1} site:scribd.com`),                              e:'Scribd — often contains leaked reports.',               p:'med', tags:['site']},
+        {q:q(`${t1} site:archive.org`),                             e:'Internet Archive — deleted content.',                   p:'med', tags:['site']},
+        {q:q(`${t1} site:dropbox.com OR site:drive.google.com`),    e:'Cloud storage — often misconfigured.',                  p:'med', tags:['site']},
+      ]},
+    ],
+    social:[
+      {group:'Major Platforms',items:[
+        {q:q(`${t1} site:linkedin.com`),                             e:'LinkedIn.',                                             p:'high',tags:['site']},
+        {q:q(`${t1} site:twitter.com OR site:x.com`),               e:'Twitter / X.',                                         p:'high',tags:['site']},
+        {q:q(`${t1} site:facebook.com`),                            e:'Facebook.',                                             p:'med', tags:['site']},
+        {q:q(`${t1} site:instagram.com`),                           e:'Instagram.',                                            p:'med', tags:['site']},
+        {q:q(`${t1} site:reddit.com`),                              e:'Reddit.',                                               p:'med', tags:['site']},
+        {q:q(`${t1} site:github.com`),                              e:'GitHub.',                                               p:'high',tags:['site']},
+      ]},
+      {group:'Secondary',items:[
+        {q:q(`${t1} site:youtube.com`),                              e:'YouTube.',                                              p:'med', tags:['site']},
+        {q:q(`${t1} site:t.me OR site:telegram.me`),                e:'Telegram.',                                             p:'med', tags:['site']},
+        {q:q(`${t1} site:medium.com OR site:substack.com`),         e:'Writing platforms.',                                    p:'med', tags:['site']},
+        {q:q(`${t1} site:discord.com OR "discord.gg"`),             e:'Discord.',                                              p:'low', tags:['site']},
+      ]},
+      {group:'Activity',items:[
+        {q:q(`${t1} forum OR board OR thread OR community`),        e:'Forum and discussion board activity.',                  p:'med', tags:[]},
+        {q:q(`${t1} "posted by" OR "written by" OR "authored by"`), e:'Content attribution.',                                  p:'low', tags:[]},
+      ]},
+    ],
+    login:[
+      {group:'Admin Interfaces',items:[
+        {q:q(`site:${dom} inurl:admin OR inurl:administrator OR inurl:backend`), e:'Admin panels.',                            p:'high',tags:['site']},
+        {q:q(`site:${dom} inurl:login OR inurl:signin OR inurl:auth`), e:'Login and authentication pages.',                   p:'high',tags:['site']},
+        {q:q(`site:${dom} inurl:portal OR inurl:dashboard OR inurl:console`), e:'Portals and dashboards.',                    p:'high',tags:['site']},
+        {q:q(`site:${dom} inurl:wp-admin OR inurl:wp-login`),        e:'WordPress admin.',                                    p:'high',tags:['site']},
+        {q:q(`site:${dom} inurl:phpmyadmin OR inurl:mysqladmin`),    e:'Database management — critical.',                     p:'high',tags:['site']},
+      ]},
+      {group:'Dev & Monitoring',items:[
+        {q:q(`site:${dom} inurl:jira OR inurl:confluence OR inurl:gitlab`), e:'Dev project tools.',                           p:'med', tags:['site']},
+        {q:q(`site:${dom} inurl:kibana OR inurl:grafana OR inurl:splunk`), e:'Monitoring dashboards — often exposed.',        p:'high',tags:['site']},
+        {q:q(`site:${dom} inurl:jenkins OR inurl:circleci`),         e:'CI/CD pipelines.',                                    p:'high',tags:['site']},
+      ]},
+      {group:'Remote Access',items:[
+        {q:q(`site:${dom} inurl:vpn OR inurl:remote OR inurl:rdweb`), e:'VPN and RD gateways.',                               p:'med', tags:['site']},
+        {q:q(`site:${dom} inurl:webmail OR inurl:owa`),              e:'Webmail and Exchange.',                               p:'med', tags:['site']},
+        {q:q(`site:${dom} "Citrix" OR "GlobalProtect" OR "Pulse Secure"`), e:'Enterprise remote access.',                    p:'med', tags:['site']},
+      ]},
+    ],
+    breach:[
+      {group:'Paste & Dumps',items:[
+        {q:q(`${t1} site:pastebin.com OR site:paste.ee`),            e:'Paste sites — primary dump location.',               p:'high',tags:['site']},
+        {q:q(`${t1} "leaked" OR "dump" OR "database leak"`),         e:'General breach references.',                         p:'high',tags:[]},
+        {q:q(`${t1} password OR passwd OR hash OR cracked`),         e:'Password-related exposure.',                         p:'high',tags:[]},
+        {q:q(`${t1} filetype:sql OR "INSERT INTO"`),                  e:'SQL dumps.',                                        p:'high',tags:['file']},
+      ]},
+      {group:'Credential Exposure',items:[
+        {q:q(`site:github.com ${t1} password OR secret OR api_key`), e:'GitHub commits containing credentials.',             p:'high',tags:['site']},
+        {q:q(`${t1} "DB_PASSWORD" OR ".env" OR "database_url"`),     e:'Environment variable exposure.',                    p:'high',tags:[]},
+        {q:q(`${t1} "AWS_SECRET" OR "aws_access_key_id"`),           e:'AWS credential exposure.',                          p:'high',tags:[]},
+        {q:q(`${t1} site:trello.com`),                               e:'Trello — frequently misconfigured as public.',       p:'med', tags:['site']},
+      ]},
+      {group:'OSINT Sources',items:[
+        {q:q(`${t1} site:intelx.io OR site:dehashed.com`),           e:'OSINT database references.',                        p:'med', tags:['site']},
+        {q:q(`${t1} "for sale" OR "database for sale"`),             e:'Data listed for sale.',                              p:'med', tags:[]},
+        {q:q(`${t1} "leaked" site:reddit.com`),                      e:'Forum discussion of leaks.',                        p:'low', tags:['site']},
+      ]},
+    ],
+  };
+  return all[curType]||all.person;
+}
+
+// ═══════ STATE ══════════════════════════════════════════════════════════════════
+let curType='person', nameVars=[], allRows=[], curFilter='all', genTmr=null;
+
+function onT1(){
+  const v=document.getElementById('t1').value.trim();
+  const block=document.getElementById('enumBlock');
+  if(isName(v)){
+    nameVars=enumerate(v).map(x=>({...x,sel:x.priority==='high'}));
+    block.style.display='block';
+    renderChips();
+  } else {
+    block.style.display='none';
+    nameVars=[];
+  }
+  schedGen();
+}
+function schedGen(){
+  clearTimeout(genTmr);
+  genTmr=setTimeout(()=>{if(allRows.length)generate();},400);
+}
+function renderChips(){
+  const sel=nameVars.filter(v=>v.sel).length;
+  document.getElementById('enumNote').textContent=`${nameVars.length} found · ${sel} selected`;
+  document.getElementById('nameChips').innerHTML=nameVars.map((v,i)=>
+    `<span class="name-chip ${v.sel?'selected':''} ${v.priority==='high'?'high':''}"
+      onclick="togVar(${i})" title="${esc(v.label)}">${esc(v.q)}</span>`
+  ).join('');
+}
+function togVar(i){nameVars[i].sel=!nameVars[i].sel;renderChips();schedGen();}
+function selAll(){nameVars.forEach(v=>v.sel=true);renderChips();schedGen();}
+function selHigh(){nameVars.forEach(v=>v.sel=v.priority==='high');renderChips();schedGen();}
+function selNone(){nameVars.forEach(v=>v.sel=false);renderChips();schedGen();}
+
+// ═══════ GENERATE ═══════════════════════════════════════════════════════════════
+function generate(){
+  const t1=document.getElementById('t1').value.trim();
+  const t2=document.getElementById('t2').value.trim();
+  if(!t1)return;
+
+  // Get selected name variants (or just use t1 as the single variant)
+  const selVars=nameVars.filter(v=>v.sel);
+  const hasVars=selVars.length>0;
+
+  // Build the base template groups once (using t1 as primary)
+  const groups=tpls(t1,t2,nameVars);
+  allRows=[];
+
+  groups.forEach(g=>{
+    // "Name Variant Searches" group is handled separately — skip it
+    if(g.group==='Name Variant Searches') return;
+
+    g.items.forEach(item=>{
+      const isNameTemplate=item.tags&&item.tags.includes('name');
+
+      if(isNameTemplate&&hasVars){
+        // For name-tagged templates: generate one row per selected variant
+        // Group them under a variant-specific sub-group heading
+        selVars.forEach(v=>{
+          // Rebuild the query with this variant substituted for t1
+          const varQ=substituteVariant(item.q,t1,v.q);
+          allRows.push({
+            q:varQ,
+            e:item.e,
+            group:g.group,
+            p:item.p,
+            tags:item.tags||[],
+            sel:false,
+            id:allRows.length,
+            variant:v.q,   // track which variant this came from
+            varLabel:v.label,
+            isVariant:true,
+          });
+        });
+      } else {
+        // Non-name templates: run once normally
+        allRows.push({q:item.q,e:item.e,group:g.group,p:item.p,tags:item.tags||[],sel:false,id:allRows.length});
+      }
+    });
+  });
+
+  render();
+  document.getElementById('toolbar').style.display='flex';
+  document.getElementById('mStats').style.display='grid';
+  updateStats();
+}
+
+function substituteVariant(origQ, t1, variantQ){
+  // Replace the primary target with the variant in the query
+  // t1 might be quoted or unquoted — handle both
+  const t1Clean=t1.replace(/^"|"$/g,'');
+  const varClean=variantQ.replace(/^"|"$/g,'');
+  // Replace exact quoted version first
+  let q=origQ.replace(new RegExp('"'+escReg(t1Clean)+'"','g'), variantQ);
+  // If no replacement happened (t1 wasn't quoted in the template), try unquoted
+  if(q===origQ) q=origQ.replace(new RegExp('\\b'+escReg(t1Clean)+'\\b','g'), varClean);
+  return q.trim().replace(/\s+/g,' ');
+}
+function escReg(s){return s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');}
+
+function render(){
+  // Check if we have variant rows
+  const hasVariants=allRows.some(r=>r.isVariant);
+
+  if(hasVariants){
+    renderWithVariants();
+  } else {
+    renderFlat();
+  }
+}
+
+function renderFlat(){
+  const groups={};
+  allRows.forEach(r=>{
+    if(!pass(r))return;
+    if(!groups[r.group])groups[r.group]=[];
+    groups[r.group].push(r);
+  });
+  let html='';
+  Object.entries(groups).forEach(([name,rows])=>{
+    html+=buildGroupHtml(name,rows);
+  });
+  document.getElementById('body').innerHTML=html||emptyState();
+}
+
+function renderWithVariants(){
+  // Strategy: show non-variant groups normally, then show variant groups
+  // collapsed by variant so user can drill into each name form
+  const nonVariantGroups={};
+  const variantGroups={};  // group -> variant -> rows[]
+
+  allRows.forEach(r=>{
+    if(!pass(r))return;
+    if(r.isVariant){
+      if(!variantGroups[r.group])variantGroups[r.group]={};
+      if(!variantGroups[r.group][r.variant])variantGroups[r.group][r.variant]=[];
+      variantGroups[r.group][r.variant].push(r);
+    } else {
+      if(!nonVariantGroups[r.group])nonVariantGroups[r.group]=[];
+      nonVariantGroups[r.group].push(r);
+    }
+  });
+
+  let html='';
+
+  // 1. Non-variant groups first (core templates)
+  Object.entries(nonVariantGroups).forEach(([name,rows])=>{
+    html+=buildGroupHtml(name,rows);
+  });
+
+  // 2. Variant groups — one parent group per category, child rows grouped by variant
+  Object.entries(variantGroups).forEach(([groupName,varMap])=>{
+    const allGroupRows=Object.values(varMap).flat();
+    const totalRows=allGroupRows.length;
+    const variants=Object.keys(varMap);
+    const hc=allGroupRows.filter(r=>r.p==='high').length;
+
+    html+=`<div class="dork-group">
+      <div class="group-hdr" onclick="togGroup(this)">
+        <span class="gh-l"><span>${gIcon(groupName)}</span> ${esc(groupName)} <span style="font-family:var(--mono);font-size:7px;padding:2px 6px;border:1px solid rgba(176,136,249,.25);color:rgba(176,136,249,.60)!important;margin-left:6px;">×${variants.length} variants</span></span>
+        <span class="gh-r">
+          ${hc?`<span style="font-family:var(--mono);font-size:8px;color:rgba(78,201,148,.50);">⬤ ${hc}</span>`:''}
+          <span style="font-family:var(--mono);font-size:8px;color:rgba(200,169,110,.35);">${totalRows}</span>
+          <span class="gh-toggle">▾</span>
+        </span>
+      </div>
+      <div class="dork-list">
+        ${variants.map(variant=>{
+          const vRows=varMap[variant];
+          const vHigh=vRows.filter(r=>r.p==='high').length;
+          return `<div class="variant-subgroup">
+            <div class="variant-hdr" onclick="togVariantGroup(this)">
+              <span class="vh-name">${esc(variant)}</span>
+              <span class="vh-meta">
+                ${vHigh?`<span class="vh-high">⬤ ${vHigh} high</span>`:''}
+                <span class="vh-count">${vRows.length}</span>
+                <span class="vh-toggle">▾</span>
+              </span>
+            </div>
+            <div class="variant-rows">
+              ${vRows.map(r=>rowHtml(r)).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`;
+  });
+
+  document.getElementById('body').innerHTML=html||emptyState();
+}
+
+function buildGroupHtml(name,rows,startCollapsed=false){
+  const hc=rows.filter(r=>r.p==='high').length;
+  return `<div class="dork-group">
+    <div class="group-hdr${startCollapsed?' collapsed':''}" onclick="togGroup(this)">
+      <span class="gh-l"><span>${gIcon(name)}</span> ${esc(name)}</span>
+      <span class="gh-r">
+        ${hc?`<span style="font-family:var(--mono);font-size:8px;color:rgba(78,201,148,.50);">⬤ ${hc}</span>`:''}
+        <span style="font-family:var(--mono);font-size:8px;color:rgba(200,169,110,.35);">${rows.length}</span>
+        <span class="gh-toggle">▾</span>
+      </span>
+    </div>
+    <div class="dork-list${startCollapsed?' collapsed':''}">${rows.map(r=>rowHtml(r)).join('')}</div>
+  </div>`;
+}
+
+function emptyState(){
+  return '<div style="padding:28px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,.25);background:var(--bg2);border:1px solid var(--border);">No results match this filter.</div>';
+}
+
+function togVariantGroup(hdr){
+  hdr.classList.toggle('collapsed');
+  hdr.nextElementSibling.classList.toggle('collapsed');
+}
+
+function rowHtml(r){
+  const pc=r.p==='high'?'pd-high':r.p==='med'?'pd-med':'pd-low';
+  const tagHtml=r.tags.filter(t=>t!=='high').map(t=>{
+    const labels={name:'name',file:'filetype:',site:'site:'};
+    return `<span class="dtag dtag-${t}">${labels[t]||t}</span>`;
+  }).join('');
+  return`<div class="dork-row${r.sel?' sel':''}" id="dr${r.id}">
+    <div class="prio-col"><span class="prio-dot ${pc}"></span></div>
+    <div class="dork-main">
+      <div class="dork-query" contenteditable="true" spellcheck="false" id="dq${r.id}" onblur="updQ(${r.id},this)">${hilite(esc(r.q))}</div>
+      <div class="dork-foot">
+        <span class="dork-exp">${esc(r.e)}</span>
+        ${tagHtml}
+      </div>
+    </div>
+    <div class="dork-actions">
+      <button class="da-btn sel-btn${r.sel?' on':''}" onclick="togSel(${r.id})">${r.sel?'✓':'○'}</button>
+      <a class="da-btn srch" href="${esc(gUrl(r.q))}" target="_blank" rel="noopener">Search</a>
+      <button class="da-btn cpy" onclick="cpyRow(${r.id},this)">Copy</button>
+    </div>
+  </div>`;
+}
+
+function hilite(q){
+  return q
+    .replace(/(-)(site:|filetype:|inurl:|intitle:|intext:|ext:|related:|cache:|after:|before:)/g,'<span class="neg">$1$2</span>')
+    .replace(/(site:|filetype:|inurl:|intitle:|intext:|ext:|related:|cache:|after:|before:)([^\s"&]+)/g,'<span class="op">$1</span><span class="val">$2</span>')
+    .replace(/&quot;([^&]+)&quot;/g,'<span class="str">&quot;$1&quot;</span>');
+}
+
+function pass(r){
+  if(curFilter==='all')return true;
+  if(curFilter==='high')return r.p==='high';
+  if(curFilter==='name')return r.tags.includes('name');
+  if(curFilter==='file')return r.tags.includes('file');
+  if(curFilter==='variants')return!!r.isVariant;
+  return true;
+}
+
+function setFilter(f,btn){
+  curFilter=f;
+  document.querySelectorAll('.tb-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+function togGroup(h){h.classList.toggle('collapsed');h.nextElementSibling.classList.toggle('collapsed');}
+function togSel(id){
+  const r=allRows[id]; r.sel=!r.sel;
+  const row=document.getElementById('dr'+id);
+  const btn=row?.querySelector('.sel-btn');
+  if(row)row.classList.toggle('sel',r.sel);
+  if(btn){btn.classList.toggle('on',r.sel);btn.textContent=r.sel?'✓':'○';}
+  updateStats();
+}
+function updQ(id,el){allRows[id].q=el.innerText.trim();}
+function updateStats(){
+  document.getElementById('sTotal').textContent=allRows.length;
+  document.getElementById('sHigh').textContent=allRows.filter(r=>r.p==='high').length;
+  document.getElementById('sSel').textContent=allRows.filter(r=>r.sel).length;
+}
+function cpyRow(id,btn){
+  navigator.clipboard.writeText(allRows[id].q).then(()=>{const o=btn.textContent;btn.textContent='✓';setTimeout(()=>btn.textContent=o,1400);});
+}
+function openSel(){
+  const s=allRows.filter(r=>r.sel);
+  if(!s.length){alert('Select queries first (click ○).');return;}
+  if(s.length>8&&!confirm(`Open ${s.length} tabs?`))return;
+  s.forEach((r,i)=>setTimeout(()=>window.open(gUrl(r.q),'_blank','noopener'),i*350));
+}
+function copySel(){
+  const s=allRows.filter(r=>r.sel);
+  const rows=s.length?s:allRows.filter(r=>pass(r));
+  navigator.clipboard.writeText(rows.map(r=>r.q).join('\n')).then(()=>{
+    const btn=event.target;const o=btn.textContent;
+    btn.textContent=`✓ Copied ${rows.length}`;setTimeout(()=>btn.textContent=o,2000);
+  });
+}
+function doExport(){
+  if(!allRows.length){alert('Generate first.');return;}
+  const rows=allRows.filter(r=>pass(r));
+  const csv='query,group,priority,explanation,url\n'+rows.map(r=>[
+    `"${r.q.replace(/"/g,'""')}"`,`"${r.group}"`,r.p,
+    `"${r.e.replace(/"/g,'""')}"`,`"${gUrl(r.q)}"`
+  ].join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href='data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download=`dorks-${document.getElementById('t1').value.replace(/\s+/g,'-').slice(0,30)}.csv`;
+  a.click();
+}
+function toggleRef(){
+  const g=document.getElementById('refGrid');
+  g.classList.toggle('hide');
+  document.getElementById('refArrow').textContent=g.classList.contains('hide')?'▾':'▴';
+}
+
+function expandAll(){
+  document.querySelectorAll('.group-hdr.collapsed').forEach(h=>{
+    h.classList.remove('collapsed');
+    h.nextElementSibling.classList.remove('collapsed');
+  });
+  document.querySelectorAll('.variant-hdr.collapsed').forEach(h=>{
+    h.classList.remove('collapsed');
+    h.nextElementSibling.classList.remove('collapsed');
+  });
+}
+function collapseAll(){
+  document.querySelectorAll('.group-hdr:not(.collapsed)').forEach(h=>{
+    h.classList.add('collapsed');
+    h.nextElementSibling.classList.add('collapsed');
+  });
+  document.querySelectorAll('.variant-hdr:not(.collapsed)').forEach(h=>{
+    h.classList.add('collapsed');
+    h.nextElementSibling.classList.add('collapsed');
+  });
+}
+
+const OPERATORS=[
+  {op:'site:',desc:'Restrict to a specific domain',ex:'site:linkedin.com "John Doe"'},
+  {op:'filetype:',desc:'Search for a file extension',ex:'filetype:pdf "Q4 report"'},
+  {op:'inurl:',desc:'Term must appear in the URL',ex:'inurl:admin inurl:login'},
+  {op:'intitle:',desc:'Term must appear in the page title',ex:'intitle:"index of"'},
+  {op:'intext:',desc:'Term must appear in the body',ex:'intext:"api_key"'},
+  {op:'"phrase"',desc:'Exact phrase match',ex:'"data breach" "2024"'},
+  {op:'-term',desc:'Exclude this term',ex:'"John Smith" -linkedin'},
+  {op:'OR',desc:'Either term can match (uppercase)',ex:'"CEO" OR "founder"'},
+  {op:'*',desc:'Wildcard — matches any word',ex:'"the * of the year"'},
+  {op:'related:',desc:'Find similar domains',ex:'related:nytimes.com'},
+  {op:'cache:',desc:"Google's cached page version",ex:'cache:example.com'},
+  {op:'after:',desc:'Results after a date',ex:'after:2023-01-01'},
+];
+
+const GICONS={'Core Identity':'🪪','Professional':'💼','Legal & Financial':'⚖',
+  'Name Variant Searches':'🔄','Social Presence':'👥','Corporate Records':'🏛',
+  'Risk & Relationships':'🔗','Infrastructure':'🔧','Direct Exposure':'🚨',
+  'Domain Intel':'🌐','Surface Exposure':'📂','Config & Secrets':'⚙',
+  'Cross-Reference':'↗','File Types':'📄','Sensitive Content':'🔒','Platforms':'🗃',
+  'Major Platforms':'⭐','Secondary':'🔗','Activity':'💬','Admin Interfaces':'🔐',
+  'Dev & Monitoring':'💻','Remote Access':'📡','Paste & Dumps':'💀',
+  'Credential Exposure':'🔓','OSINT Sources':'🕵'};
+function gIcon(n){return GICONS[n]||'◈';}
+function gUrl(q){return'https://www.google.com/search?q='+encodeURIComponent(q);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+window.addEventListener('load',()=>{
+  document.getElementById('typeGrid').innerHTML=TYPES.map(t=>
+    `<button class="type-btn${t.id===curType?' active':''}" onclick="curType='${t.id}';document.querySelectorAll('.type-btn').forEach(b=>b.classList.remove('active'));this.classList.add('active')">
+      <span class="tb-icon">${t.icon}</span><span class="tb-name">${t.name}</span>
+    </button>`).join('');
+  document.getElementById('refGrid').innerHTML=OPERATORS.map(o=>
+    `<div class="ref-item"><div class="ref-op">${esc(o.op)}</div><div class="ref-desc">${esc(o.desc)}</div><div class="ref-ex">${esc(o.ex)}</div></div>`
+  ).join('');
+});
+</script>
+</body>
+</html>
