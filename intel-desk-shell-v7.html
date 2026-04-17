@@ -152,7 +152,7 @@ body *{color:inherit;}
 .nav-cat{
   font-family:var(--mono);font-size:11px;font-weight:500;
   text-transform:uppercase;letter-spacing:0.18em;
-  color:rgba(240,236,228,0.50)!important;
+  color:rgba(240,236,228,0.72)!important;
   padding:11px 16px;display:flex;align-items:center;gap:9px;
   cursor:pointer;user-select:none;
   border-top:1px solid var(--border);
@@ -160,6 +160,7 @@ body *{color:inherit;}
   transition:background 0.20s, color 0.20s, box-shadow 0.20s;
   position:relative;
   overflow:hidden;
+  box-shadow:inset 3px 0 0 rgba(200,169,110,0.35);
 }
 .nav-cat:first-child{border-top:none;}
 /* Gold backlight on hover — sweeps in from left */
@@ -167,26 +168,26 @@ body *{color:inherit;}
   content:'';
   position:absolute;inset:0;
   /* Baseline: always a faint gold glow from the left */
-  background:linear-gradient(90deg, rgba(200,169,110,0.07) 0%, rgba(200,169,110,0.02) 55%, transparent 100%);
+  background:linear-gradient(90deg, rgba(200,169,110,0.32) 0%, rgba(200,169,110,0.12) 55%, transparent 100%);
   opacity:1;
   transition:opacity 0.20s, background 0.20s;
   pointer-events:none;
 }
 /* Hover — brighter sweep */
 .nav-cat:hover::before{
-  background:linear-gradient(90deg, rgba(200,169,110,0.18) 0%, rgba(200,169,110,0.06) 60%, transparent 100%);
+  background:linear-gradient(90deg, rgba(200,169,110,0.50) 0%, rgba(200,169,110,0.22) 60%, transparent 100%);
 }
 .nav-cat:hover{
-  color:rgba(240,236,228,0.88)!important;
-  box-shadow:inset 3px 0 0 rgba(200,169,110,0.60);
+  color:#f0e8d0!important;
+  box-shadow:inset 4px 0 0 rgba(200,169,110,0.95), 0 0 20px rgba(200,169,110,0.14);
 }
 /* Open/active — strongest glow, bright edge */
 .nav-cat.open{
-  color:#e8d5a3!important;
-  box-shadow:inset 3px 0 0 rgba(200,169,110,0.90);
+  color:#f5ecd4!important;
+  box-shadow:inset 4px 0 0 #e8d5a3, 0 0 30px rgba(200,169,110,0.20), inset 0 0 40px rgba(200,169,110,0.10);
 }
 .nav-cat.open::before{
-  background:linear-gradient(90deg, rgba(200,169,110,0.22) 0%, rgba(200,169,110,0.08) 65%, transparent 100%);
+  background:linear-gradient(90deg, rgba(200,169,110,0.60) 0%, rgba(200,169,110,0.28) 50%, rgba(200,169,110,0.06) 100%);
 }
 
 /* Arrow — big and obvious */
@@ -1176,52 +1177,21 @@ const ALL_TOOLS = CATEGORIES.flatMap(c => c.tools);
 const LIVE_TOOLS = ALL_TOOLS.filter(t => t.live);
 const TOTAL_DATASETS = ALL_TOOLS.reduce((n, t) => n + (t.datasets || 0), 0);
 
-// ── BUILD SIDEBAR ─────────────────────────────────────────────────────────────
 let current = null;
-
-// Track which categories are open
 const openCats = new Set();
 
-function buildSidebar() {
-  const scroll = document.getElementById('sidebarScroll');
-  if(!scroll) return;
-  let html = '';
-  CATEGORIES.forEach(function(cat, ci) {
-    const isOpen = false; // all collapsed by default — user clicks to expand
-    const liveCount = cat.tools.filter(t => t.live).length;
-    html += '<div class="nav-cat" id="cat-hdr-' + cat.id + '" data-cat="' + cat.id + '" onclick="toggleCat(\''+cat.id+'\')"> ';
-    html += '<span class="nav-cat-arrow" id="cat-arrow-' + cat.id + '">' + (isOpen ? '▾' : '▸') + '</span>';
-    html += cat.label;
-    html += '<span class="nav-cat-count">' + liveCount + '</span>';
-    html += '</div>';
-    html += '<div class="nav-cat-tools" id="cat-tools-' + cat.id + '" style="' + (isOpen ? '' : 'display:none;') + '">';
-    cat.tools.forEach(function(t) {
-      const cls = 'tool-btn' + (t.live ? '' : ' soon');
-      const click = t.live ? 'loadTool(\'' + t.id + '\')' : '';
-      html += '<button class="' + cls + '" id="btn-' + t.id + '" onclick="' + click + '">';
-      html += '<div class="tool-btn-inner">';
-      html += '<div class="tool-icon">' + t.icon + '</div>';
-      html += '<div class="tool-info">';
-      html += '<div class="tool-name">' + t.name + (t.newTab ? ' <span style="font-size:9px;opacity:0.35;">↗</span>' : '') + '</div>';
-      html += '<div class="tool-desc">' + t.desc + '</div>';
-      html += '</div>';
-      if(!t.live) html += '<span class="soon-badge">Soon</span>';
-      html += '</div></button>';
-    });
-    html += '</div>';
-  });
-  scroll.innerHTML = html;
-}
-
-function toggleCat(id) {
-  const tools = document.getElementById('cat-tools-' + id);
-  const arrow = document.getElementById('cat-arrow-' + id);
-  const hdr   = document.getElementById('cat-hdr-' + id);
-  if(!tools) return;
-  const isOpen = tools.style.display !== 'none';
-  tools.style.display = isOpen ? 'none' : 'block';
-  if(arrow) arrow.textContent = isOpen ? '▸' : '▾';
-  if(hdr)   hdr.classList.toggle('open', !isOpen);
+function goHome() {
+  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.tool-iframe').forEach(f => f.classList.remove('visible'));
+  const welcome = document.getElementById('welcome');
+  if (welcome) welcome.classList.remove('hidden');
+  const seo = document.getElementById('seoAcc');
+  if (seo) seo.style.display = 'none';
+  const frame = document.getElementById('toolFrame');
+  if (frame) { frame.src = ''; frame.classList.remove('visible'); }
+  current = null;
+  closeSidebar();
+  history.replaceState(null, '', location.pathname);
 }
 
 function expandAllCats() {
@@ -1245,372 +1215,6 @@ function collapseAllCats() {
     if(hdr)   hdr.classList.remove('open');
   });
 }
-
-
-function openCatForTool(id) {
-  CATEGORIES.forEach(function(cat) {
-    if(cat.tools.some(t => t.id === id)) {
-      const tools = document.getElementById('cat-tools-' + cat.id);
-      const arrow  = document.getElementById('cat-arrow-' + cat.id);
-      const hdr    = document.getElementById('cat-hdr-' + cat.id);
-      if(tools) { tools.style.display = 'block'; }
-      if(arrow)  { arrow.textContent = '▾'; }
-      if(hdr)    { hdr.classList.add('open'); }
-    }
-  });
-}
-
-
-function buildWelcome() {
-  document.getElementById('welcomeStats').innerHTML = `
-    <div class="welcome-stat">
-      <div class="ws-num">${LIVE_TOOLS.length}</div>
-      <div class="ws-lbl">Live Tools</div>
-    </div>
-    <div class="welcome-stat">
-      <div class="ws-num">${TOTAL_DATASETS.toLocaleString()}+</div>
-      <div class="ws-lbl">Data Sources</div>
-    </div>
-    <div class="welcome-stat">
-      <div class="ws-num">4</div>
-      <div class="ws-lbl">Sanctions Lists</div>
-    </div>
-    <div class="welcome-stat">
-      <div class="ws-num">24k+</div>
-      <div class="ws-lbl">Sanctioned Entities</div>
-    </div>
-  `;
-
-  // Category cards — click to open first tool in that category
-  const CAT_ICONS = {
-    'email-comms':  '✉',
-    'documents':    '📄',
-    'compliance':   '⚖',
-    'geospatial':   '🌐',
-    'live-intel':   '📡',
-    'identity':     '👤',
-    'ip-domain':    '🔗',
-    'image-forensics': '🔍',
-  };
-  document.getElementById('welcomeCats').innerHTML = CATEGORIES.map(function(cat) {
-    const icon = CAT_ICONS[cat.id] || '◈';
-    const liveCount = cat.tools.filter(t => t.live).length;
-    const firstLive = cat.tools.find(t => t.live);
-    const click = firstLive ? `loadTool('${firstLive.id}')` : '';
-    return `<div class="wcat-card" onclick="${click}">
-      <div class="wcat-icon">${icon}</div>
-      <div class="wcat-name">${cat.label}</div>
-      <div class="wcat-count">${liveCount} tool${liveCount !== 1 ? 's' : ''}</div>
-    </div>`;
-  }).join('');
-}
-
-// ── BUILD TICKER ──────────────────────────────────────────────────────────────
-function buildTicker() {
-  document.getElementById('tickerTools').textContent = LIVE_TOOLS.length;
-  document.getElementById('tickerDatasets').textContent = TOTAL_DATASETS + '+';
-
-  // Scroll items — duplicate for seamless loop
-  const items = [
-    { label: 'OFAC SDN List',            value: '~13,000 entries' },
-    { label: 'UN Security Council',       value: '~900 entries' },
-    { label: 'EU Consolidated Sanctions', value: '~5,800 entries' },
-    { label: 'UK FCDO Sanctions List',    value: '~4,200 entries' },
-    { label: 'Email Header Parsing',      value: 'SPF · DKIM · DMARC' },
-    { label: 'EXIF Extraction',           value: 'GPS · Camera · Timestamp' },
-    { label: 'PDF/DOCX Forensics',        value: 'Author · Revision history' },
-    { label: 'Coordinate Conversion',     value: '7 formats · W3W' },
-    { label: 'Sun & Shadow Calculator',     value: 'Photo timestamp forensics' },
-    { label: 'World Timezone Converter',      value: '90+ cities · Overlap view' },
-    { label: 'Email Intelligence',        value: 'Holehe · 120+ platforms' },
-    { label: 'Username Search',           value: 'Sherlock · WhatsMyName · 500+ sites' },
-    { label: 'Phone Intelligence',        value: 'Carrier · Type · Platform scan' },
-    { label: 'IP Intelligence',           value: 'Geolocation · ASN · Threat score' },
-    { label: 'WHOIS & DNS',               value: 'Registration · MX · TXT · NS' },
-    { label: 'URL Intelligence',              value: 'Redirect chain · SSL · Preview' },
-    { label: 'Sanctions Screening',       value: '4 lists · Real-time' },
-    { label: 'what3words API',            value: 'Bidirectional lookup' },
-    { label: 'Match Confidence Scoring',  value: '0–100 scale' },
-  ];
-
-  const html = [...items, ...items].map(item => `
-    <div class="ticker-item">
-      <div class="ti-dot"></div>
-      <strong>${item.label}</strong>
-      <span style="color:rgba(240,236,228,0.28)!important">—</span>
-      ${item.value}
-    </div>`).join('');
-
-  document.getElementById('tickerScroll').innerHTML = html;
-}
-
-// ── LOAD TOOL ─────────────────────────────────────────────────────────────────
-function goHome() {
-  // Clear active tool
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  document.querySelectorAll('.tool-iframe').forEach(f => f.classList.remove('visible'));
-  // Show welcome screen (loadTool hides it via classList.add('hidden'))
-  const welcome = document.getElementById('welcome');
-  if (welcome) welcome.classList.remove('hidden');
-  // Hide SEO accordion
-  const seo = document.getElementById('seoAcc');
-  if (seo) seo.style.display = 'none';
-  // Reset current tool
-  current = null;
-  // Close sidebar on mobile
-  closeSidebar();
-}
-
-function loadTool(id) {
-  const t = ALL_TOOLS.find(t => t.id === id);
-  if (!t || !t.live) return;
-
-  // Tools that need file upload open in a new tab
-  // (Squarespace iframe blocks file inputs and certain fetch calls)
-  if(t.newTab) {
-    window.open(t.url, '_blank', 'noopener');
-    // Still highlight in sidebar so user knows what they clicked
-    openCatForTool(id);
-    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById(`btn-${id}`)?.classList.add('active');
-    closeSidebar();
-    return;
-  }
-
-  if(current === id) return;
-  current = id;
-
-  // Sidebar — open the right category and mark active
-  openCatForTool(id);
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  document.getElementById(`btn-${id}`)?.classList.add('active');
-
-  // Hide welcome, show tool UI
-  document.getElementById('welcome').classList.add('hidden');
-  document.getElementById('seoAcc').style.display = '';
-  document.getElementById('seoBody').innerHTML = t.seo || '';
-  document.getElementById('seoBody').classList.remove('expanded');
-  document.getElementById('seoToggle').textContent='Read more';
-
-  // Loader
-  const loader = document.getElementById('loader');
-  const frame  = document.getElementById('toolFrame');
-  loader.style.display = 'flex';
-  loader.classList.remove('hide');
-  document.getElementById('loaderName').textContent = t.name;
-
-  frame.classList.remove('visible');
-  frame.src = '';
-  frame.onload = () => {
-    loader.classList.add('hide');
-    frame.classList.add('visible');
-    setTimeout(() => { loader.style.display = 'none'; }, 280);
-  };
-  setTimeout(() => { frame.src = t.url; }, 30);
-
-  closeSidebar();
-  history.replaceState(null, '', `#${id}`);
-}
-
-// ── SEARCH ────────────────────────────────────────────────────────────────────
-let searchFocus = -1;
-let filtered = [...LIVE_TOOLS];
-
-function onSearch(val) {
-  const q = val.trim().toLowerCase();
-  searchFocus = -1;
-  filtered = q ? LIVE_TOOLS.filter(t =>
-    t.name.toLowerCase().includes(q) || t.desc.toLowerCase().includes(q)
-  ) : [...LIVE_TOOLS];
-  renderDropdown();
-  document.getElementById('searchDropdown').classList.add('open');
-}
-
-function renderDropdown() {
-  const dd = document.getElementById('searchDropdown');
-  if (!filtered.length) {
-    dd.innerHTML = `<div class="search-empty">No tools match your search</div>`;
-    return;
-  }
-  dd.innerHTML = filtered.map((t,i) => `
-    <div class="search-result-item" data-idx="${i}"
-      onclick="loadTool('${t.id}')"
-      onmouseenter="searchFocus=${i};highlightItem()">
-      <span class="sr-icon">${t.icon}</span>
-      <div>
-        <div class="sr-name">${t.name}</div>
-        <div class="sr-desc">${t.desc}</div>
-      </div>
-    </div>`).join('');
-}
-
-function highlightItem() {
-  document.querySelectorAll('.search-result-item').forEach((el,i) => el.classList.toggle('focused', i === searchFocus));
-}
-
-function searchKey(e) {
-  const items = document.querySelectorAll('.search-result-item');
-  if (e.key==='ArrowDown'){e.preventDefault();searchFocus=Math.min(searchFocus+1,items.length-1);highlightItem();}
-  else if(e.key==='ArrowUp'){e.preventDefault();searchFocus=Math.max(searchFocus-1,0);highlightItem();}
-  else if(e.key==='Enter'){if(searchFocus>=0&&filtered[searchFocus]){loadTool(filtered[searchFocus].id);document.getElementById('searchInput').value='';}}
-  else if(e.key==='Escape'){closeSearch();}
-}
-
-function openSearch(){filtered=[...LIVE_TOOLS];renderDropdown();document.getElementById('searchDropdown').classList.add('open');}
-function closeSearch(){document.getElementById('searchDropdown').classList.remove('open');searchFocus=-1;}
-document.addEventListener('click',e=>{if(!document.getElementById('searchWrap').contains(e.target))closeSearch();});
-
-// ── MOBILE ────────────────────────────────────────────────────────────────────
-function toggleSidebar(){
-  const open = document.getElementById('sidebar').classList.toggle('open');
-  document.getElementById('sidebarOverlay').classList.toggle('visible', open);
-}
-function closeSidebar(){
-  document.getElementById('sidebar').classList.remove('open');
-  document.getElementById('sidebarOverlay').classList.remove('visible');
-}
-
-// ── LOAD PAGE (FAQ / Terms / Contact) ────────────────────────────────────────
-function loadPage(id) {
-  const names = { faq:'FAQ', terms:'Terms & Privacy', contact:'Contact Us' };
-  const seo   = {
-    faq:     'Frequently asked questions about The Intel Desk — account registration, rate limits, bug reporting, API access, and response times.',
-    terms:   'Privacy Policy and Terms of Service for inteldesk.io. Information on data collection, cookies, intellectual property, and your rights.',
-    contact: 'Get in touch with The Intel Desk team. Report bugs, suggest tools, or ask questions.',
-  };
-
-  // Clear sidebar active state
-  document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
-  current = null;
-
-  // Update SEO accordion
-  document.getElementById('seoAcc').style.display = '';
-  // seoLbl no longer used (pages)
-  document.getElementById('seoBody').innerHTML   = seo[id];
-  document.getElementById('seoBody').classList.remove('expanded');
-  document.getElementById('seoToggle').textContent='Read more';
-
-  // Hide welcome
-  document.getElementById('welcome').classList.add('hidden');
-
-  // Loader
-  const loader = document.getElementById('loader');
-  const frame  = document.getElementById('toolFrame');
-  loader.style.display = 'flex';
-  loader.classList.remove('hide');
-  document.getElementById('loaderName').textContent = names[id];
-
-  frame.classList.remove('visible');
-  frame.src = '';
-  frame.onload = () => { loader.classList.add('hide'); frame.classList.add('visible'); setTimeout(()=>loader.style.display='none',280); };
-  setTimeout(() => { frame.src = `${PAGES_BASE}/${id}.html`; }, 30);
-
-  closeSidebar();
-  history.replaceState(null, '', `#${id}`);
-}
-
-// ── SEO TOGGLE ───────────────────────────────────────────────────────────────
-function toggleSEO() {
-  const body = document.getElementById('seoBody');
-  const btn  = document.getElementById('seoToggle');
-  const expanded = body.classList.toggle('expanded');
-  btn.textContent = expanded ? 'Show less' : 'Read more';
-}
-
-// ── INIT ──────────────────────────────────────────────────────────────────────
-document.addEventListener('DOMContentLoaded', function() {
-  buildSidebar();
-  buildWelcome();
-  buildTicker();
-  // Animate stat numbers
-  setTimeout(function() {
-    document.querySelectorAll('.ws-num').forEach(function(el) {
-      const target = parseInt(el.textContent.replace(/[^0-9]/g,''));
-      if(!target || target > 10000) return;
-      let current = 0;
-      const step = Math.ceil(target / 30);
-      const suffix = el.textContent.includes('+') ? '+' : '';
-      el.textContent = '0' + suffix;
-      const timer = setInterval(function() {
-        current = Math.min(current + step, target);
-        el.textContent = current + suffix;
-        if(current >= target) clearInterval(timer);
-      }, 35);
-    });
-  }, 200);
-
-  const hash = location.hash.slice(1);
-  if (hash && ALL_TOOLS.find(t => t.id === hash && t.live)) {
-    openCatForTool(hash);
-    loadTool(hash);
-  }
-});
-
-// ── EMAIL CAPTURE STRIP ───────────────────────────────────────────────────────
-(function() {
-  // Show after 45 seconds if not already dismissed this session
-  if (sessionStorage.getItem('email_strip_dismissed')) return;
-
-  var timer = setTimeout(function() {
-    var strip = document.getElementById('emailStrip');
-    if (strip) strip.classList.add('visible');
-  }, 45000);
-
-  // Also show after user has loaded 3+ tools (engaged user)
-  var origLoadTool = window.loadTool;
-  var toolLoadCount = 0;
-})();
-
-function submitEmailStrip() {
-  var input = document.getElementById('emailStripInput');
-  var email = (input ? input.value : '').trim();
-  if (!email || !email.includes('@')) {
-    input && input.focus();
-    return;
-  }
-
-  // Send to Formspree (free, no backend needed)
-  // Replace FORM_ID with your actual Formspree form ID
-  var FORMSPREE_URL = 'https://formspree.io/f/REPLACE_WITH_FORM_ID';
-
-  fetch(FORMSPREE_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
-    body: JSON.stringify({ email: email, source: 'intel-desk-strip' })
-  })
-  .then(function(r) {
-    // Show success regardless (graceful degradation)
-    var form = document.querySelector('.email-strip-form');
-    var success = document.getElementById('emailStripSuccess');
-    if (form) form.style.display = 'none';
-    if (success) success.style.display = 'block';
-    sessionStorage.setItem('email_strip_dismissed', '1');
-    setTimeout(dismissEmailStrip, 3000);
-  })
-  .catch(function() {
-    // Still show success — don't punish user for network errors
-    var form = document.querySelector('.email-strip-form');
-    var success = document.getElementById('emailStripSuccess');
-    if (form) form.style.display = 'none';
-    if (success) success.style.display = 'block';
-    sessionStorage.setItem('email_strip_dismissed', '1');
-    setTimeout(dismissEmailStrip, 3000);
-  });
-}
-
-function dismissEmailStrip() {
-  var strip = document.getElementById('emailStrip');
-  if (strip) {
-    strip.classList.remove('visible');
-    setTimeout(function() { strip.style.display = 'none'; }, 400);
-  }
-  sessionStorage.setItem('email_strip_dismissed', '1');
-}
-
-</script>
-</body>
-</html>function toggleCat(id){}
-
 
 function buildSidebar() {
   const scroll = document.getElementById('sidebarScroll');
@@ -1656,16 +1260,16 @@ function toggleCat(id) {
 
 
 function openCatForTool(toolId) {
-  for(const cat of CATEGORIES){
-    if(cat.tools.find(t => t.id === toolId)){
-      openCats.add(cat.id);
-      const toolsEl = document.getElementById(`cat-${cat.id}`);
-      const catEl   = toolsEl?.previousElementSibling;
-      if(toolsEl) toolsEl.classList.add('open');
-      if(catEl)   catEl.classList.add('open');
-      break;
+  CATEGORIES.forEach(function(cat) {
+    if(cat.tools.some(t => t.id === toolId)) {
+      const tools = document.getElementById('cat-tools-' + cat.id);
+      const arrow = document.getElementById('cat-arrow-' + cat.id);
+      const hdr   = document.getElementById('cat-hdr-'   + cat.id);
+      if(tools) tools.style.display = 'block';
+      if(arrow) arrow.textContent = '▾';
+      if(hdr)   hdr.classList.add('open');
     }
-  }
+  });
 }
 
 // ── BUILD WELCOME ─────────────────────────────────────────────────────────────
