@@ -1033,15 +1033,15 @@ const CATEGORIES = [
 
   {
     id: 'influence',
-    label: 'Influence Operations',
+    label: 'Network Analysis',
     tools: [
       {
-        id:'influence-tracer', icon:'🕸️', live:true,
-        name:'Influence Network Tracer',
-        desc:'CGTN affiliates · ASN · SSL · Content signals',
-        url:`${BASE}/influence-tracer.html`,
-        datasets: 4,
-        seo:`Trace state media affiliate networks using infrastructure forensics. Detects CGTN-linked and Kremlin-affiliated domains through shared hosting ASNs (Alibaba Cloud, Tencent Cloud), SSL certificate Subject Alternative Name overlap, analytics ID matching, WHOIS batch registration patterns, and content signals. Methodology sourced from Citizen Lab PAPERWALL report, Graphika Falsos Amigos, and DFRLab Pravda Network investigation. Outputs a confidence-scored verdict, force-directed network graph, signal breakdown with source citations, and domain table. Export as CSV, GEXF, or JSON.`,
+        id:'network-analyzer', icon:'🕸️', live:true,
+        name:'Network Analyzer',
+        desc:'Infrastructure cartography · 5 dimensions · Nation-neutral',
+        url:`${BASE}/network-analyzer.html`,
+        datasets: 10,
+        seo:`Map infrastructure networks connecting any domain — state media, covert affiliates, or unknown sites. Analyzes every outlet from every country across five independent dimensions: Infrastructure Opacity, Ownership Transparency, Content Sourcing, Network Centrality, and State Media Proximity. Nation-neutral coverage of 10 countries including CN, RU, US, GB, FR, DE, QA, IR, KP, and VE. Methodology sourced from Citizen Lab PAPERWALL report, Graphika Falsos Amigos, DFRLab Pravda Network, and VIGINUM Portal Kombat. Outputs a force-directed network graph, domain queue for iterative expansion, five-dimension score table, and detail drawer. Export as CSV, GEXF, or JSON. Session auto-saves to browser storage.`,
       },
     ],
   },
@@ -1318,7 +1318,7 @@ function buildWelcome() {
     'identity':     '👤',
     'ip-domain':    '🔗',
     'image-forensics': '🔍',
-    'influence':       '🕸️',
+    'influence':       '🕸️',  // Network Analysis
   };
   document.getElementById('welcomeCats').innerHTML = CATEGORIES.map(function(cat) {
     const icon = CAT_ICONS[cat.id] || '◈';
