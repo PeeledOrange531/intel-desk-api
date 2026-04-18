@@ -161,6 +161,96 @@ h1 em{font-style:italic;color:var(--gold);}
 .gl-step.active{color:var(--gold);}
 .gl-step.active::before{content:'◉';}
 
+/* ── FULL-PAGE GHOST LOADING OVERLAY ── */
+.ghost-overlay{
+  position:fixed;inset:0;
+  background:rgba(5,5,5,.92);
+  backdrop-filter:blur(6px);
+  z-index:999;
+  display:none;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  gap:0;
+}
+.ghost-overlay.on{display:flex;}
+.ghost-stage{
+  width:340px;height:80px;
+  position:relative;margin-bottom:28px;
+}
+.ghost-runner{
+  position:absolute;
+  font-size:36px;
+  top:50%;transform:translateY(-50%);
+  animation:ghostRun 2.2s ease-in-out infinite;
+  filter:drop-shadow(0 0 12px rgba(200,169,110,.6));
+  will-change:left;
+}
+@keyframes ghostRun{
+  0%  {left:0;   transform:translateY(-50%) scaleX(1);}
+  45% {left:calc(100% - 40px); transform:translateY(-50%) scaleX(1);}
+  50% {left:calc(100% - 40px); transform:translateY(-50%) scaleX(-1);}
+  95% {left:0;   transform:translateY(-50%) scaleX(-1);}
+  100%{left:0;   transform:translateY(-50%) scaleX(1);}
+}
+/* little dots trailing the ghost */
+.ghost-dots{
+  position:absolute;bottom:8px;left:0;right:0;
+  display:flex;justify-content:center;gap:6px;
+}
+.ghost-dot{
+  width:5px;height:5px;border-radius:50%;
+  background:rgba(200,169,110,.25);
+  animation:dotFade 2.2s ease-in-out infinite;
+}
+.ghost-dot:nth-child(1){animation-delay:0s;}
+.ghost-dot:nth-child(2){animation-delay:.15s;}
+.ghost-dot:nth-child(3){animation-delay:.30s;}
+.ghost-dot:nth-child(4){animation-delay:.45s;}
+.ghost-dot:nth-child(5){animation-delay:.60s;}
+@keyframes dotFade{0%,100%{opacity:.15;}50%{opacity:.7;}}
+
+.ghost-domain{
+  font-family:var(--mono);font-size:12px;font-weight:500;
+  color:var(--gold2);letter-spacing:.06em;
+  margin-bottom:8px;
+}
+.ghost-msg{
+  font-family:var(--serif);font-size:22px;font-weight:300;font-style:italic;
+  color:rgba(240,236,228,.65);
+  margin-bottom:20px;
+  text-align:center;
+  min-height:32px;
+  transition:opacity .4s ease;
+}
+.ghost-steps-wrap{display:flex;flex-direction:column;gap:5px;margin-bottom:20px;}
+.ghost-step{
+  font-family:var(--mono);font-size:10px;color:var(--dim);
+  display:flex;align-items:center;gap:8px;transition:color .25s;
+  letter-spacing:.06em;
+}
+.ghost-step::before{content:'○';font-size:8px;flex-shrink:0;}
+.ghost-step.done{color:var(--green);}
+.ghost-step.done::before{content:'●';}
+.ghost-step.active{color:var(--gold);}
+.ghost-step.active::before{content:'◉';}
+.ghost-cancel{
+  font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.14em;color:rgba(192,57,43,.5);
+  background:transparent;border:1px solid rgba(192,57,43,.22);
+  padding:6px 16px;cursor:pointer;transition:all .2s;margin-top:4px;
+}
+.ghost-cancel:hover{color:var(--red);border-color:rgba(192,57,43,.5);}
+.ghost-progress-bar{
+  width:280px;height:2px;background:rgba(255,255,255,.06);
+  border-radius:2px;overflow:hidden;margin-bottom:8px;
+}
+.ghost-progress-fill{
+  height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));
+  width:0%;transition:width .6s ease;border-radius:2px;
+  box-shadow:0 0 8px rgba(200,169,110,.5);
+}
+
 /* ── QUEUE + TABLE GRID ── */
 .lower-grid{display:grid;grid-template-columns:360px 1fr;gap:12px;margin-bottom:12px;}
 
@@ -321,6 +411,32 @@ h1 em{font-style:italic;color:var(--gold);}
 ::-webkit-scrollbar-thumb{background:rgba(200,169,110,.18);border-radius:2px;}
 
 /* ── RESPONSIVE ── */
+.mode-toggle{display:flex;gap:0;border:1px solid var(--border);
+  background:var(--bg2);margin-bottom:0;border-bottom:none;}
+.mt-btn{flex:1;padding:10px 16px;background:transparent;border:none;
+  cursor:pointer;font-family:var(--mono);font-size:11px;font-weight:500;
+  text-transform:uppercase;letter-spacing:.14em;color:var(--muted);
+  transition:all .2s;position:relative;border-right:1px solid var(--border);
+  text-align:left;}
+.mt-btn:last-child{border-right:none;}
+.mt-btn.active{color:var(--gold2);background:rgba(200,169,110,.07);}
+.mt-btn.active::before{content:'';position:absolute;top:0;left:0;right:0;
+  height:2px;background:var(--gold);}
+.mt-btn:hover:not(.active){color:var(--text);background:rgba(255,255,255,.03);}
+.mt-sub{font-size:9px;display:block;margin-top:3px;text-transform:none;
+  letter-spacing:.02em;color:var(--dim);font-weight:400;}
+.mt-btn.active .mt-sub{color:rgba(200,169,110,.55);}
+/* actor dropdown */
+.actor-select{flex:1;background:var(--bg3);border:none;outline:none;
+  font-family:var(--mono);font-size:12px;color:var(--muted);
+  padding:0 16px;cursor:pointer;border-right:1px solid var(--border);}
+.actor-select option{background:var(--bg2);}
+/* clear session button */
+.sb-clear{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.12em;color:rgba(192,57,43,.45);background:transparent;
+  border:1px solid rgba(192,57,43,.18);padding:3px 10px;
+  cursor:pointer;transition:all .15s;margin-left:4px;}
+.sb-clear:hover{color:var(--red);border-color:rgba(192,57,43,.45);}
 @media(max-width:860px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -342,6 +458,7 @@ h1 em{font-style:italic;color:var(--gold);}
     <div class="sb-dot"></div>
     <span class="sb-text">Session</span>
     <span class="sb-count" id="sessionCount">0 domains</span>
+    <button class="sb-clear" onclick="clearSession()" title="Clear session and start fresh">✕ Clear</button>
   </div>
 </header>
 
@@ -378,10 +495,47 @@ h1 em{font-style:italic;color:var(--gold);}
 <div class="err" id="errBar"></div>
 
 <!-- SEED INPUT -->
+<div class="mode-toggle">
+  <button class="mt-btn active" id="mtBottom" onclick="setInputMode('bottom')">
+    ↑ Investigate Domain
+    <span class="mt-sub">suspicious site → trace network</span>
+  </button>
+  <button class="mt-btn" id="mtTop" onclick="setInputMode('top')">
+    ↓ Map from State Actor
+    <span class="mt-sub">known outlet → find affiliates</span>
+  </button>
+</div>
 <div class="seed-row">
   <input class="seed-input" id="seedInput" type="text"
     placeholder="Enter any domain — cgtn.com, bbc.com, suspicious-news.net…"
     onkeydown="if(event.key==='Enter')runSeed()">
+  <select class="actor-select" id="actorSelect" style="display:none;">
+    <option value="">— Select state actor —</option>
+    <optgroup label="Chinese State Media">
+      <option value="cgtn.com">CGTN (China)</option>
+      <option value="xinhuanet.com">Xinhua (China)</option>
+      <option value="globaltimes.cn">Global Times (China)</option>
+      <option value="chinadaily.com.cn">China Daily (China)</option>
+      <option value="timesnewswire.com">Times Newswire (PAPERWALL hub)</option>
+    </optgroup>
+    <optgroup label="Russian State Media">
+      <option value="rt.com">RT (Russia)</option>
+      <option value="tass.ru">TASS (Russia)</option>
+      <option value="sputniknews.com">Sputnik (Russia)</option>
+      <option value="news-pravda.com">Pravda Network (Russia)</option>
+    </optgroup>
+    <optgroup label="Western / Gulf State Media">
+      <option value="bbc.com">BBC (UK)</option>
+      <option value="voanews.com">Voice of America (US)</option>
+      <option value="france24.com">France 24 (France)</option>
+      <option value="dw.com">Deutsche Welle (Germany)</option>
+      <option value="aljazeera.com">Al Jazeera (Qatar)</option>
+    </optgroup>
+    <optgroup label="Other">
+      <option value="presstv.ir">Press TV (Iran)</option>
+      <option value="telesurtv.net">teleSUR (Venezuela)</option>
+    </optgroup>
+  </select>
   <button class="seed-btn" id="seedBtn" onclick="runSeed()">Analyze →</button>
 </div>
 <div class="seed-hint" id="seedHint">Enter a seed domain to begin mapping its network. Neighbors are auto-queued for expansion.</div>
@@ -488,6 +642,32 @@ h1 em{font-style:italic;color:var(--gold);}
   <div class="dd-inner" id="detailInner"></div>
 </div>
 
+<!-- GHOST LOADING OVERLAY -->
+<div class="ghost-overlay" id="ghostOverlay">
+  <div class="ghost-domain" id="ghostDomain"></div>
+  <div class="ghost-stage">
+    <div class="ghost-runner" id="ghostRunner">👻</div>
+    <div class="ghost-dots">
+      <div class="ghost-dot"></div>
+      <div class="ghost-dot"></div>
+      <div class="ghost-dot"></div>
+      <div class="ghost-dot"></div>
+      <div class="ghost-dot"></div>
+    </div>
+  </div>
+  <div class="ghost-progress-bar"><div class="ghost-progress-fill" id="ghostProgress"></div></div>
+  <div class="ghost-msg" id="ghostMsg">Great things come to those who wait…</div>
+  <div class="ghost-steps-wrap">
+    <div class="ghost-step" id="gs1">Resolving IP &amp; ASN</div>
+    <div class="ghost-step" id="gs2">Harvesting SSL certificates</div>
+    <div class="ghost-step" id="gs3">WHOIS / RDAP lookup</div>
+    <div class="ghost-step" id="gs4">Reverse IP neighbors</div>
+    <div class="ghost-step" id="gs5">Scraping content signals</div>
+    <div class="ghost-step" id="gs6">Computing five dimensions</div>
+  </div>
+  <button class="ghost-cancel" onclick="cancelLoading()">✕ Cancel</button>
+</div>
+
 </div><!-- /page -->
 
 <!-- TOOLTIP -->
@@ -551,13 +731,6 @@ setInterval(saveSession, 60000);
 // ══════════════════════════════════════════════════════════════════════════════
 // ANALYSIS
 // ══════════════════════════════════════════════════════════════════════════════
-async function runSeed() {
-  const domain = cleanDomain(document.getElementById('seedInput').value);
-  if (!domain) { showErr('Enter a domain first.'); return; }
-  clearErr();
-  await analyzeDomain(domain, 'seed');
-}
-
 async function analyzeDomain(domain, nodeType = 'queued') {
   domain = cleanDomain(domain);
   if (!domain) return;
@@ -1341,26 +1514,150 @@ function updateSessionBadge() {
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-// Loading steps
-const STEP_IDS = ['ls1','ls2','ls3','ls4','ls5','ls6'];
-const STEP_DELAYS = [0, 900, 1700, 2500, 3400, 4200];
-function setLoading(on, domain='') {
-  const el = document.getElementById('graphLoading');
-  el.classList.toggle('on', on);
-  document.getElementById('seedBtn').disabled = on;
-  if (on) document.getElementById('loadingLabel').textContent =
-    domain ? `Analyzing ${truncate(domain,30)}…` : 'Analyzing…';
+// ── INPUT MODE TOGGLE ─────────────────────────────────────────────────────────
+let inputMode = 'bottom';
+function setInputMode(mode) {
+  inputMode = mode;
+  document.getElementById('mtBottom').classList.toggle('active', mode === 'bottom');
+  document.getElementById('mtTop').classList.toggle('active', mode === 'top');
+  const inp = document.getElementById('seedInput');
+  const sel = document.getElementById('actorSelect');
+  if (mode === 'bottom') {
+    inp.style.display = ''; sel.style.display = 'none';
+    document.getElementById('seedHint').textContent =
+      'Enter any domain to investigate its infrastructure and map its network outward.';
+  } else {
+    inp.style.display = 'none'; sel.style.display = '';
+    document.getElementById('seedHint').textContent =
+      'Select a known state media outlet to map its affiliate network via shared infrastructure.';
+  }
 }
-function startLoadingSteps() {
-  STEP_IDS.forEach(id => {
-    document.getElementById(id)?.classList.remove('done','active');
-  });
-  STEP_IDS.forEach((id, i) => {
+
+// ── CLEAR SESSION ─────────────────────────────────────────────────────────────
+function clearSession() {
+  if (Object.keys(state.nodes).length > 0) {
+    if (!confirm('Clear everything and start a fresh investigation?')) return;
+  }
+  state.nodes = {};
+  state.edges = [];
+  state.selected = null;
+  if (cy) { cy.elements().remove(); }
+  renderQueue();
+  renderTable();
+  closeDetail();
+  updateSessionBadge();
+  document.getElementById('graphEmpty').style.display = '';
+  document.getElementById('seedInput').value = '';
+  document.getElementById('actorSelect').value = '';
+  localStorage.removeItem(LS_KEY);
+  showHint('Session cleared. Enter a new domain to start fresh.');
+  // Reset graph stats
+  document.getElementById('gNodeCount').textContent    = '0';
+  document.getElementById('gEdgeCount').textContent    = '0';
+  document.getElementById('gAnalyzedCount').textContent = '0';
+}
+
+// ── GHOST LOADING OVERLAY ─────────────────────────────────────────────────────
+const GHOST_MESSAGES = [
+  'Great things come to those who wait…',
+  'Chasing ghosts through the internet…',
+  'Rattling the SSL certificate chains…',
+  'Haunting WHOIS databases worldwide…',
+  'Peering behind the registrar curtain…',
+  'The truth is out there (probably on Tencent Cloud)…',
+  'Mapping the invisible threads…',
+  'Following the infrastructure breadcrumbs…',
+  'Even ghosts need to check the WHOIS…',
+  'Connecting the dots you cannot see…',
+];
+const GHOST_STEP_IDS    = ['gs1','gs2','gs3','gs4','gs5','gs6'];
+const GHOST_STEP_DELAYS = [0, 900, 1700, 2500, 3400, 4200];
+let ghostMsgInterval   = null;
+let ghostCancelled     = false;
+let ghostProgressTimer = null;
+
+function setLoading(on, domain = '') {
+  const overlay = document.getElementById('ghostOverlay');
+  document.getElementById('seedBtn').disabled = on;
+
+  if (on) {
+    ghostCancelled = false;
+    overlay.classList.add('on');
+
+    // Domain label
+    document.getElementById('ghostDomain').textContent =
+      domain ? `Analyzing: ${truncate(domain, 40)}` : 'Analyzing…';
+
+    // Rotate messages every 3.5s
+    let msgIdx = 0;
+    document.getElementById('ghostMsg').textContent = GHOST_MESSAGES[0];
+    ghostMsgInterval = setInterval(() => {
+      msgIdx = (msgIdx + 1) % GHOST_MESSAGES.length;
+      const el = document.getElementById('ghostMsg');
+      el.style.opacity = '0';
+      setTimeout(() => {
+        el.textContent = GHOST_MESSAGES[msgIdx];
+        el.style.opacity = '1';
+      }, 400);
+    }, 3500);
+
+    // Progress bar — creeps to 90% over ~45s, never reaches 100 until done
+    let progress = 0;
+    document.getElementById('ghostProgress').style.width = '0%';
+    ghostProgressTimer = setInterval(() => {
+      progress = Math.min(progress + (Math.random() * 3), 90);
+      document.getElementById('ghostProgress').style.width = progress + '%';
+    }, 800);
+
+    // Steps
+    GHOST_STEP_IDS.forEach(id => {
+      document.getElementById(id)?.classList.remove('done','active');
+    });
+    GHOST_STEP_IDS.forEach((id, i) => {
+      setTimeout(() => {
+        if (ghostCancelled) return;
+        if (i > 0) document.getElementById(GHOST_STEP_IDS[i-1])?.classList.replace('active','done');
+        document.getElementById(id)?.classList.add('active');
+      }, GHOST_STEP_DELAYS[i]);
+    });
+
+  } else {
+    // Flash to 100% then hide
+    clearInterval(ghostMsgInterval);
+    clearInterval(ghostProgressTimer);
+    document.getElementById('ghostProgress').style.width = '100%';
     setTimeout(() => {
-      if (i > 0) document.getElementById(STEP_IDS[i-1])?.classList.replace('active','done');
-      document.getElementById(id)?.classList.add('active');
-    }, STEP_DELAYS[i]);
-  });
+      overlay.classList.remove('on');
+      // Mark last step done
+      const last = GHOST_STEP_IDS[GHOST_STEP_IDS.length - 1];
+      document.getElementById(last)?.classList.replace('active','done');
+    }, 350);
+  }
+}
+
+function cancelLoading() {
+  ghostCancelled = true;
+  clearInterval(ghostMsgInterval);
+  clearInterval(ghostProgressTimer);
+  document.getElementById('ghostOverlay').classList.remove('on');
+  document.getElementById('seedBtn').disabled = false;
+  showHint('Analysis cancelled. Enter a domain to try again.');
+}
+
+// Keep old step IDs working (graph panel still uses them as backup)
+function startLoadingSteps() { /* handled by ghost overlay now */ }
+
+// ── SEED INPUT ────────────────────────────────────────────────────────────────
+async function runSeed() {
+  const domain = inputMode === 'bottom'
+    ? cleanDomain(document.getElementById('seedInput').value)
+    : cleanDomain(document.getElementById('actorSelect').value);
+  if (!domain) {
+    showErr(inputMode === 'bottom' ? 'Enter a domain first.' : 'Select a state actor first.');
+    return;
+  }
+  clearErr();
+  await analyzeDomain(domain, 'seed');
 }
 
 // About toggle
