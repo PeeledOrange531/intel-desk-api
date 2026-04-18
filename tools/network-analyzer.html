@@ -135,7 +135,7 @@ h1 em{font-style:italic;color:var(--gold);}
 .gl-line{width:16px;height:2px;flex-shrink:0;}
 
 /* graph empty state */
-.graph-empty{position:absolute;inset:0;display:flex;flex-direction:column;
+.graph-empty{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;pointer-events:none;
   align-items:center;justify-content:center;gap:10px;pointer-events:none;}
 .ge-icon{font-size:36px;opacity:.15;}
 .ge-text{font-family:var(--mono);font-size:11px;color:var(--dim);
@@ -500,11 +500,10 @@ h1 em{font-style:italic;color:var(--gold);}
       <button class="gc-btn" onclick="cyCluster()">Cluster</button>
     </div>
   </div>
-  <div id="cy">
-    <div class="graph-empty" id="graphEmpty">
-      <div class="ge-icon">◎</div>
-      <div class="ge-text">Enter a domain above to begin.<br>The network graph builds here as you analyze domains.</div>
-    </div>
+  <div id="cy"></div>
+  <div class="graph-empty" id="graphEmpty">
+    <div class="ge-icon">◎</div>
+    <div class="ge-text">Enter a domain above to begin.<br>The network graph builds here as you analyze domains.</div>
   </div>
   <div class="graph-legend" id="graphLegend">
     <div class="gl"><div class="gl-dot" style="background:var(--gold)"></div>Seed / State media</div>
@@ -650,6 +649,11 @@ function loadSession() {
     const snap = JSON.parse(raw);
     state.nodes = snap.nodes || {};
     state.edges = snap.edges || [];
+    // Reset any nodes stuck as 'running' from a previous crashed session
+    for (const node of Object.values(state.nodes)) {
+      if (node.status === 'running') node.status = 'queued';
+    }
+    isRunning = false; // always start fresh
     rebuildGraphFromState();
     renderQueue();
     renderTable();
@@ -762,7 +766,7 @@ function addEdge(source, target, type) {
 function initCy() {
   if (cy) { cy.destroy(); cy = null; }
 
-  document.getElementById('graphEmpty').style.display = 'none';
+  // graphEmpty is now a sibling, not a child — Cytoscape won't touch it
 
   cy = cytoscape({
     container: document.getElementById('cy'),
@@ -937,6 +941,10 @@ function rebuildGraphFromState() {
 
 function updateGraphNode(domain) {
   if (!cy) initCy();
+
+  // Hide the empty state as soon as we have any node
+  const emptyEl = document.getElementById('graphEmpty');
+  if (emptyEl) emptyEl.style.display = 'none';
 
   const v    = nodeVisuals(domain);
   const node = cy.$id(domain);
@@ -1700,6 +1708,11 @@ function toggleAbout() {
 // INIT
 // ══════════════════════════════════════════════════════════════════════════════
 document.addEventListener('DOMContentLoaded', () => {
+  // Always start clean — never inherit a stuck isRunning state
+  isRunning      = false;
+  ghostCancelled = false;
+  document.getElementById('graphLoading').classList.remove('on');
+
   initCy();
   loadSession();
   // Ping backend
@@ -1707,7 +1720,7 @@ document.addEventListener('DOMContentLoaded', () => {
     .then(r => r.json())
     .then(d => {
       if (d.status === 'ok') {
-        showHint(`Backend live · ${d.state_media} state media outlets · ${d.countries_covered} countries · ${d.covert_affiliates} known covert affiliates`);
+        showHint(`Backend live · ${d.state_media} state media outlets · ${d.covert_affiliates} known covert affiliates in database`);
       }
     })
     .catch(() => showHint('Backend offline — deploy network_analyzer.py to Render first.'));
