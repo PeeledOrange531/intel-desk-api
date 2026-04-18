@@ -10,7 +10,7 @@ from functools import wraps
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 import requests
-from influence_tracer import influence_bp
+rom network_analyzer import network_bp
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ log = logging.getLogger(__name__)
 # ─────────────────────────────────────────────────────────────────────────────
 
 app = Flask(__name__)
-app.register_blueprint(influence_bp)
+app.register_blueprint(network_bp)
 app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50MB upload limit
 CORS(app, origins='*', supports_credentials=False)
 
