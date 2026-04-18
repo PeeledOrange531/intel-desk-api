@@ -479,7 +479,7 @@ h1 em{font-style:italic;color:var(--gold);}
   <input class="seed-input" id="seedInput" type="text"
     placeholder="Any domain — cgtn.com, bbc.com, that-sketchy-news-site.net…"
     onkeydown="if(event.key==='Enter')runSeed()">
-  <button class="seed-btn" id="seedBtn" onclick="runSeed()">Analyze →</button>
+  <button class="seed-btn" id="seedBtn" onclick="document.getElementById('seedHint').textContent='Click received…';runSeed()">Analyze →</button>
 </div>
 <div class="seed-hint" id="seedHint">Investigate: analyze one domain and manually expand. Expand: analyze seed then automatically run first 10 neighbors.</div>
 
@@ -607,6 +607,21 @@ h1 em{font-style:italic;color:var(--gold);}
 </div>
 
 <script>
+// ══════════════════════════════════════════════════════════════════════════════
+// GLOBAL ERROR HANDLER — catches runtime errors that silence the whole page
+// ══════════════════════════════════════════════════════════════════════════════
+window.onerror = function(msg, src, line, col, err) {
+  const hint = document.getElementById('seedHint');
+  if (hint) hint.textContent = '⚠ JS Error line ' + line + ': ' + msg;
+  console.error('Global error:', msg, 'line:', line, err);
+  return false;
+};
+window.addEventListener('unhandledrejection', function(e) {
+  const hint = document.getElementById('seedHint');
+  if (hint) hint.textContent = '⚠ Unhandled promise: ' + e.reason;
+  console.error('Unhandled rejection:', e.reason);
+});
+
 // ══════════════════════════════════════════════════════════════════════════════
 // CONFIG
 // ══════════════════════════════════════════════════════════════════════════════
