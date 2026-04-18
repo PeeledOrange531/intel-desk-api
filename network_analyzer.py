@@ -35,6 +35,7 @@ import re
 import socket
 import time
 import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from urllib.parse import urlparse
 
 import requests
@@ -61,8 +62,13 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.5",
 }
 
-HTTP_TIMEOUT   = 10
-SCRAPE_TIMEOUT = 14
+HTTP_TIMEOUT   = 5   # aggressive — Render has 30s request limit
+SCRAPE_TIMEOUT = 6   # scraping must be fast
+SOCKET_TIMEOUT = 4   # DNS resolution
+
+# Set socket default timeout so gethostbyname can't hang forever
+import socket as _sock
+_sock.setdefaulttimeout(SOCKET_TIMEOUT)
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -839,36 +845,46 @@ def analyze_domain(domain: str) -> dict:
     }
 
     try:
-        result["db_match"]  = check_database(domain)
-        ip_res              = resolve_ip(domain)
-        result["ip_info"]   = ip_res
+        # Step 1: DB check (instant) + parallel network calls
+        result["db_match"] = check_database(domain)
+        ip_res             = resolve_ip(domain)
+        result["ip_info"]  = ip_res
+        ip                 = ip_res.get("ip")
 
-        if ip_res["ip"]:
-            result["asn_info"] = get_asn_info(ip_res["ip"])
+        # Step 2: Run slow external calls in parallel (max 20s total)
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            f_asn   = ex.submit(get_asn_info,    ip)    if ip   else None
+            f_whois = ex.submit(get_rdap_whois,  domain)
+            f_sans  = ex.submit(get_ssl_sans,    domain)
+            f_rip   = ex.submit(get_reverse_ip,  ip)    if ip   else None
+            f_scrape= ex.submit(scrape_page,     domain)
 
-        result["whois"]      = get_rdap_whois(domain)
-        result["attribution"]= derive_attribution(domain, result["whois"], result["asn_info"])
+            def safe_result(f, default):
+                if f is None: return default
+                try:   return f.result(timeout=18)
+                except Exception: return default
 
-        sans                         = get_ssl_sans(domain)
+            result["asn_info"]   = safe_result(f_asn,    {})
+            result["whois"]      = safe_result(f_whois,  {})
+            sans                 = safe_result(f_sans,   [])
+            rip                  = safe_result(f_rip,    [])
+            result["scrape"]     = safe_result(f_scrape, {})
+
         result["ssl_sans"]           = sans
         result["ssl_san_overlap"]    = find_san_overlap(sans)
-
-        if ip_res["ip"]:
-            nbrs                         = get_reverse_ip(ip_res["ip"])
-            result["reverse_ip"]         = nbrs
-            result["reverse_ip_overlap"] = find_rip_overlap(nbrs)
-
-        result["scrape"] = scrape_page(domain)
+        result["reverse_ip"]         = rip
+        result["reverse_ip_overlap"] = find_rip_overlap(rip)
+        result["attribution"]        = derive_attribution(domain, result["whois"], result["asn_info"])
 
         result["dimensions"] = compute_dimensions(
-            domain          = domain,
-            db_match        = result["db_match"],
-            asn_info        = result["asn_info"],
-            attribution     = result["attribution"],
-            whois           = result["whois"],
-            ssl_san_overlap = result["ssl_san_overlap"],
+            domain             = domain,
+            db_match           = result["db_match"],
+            asn_info           = result["asn_info"],
+            attribution        = result["attribution"],
+            whois              = result["whois"],
+            ssl_san_overlap    = result["ssl_san_overlap"],
             reverse_ip_overlap = result["reverse_ip_overlap"],
-            scrape          = result["scrape"],
+            scrape             = result["scrape"],
         )
 
     except Exception as e:
