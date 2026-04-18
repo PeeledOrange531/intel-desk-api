@@ -1,1061 +1,990 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Network Analyzer — Intel Desk</title>
-<meta name="description" content="Map infrastructure networks connecting state media outlets, covert affiliates, and unknown domains. Nation-neutral analysis across five dimensions.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-<style>
-:root{
-  --bg:#050505;--bg2:#0d0d0d;--bg3:#141414;
-  --border:rgba(255,255,255,0.09);--border-hi:rgba(255,255,255,0.20);
-  --text:#f5f2ec;--muted:rgba(240,236,228,0.60);--dim:rgba(240,236,228,0.28);
-  --gold:#c8a96e;--gold2:#e8d5a3;
-  --green:#4ec994;--orange:#e87b4a;--red:#c0392b;--blue:#7eb8e4;
-  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;
-  --sans:'Syne',sans-serif;
-}
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
-html,body{background:var(--bg);color:var(--text);font-family:var(--sans);overflow-x:hidden;}
+"""
+network_analyzer.py
+===================
+Flask Blueprint — Network Analyzer (formerly Influence Network Tracer)
 
-/* ── RUNNING BANNER — always in DOM, shown via .is-running on body ── */
-.running-banner{
-  display:none;
-  position:sticky;top:0;z-index:999;
-  background:rgba(200,169,110,0.12);
-  border-bottom:2px solid var(--gold);
-  padding:10px 20px;
-  align-items:center;gap:14px;
-  backdrop-filter:blur(8px);
-}
-body.is-running .running-banner{display:flex;}
-.rb-ghost{font-size:22px;animation:rbBounce 0.6s ease-in-out infinite alternate;}
-@keyframes rbBounce{from{transform:translateY(0)}to{transform:translateY(-4px)}}
-.rb-text{font-family:var(--mono);font-size:11px;color:var(--gold2);flex:1;letter-spacing:.04em;}
-.rb-domain{color:var(--gold);font-weight:500;}
-.rb-steps{display:flex;gap:10px;flex-wrap:wrap;}
-.rb-step{font-family:var(--mono);font-size:9px;color:var(--dim);
-  display:flex;align-items:center;gap:4px;transition:color .2s;}
-.rb-step.active{color:var(--gold);}
-.rb-step.done{color:var(--green);}
-.rb-step::before{content:'○';font-size:7px;}
-.rb-step.active::before{content:'◉';}
-.rb-step.done::before{content:'●';}
-.rb-cancel{
-  background:var(--red);border:none;
-  color:#fff;font-family:var(--mono);font-size:11px;font-weight:500;
-  text-transform:uppercase;letter-spacing:.12em;
-  padding:8px 18px;cursor:pointer;
-  flex-shrink:0;transition:opacity .15s;
-}
-.rb-cancel:hover{opacity:.85;}
+Registers routes under /network/:
+  POST /network/analyze   — analyze a single domain, returns 5-dimension scores
+  POST /network/expand    — expand from any seed domain
+  GET  /network/ping      — health check
 
-/* ── PAGE ── */
-.page{display:flex;flex-direction:column;min-height:100vh;padding:20px 24px 56px;}
-.hdr{display:flex;align-items:flex-start;justify-content:space-between;
-  margin-bottom:18px;padding-bottom:16px;border-bottom:1px solid var(--border);gap:16px;flex-wrap:wrap;}
-.eyebrow{font-family:var(--mono);font-size:9px;text-transform:uppercase;
-  letter-spacing:.22em;color:var(--gold);margin-bottom:6px;display:flex;align-items:center;gap:8px;}
-.eyebrow::before{content:'';width:16px;height:1px;background:var(--gold);opacity:.5;}
-h1{font-family:var(--serif);font-size:clamp(24px,3vw,40px);font-weight:300;line-height:.95;}
-h1 em{font-style:italic;color:var(--gold);}
-.sub{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:6px;max-width:500px;line-height:1.7;}
-.session-badge{display:flex;align-items:center;gap:8px;flex-shrink:0;}
-.sb-dot{width:7px;height:7px;border-radius:50%;background:var(--green);
-  animation:ping 2.4s ease-in-out infinite;}
-@keyframes ping{0%,100%{box-shadow:0 0 0 0 rgba(78,201,148,.6);}50%{box-shadow:0 0 0 7px rgba(78,201,148,0);}}
-.sb-text{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);}
-.sb-count{font-family:var(--mono);font-size:9px;color:var(--gold);padding:2px 8px;border:1px solid rgba(200,169,110,.22);}
-.sb-clear{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;
-  color:rgba(192,57,43,.5);background:transparent;border:1px solid rgba(192,57,43,.20);
-  padding:3px 10px;cursor:pointer;transition:all .15s;margin-left:4px;}
-.sb-clear:hover{color:var(--red);border-color:rgba(192,57,43,.45);}
+Philosophy: graph-first network cartography, nation-neutral.
+Every domain — BBC, RT, CGTN, VOA, Al Jazeera — is analyzed on
+the same five dimensions. The tool maps networks. Analysts interpret.
 
-/* ── ABOUT ── */
-.about-block{background:var(--bg2);border:1px solid var(--border);
-  border-top:2px solid rgba(200,169,110,.30);margin-bottom:18px;overflow:hidden;}
-.about-top{padding:12px 18px;display:flex;align-items:flex-start;gap:12px;cursor:pointer;}
-.about-summary{font-family:var(--mono);font-size:11px;color:var(--muted);flex:1;line-height:1.8;}
-.about-summary strong{color:var(--gold2);}
-.about-toggle{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;
-  color:rgba(200,169,110,.5);background:transparent;border:1px solid rgba(200,169,110,.18);
-  padding:4px 10px;cursor:pointer;flex-shrink:0;transition:all .15s;}
-.about-body{max-height:0;overflow:hidden;transition:max-height .4s ease;}
-.about-body.open{max-height:500px;padding:0 18px 16px;}
-.about-body p{font-family:var(--mono);font-size:11px;color:var(--muted);line-height:1.9;margin-bottom:8px;}
-.about-body strong{color:var(--gold2);}
-.about-body h3{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--gold);margin:12px 0 6px;}
-.dim-chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px;}
-.dim-chip{font-family:var(--mono);font-size:9px;padding:2px 8px;border:1px solid rgba(255,255,255,.08);color:var(--dim);}
+Five scoring dimensions (0–10 each):
+  1. infrastructure_opacity   — hidden WHOIS, anonymous registrant, batch reg,
+                                 opaque hosting chain
+  2. ownership_transparency   — named staff, About/Contact pages, disclosed
+                                 funding, verifiable legal entity (inverted:
+                                 high score = LOW transparency = more opaque)
+  3. content_sourcing         — original reporting vs. republished state media
+                                 vs. AI-summarized content without attribution
+  4. network_centrality       — connection density in the graph being built
+                                 (computed client-side, seeded here as 0)
+  5. state_media_proximity    — links to / shares infrastructure with ANY
+                                 known state media, any country, neutral signal
 
-/* ── ERROR ── */
-.err{background:rgba(192,57,43,.10);border:1px solid rgba(192,57,43,.28);
-  padding:8px 14px;font-family:var(--mono);font-size:11px;color:#e07060;display:none;margin-bottom:10px;}
-.err.on{display:block;}
+All external calls use free, no-key APIs.
+Methodology citations included on every signal.
+"""
 
-/* ── MODE TOGGLE + INPUT ── */
-.mode-toggle{display:flex;gap:0;border:1px solid var(--border);background:var(--bg2);border-bottom:none;}
-.mt-btn{flex:1;padding:9px 14px;background:transparent;border:none;cursor:pointer;
-  font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;
-  letter-spacing:.14em;color:var(--muted);transition:all .2s;position:relative;
-  border-right:1px solid var(--border);text-align:left;}
-.mt-btn:last-child{border-right:none;}
-.mt-btn.active{color:var(--gold2);background:rgba(200,169,110,.07);}
-.mt-btn.active::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:var(--gold);}
-.mt-sub{font-size:9px;display:block;margin-top:2px;text-transform:none;letter-spacing:.02em;color:var(--dim);font-weight:400;}
-.seed-row{display:flex;gap:0;border:1px solid var(--border);background:var(--bg2);transition:border-color .2s;}
-.seed-row:focus-within{border-color:rgba(200,169,110,.38);}
-.seed-input{flex:1;background:transparent;border:none;outline:none;
-  font-family:var(--mono);font-size:14px;color:var(--text);padding:13px 16px;letter-spacing:.02em;}
-.seed-input::placeholder{color:var(--dim);}
-.seed-btn{background:rgba(200,169,110,.12);border:none;border-left:1px solid rgba(200,169,110,.22);
-  color:var(--gold);font-family:var(--mono);font-size:11px;font-weight:500;
-  text-transform:uppercase;letter-spacing:.16em;padding:0 24px;cursor:pointer;transition:all .2s;}
-.seed-btn:hover:not(:disabled){background:rgba(200,169,110,.22);color:var(--gold2);}
-.seed-btn:disabled{opacity:.35;cursor:not-allowed;}
-.seed-hint{font-family:var(--mono);font-size:10px;color:var(--dim);margin:6px 0 14px;padding-left:2px;}
+import json
+import os
+import re
+import socket
+import time
+import logging
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from urllib.parse import urlparse
 
-/* ── GRAPH ── */
-.graph-panel{background:var(--bg2);border:1px solid var(--border);
-  margin-bottom:10px;display:flex;flex-direction:column;min-height:480px;position:relative;}
-.graph-header{display:flex;align-items:center;justify-content:space-between;
-  padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;flex-wrap:wrap;gap:6px;}
-.panel-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.20em;color:var(--dim);}
-.panel-label em{color:var(--gold);font-style:normal;}
-.graph-stats{display:flex;gap:12px;}
-.gstat{font-family:var(--mono);font-size:10px;color:var(--muted);}
-.gstat span{color:var(--gold2);font-weight:500;}
-.graph-controls{display:flex;gap:0;flex-shrink:0;}
-.gc-btn{padding:5px 10px;background:transparent;border:none;border-left:1px solid var(--border);
-  color:var(--dim);font-family:var(--mono);font-size:9px;text-transform:uppercase;
-  letter-spacing:.10em;cursor:pointer;transition:all .15s;}
-.gc-btn:hover{color:var(--gold);background:rgba(200,169,110,.05);}
-#cy{flex:1;min-height:420px;background:
-  radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.04) 0%,transparent 70%),var(--bg);
-  cursor:grab;}
-#cy:active{cursor:grabbing;}
-.graph-empty{position:absolute;inset:0;z-index:2;display:flex;flex-direction:column;
-  align-items:center;justify-content:center;gap:8px;pointer-events:none;}
-.ge-icon{font-size:32px;opacity:.15;}
-.ge-text{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;line-height:1.9;}
-.graph-legend{display:flex;gap:14px;flex-wrap:wrap;padding:8px 14px;border-top:1px solid var(--border);background:var(--bg3);flex-shrink:0;}
-.gl{display:flex;align-items:center;gap:4px;font-family:var(--mono);font-size:9px;color:var(--dim);}
-.gl-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
-.gl-line{width:14px;height:2px;flex-shrink:0;}
+import requests
+from bs4 import BeautifulSoup
+from flask import Blueprint, jsonify, request
 
-/* ── LOWER GRID ── */
-.lower-grid{display:grid;grid-template-columns:340px 1fr;gap:10px;margin-bottom:10px;}
+# ── Setup ──────────────────────────────────────────────────────────────────────
+logger = logging.getLogger(__name__)
 
-/* ── QUEUE ── */
-.queue-panel{background:var(--bg2);border:1px solid var(--border);display:flex;flex-direction:column;max-height:460px;}
-.queue-header{padding:9px 12px;border-bottom:1px solid var(--border);background:var(--bg3);
-  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.queue-add{display:flex;gap:0;border:1px solid var(--border);}
-.qa-input{background:var(--bg);border:none;outline:none;font-family:var(--mono);font-size:11px;
-  color:var(--text);padding:6px 10px;width:150px;}
-.qa-input::placeholder{color:var(--dim);}
-.qa-btn{background:rgba(200,169,110,.10);border:none;border-left:1px solid rgba(200,169,110,.20);
-  color:var(--gold);font-family:var(--mono);font-size:10px;text-transform:uppercase;
-  letter-spacing:.10em;padding:6px 10px;cursor:pointer;transition:all .15s;}
-.queue-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,.15) transparent;}
-.queue-empty{padding:20px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.9;}
-.queue-empty strong{color:var(--muted);}
-.queue-status{padding:7px 12px;font-family:var(--mono);font-size:10px;border-top:1px solid var(--border);
-  flex-shrink:0;display:none;align-items:center;gap:6px;}
-.queue-status.on{display:flex;}
-.qs-dot{width:5px;height:5px;border-radius:50%;flex-shrink:0;}
-.queue-actions{display:flex;gap:0;border-top:1px solid var(--border);flex-shrink:0;}
-.qa-action{flex:1;padding:8px;background:transparent;border:none;border-right:1px solid var(--border);
-  color:var(--dim);font-family:var(--mono);font-size:9px;text-transform:uppercase;
-  letter-spacing:.10em;cursor:pointer;transition:all .15s;}
-.qa-action:last-child{border-right:none;}
-.qa-action:hover{color:var(--gold);background:rgba(200,169,110,.05);}
-.qa-action.danger:hover{color:var(--red);}
-.qa-action:disabled{opacity:.3;cursor:not-allowed;}
-.qa-run-next{color:var(--gold2);}
-.q-item{display:flex;align-items:center;gap:7px;padding:8px 12px;
-  border-bottom:1px solid rgba(255,255,255,.04);transition:background .1s;}
-.q-item:hover{background:rgba(255,255,255,.02);}
-.qi-domain{font-family:var(--mono);font-size:11px;color:var(--muted);flex:1;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.qi-status{font-family:var(--mono);font-size:9px;text-transform:uppercase;
-  letter-spacing:.10em;color:var(--dim);flex-shrink:0;padding:1px 5px;border:1px solid rgba(255,255,255,.07);}
-.qi-status.running{color:var(--gold);border-color:rgba(200,169,110,.30);animation:statusPulse .8s ease-in-out infinite;}
-.qi-status.done{color:var(--green);border-color:rgba(78,201,148,.25);}
-.qi-status.error{color:var(--red);border-color:rgba(192,57,43,.25);}
-@keyframes statusPulse{0%,100%{opacity:1;}50%{opacity:.5;}}
-.qi-btn{background:transparent;border:none;color:var(--dim);font-size:10px;cursor:pointer;padding:1px 5px;transition:color .15s;}
-.qi-btn:hover{color:var(--gold);}
-.qi-remove{color:rgba(192,57,43,.35);}
-.qi-remove:hover{color:var(--red)!important;}
+network_bp = Blueprint("network", __name__, url_prefix="/network")
 
-/* ── TABLE ── */
-.table-panel{background:var(--bg2);border:1px solid var(--border);display:flex;flex-direction:column;}
-.table-header{padding:9px 14px;border-bottom:1px solid var(--border);background:var(--bg3);
-  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
-.table-filters{display:flex;gap:0;}
-.tf-btn{padding:5px 10px;background:transparent;border:none;border-right:1px solid var(--border);
-  color:var(--dim);font-family:var(--mono);font-size:9px;text-transform:uppercase;
-  letter-spacing:.10em;cursor:pointer;transition:all .15s;}
-.tf-btn:last-child{border-right:none;}
-.tf-btn.active{color:var(--gold);background:rgba(200,169,110,.07);}
-.table-exports{display:flex;gap:5px;}
-.exp-btn{padding:4px 9px;background:transparent;border:1px solid var(--border);color:var(--dim);
-  font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.10em;cursor:pointer;transition:all .15s;}
-.exp-btn:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
-.table-scroll{flex:1;overflow-y:auto;scrollbar-width:thin;scrollbar-color:rgba(200,169,110,.15) transparent;min-height:120px;}
-.tbl-row{display:grid;grid-template-columns:1fr 44px 44px 44px 44px 44px 60px;
-  align-items:center;padding:7px 14px;gap:5px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;transition:background .1s;}
-.tbl-row:hover{background:rgba(255,255,255,.02);}
-.tbl-row.hdr{background:var(--bg3);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:1;cursor:default;}
-.tbl-domain{font-family:var(--mono);font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.tbl-hdr{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);text-align:center;}
-.tbl-dim{text-align:center;}
-.dim-bar{display:flex;align-items:center;justify-content:center;flex-direction:column;gap:2px;}
-.dim-val{font-family:var(--mono);font-size:10px;font-weight:500;}
-.dim-spark{width:26px;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;}
-.dim-fill{height:100%;border-radius:2px;transition:width .5s ease;}
-.tbl-empty{padding:24px;text-align:center;font-family:var(--mono);font-size:11px;color:var(--dim);}
+_DB_PATH = os.path.join(os.path.dirname(__file__), "network_database.json")
+try:
+    with open(_DB_PATH) as f:
+        NET_DB = json.load(f)
+    logger.info("Network analyzer: database loaded OK")
+except Exception as e:
+    logger.error(f"Network analyzer: could not load database: {e}")
+    NET_DB = {}
 
-/* ── DETAIL DRAWER ── */
-.detail-drawer{background:var(--bg2);border:1px solid var(--border);border-top:2px solid rgba(200,169,110,.28);
-  overflow:hidden;max-height:0;transition:max-height .4s ease;margin-bottom:10px;}
-.detail-drawer.open{max-height:580px;}
-.dd-inner{padding:18px 22px;}
-.dd-top{display:flex;align-items:flex-start;gap:18px;margin-bottom:16px;flex-wrap:wrap;}
-.dd-domain{font-family:var(--serif);font-size:26px;font-weight:300;color:var(--gold2);flex:1;}
-.dd-meta{display:flex;flex-direction:column;gap:4px;flex:2;}
-.dd-meta-row{display:flex;gap:8px;align-items:center;}
-.dd-lbl{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);width:68px;flex-shrink:0;}
-.dd-val{font-family:var(--mono);font-size:11px;color:var(--muted);}
-.dd-dims{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-bottom:14px;}
-.dd-dim-card{background:var(--bg3);border:1px solid var(--border);padding:12px 10px;}
-.ddc-name{font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:var(--dim);margin-bottom:6px;line-height:1.4;}
-.ddc-score{font-family:var(--serif);font-size:28px;font-weight:300;line-height:1;}
-.ddc-label{font-family:var(--mono);font-size:9px;color:var(--muted);margin-top:4px;}
-.ddc-bar{height:3px;background:rgba(255,255,255,.07);border-radius:2px;margin-top:6px;overflow:hidden;}
-.ddc-fill{height:100%;border-radius:2px;transition:width .6s ease;}
-.ddc-note{font-family:var(--mono);font-size:9px;color:var(--dim);line-height:1.6;padding-left:8px;position:relative;}
-.ddc-note::before{content:'·';position:absolute;left:1px;color:var(--gold);opacity:.5;}
-.dd-close{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;
-  color:var(--dim);background:transparent;border:1px solid var(--border);padding:5px 12px;
-  cursor:pointer;transition:all .15s;margin-top:10px;}
-.dd-close:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
-
-/* ── TOOLTIP ── */
-.tooltip{position:fixed;background:var(--bg3);border:1px solid var(--border);padding:9px 12px;
-  font-family:var(--mono);font-size:10px;color:var(--muted);pointer-events:none;z-index:200;
-  max-width:240px;line-height:1.7;display:none;box-shadow:0 8px 32px rgba(0,0,0,.7);}
-.tooltip.on{display:block;}
-.tt-domain{color:var(--gold2);font-weight:500;margin-bottom:4px;font-size:11px;}
-
-/* ── SCROLLBARS ── */
-::-webkit-scrollbar{width:3px;}
-::-webkit-scrollbar-thumb{background:rgba(200,169,110,.18);border-radius:2px;}
-
-/* ── RESPONSIVE ── */
-@media(max-width:800px){
-  .lower-grid{grid-template-columns:1fr;}
-  .dd-dims{grid-template-columns:repeat(2,1fr);}
-  .page{padding:12px 12px 48px;}
-  .rb-steps{display:none;}
-}
-</style>
-</head>
-<body>
-
-<!-- ══ RUNNING BANNER — always in DOM, visible when body.is-running ══ -->
-<div class="running-banner" id="runningBanner">
-  <div class="rb-ghost">👻</div>
-  <div class="rb-text">Analyzing <span class="rb-domain" id="rbDomain">…</span></div>
-  <div class="rb-steps">
-    <span class="rb-step" id="rs1">IP &amp; ASN</span>
-    <span class="rb-step" id="rs2">SSL certs</span>
-    <span class="rb-step" id="rs3">WHOIS</span>
-    <span class="rb-step" id="rs4">Reverse IP</span>
-    <span class="rb-step" id="rs5">Scraping</span>
-    <span class="rb-step" id="rs6">Scoring</span>
-  </div>
-  <button class="rb-cancel" onclick="forceReset()">✕ CANCEL</button>
-</div>
-
-<div class="page">
-
-<!-- HEADER -->
-<header class="hdr">
-  <div>
-    <div class="eyebrow">Network Intelligence · Infrastructure Cartography</div>
-    <h1>Network <em>Analyzer</em></h1>
-    <p class="sub">Map infrastructure networks connecting any domain. Nation-neutral. Five independent dimensions. Analyst interprets.</p>
-  </div>
-  <div class="session-badge">
-    <div class="sb-dot"></div>
-    <span class="sb-text">Session</span>
-    <span class="sb-count" id="sessionCount">0 domains</span>
-    <button class="sb-clear" onclick="clearSession()">✕ Clear</button>
-  </div>
-</header>
-
-<!-- ABOUT -->
-<div class="about-block">
-  <div class="about-top" onclick="toggleAbout()">
-    <div class="about-summary">
-      <strong>What this tool does:</strong> Enter any domain to map its infrastructure network — SSL certificate neighbors, shared IP hosting, WHOIS clusters, and content relationships. BBC, RT, CGTN, VOA analyzed identically.
-    </div>
-    <button class="about-toggle" id="aboutToggleBtn">About ▾</button>
-  </div>
-  <div class="about-body" id="aboutBody">
-    <h3>Five scoring dimensions</h3>
-    <div class="dim-chips">
-      <span class="dim-chip">Infrastructure Opacity</span>
-      <span class="dim-chip">Ownership Transparency</span>
-      <span class="dim-chip">Content Sourcing</span>
-      <span class="dim-chip">Network Centrality</span>
-      <span class="dim-chip">State Media Proximity</span>
-    </div>
-    <h3>How to use</h3>
-    <p><strong>Investigate:</strong> Analyze one domain, then manually choose which neighbors to expand. <strong>Expand:</strong> Analyze seed then auto-run first 10 neighbors immediately.</p>
-    <p style="color:var(--dim);font-size:10px;">Sources: Citizen Lab Report 174 · Graphika Falsos Amigos · DFRLab/CheckFirst Pravda · VIGINUM Portal Kombat. Signals, not verdicts.</p>
-  </div>
-</div>
-
-<!-- ERROR -->
-<div class="err" id="errBar"></div>
-
-<!-- MODE + INPUT -->
-<div class="mode-toggle">
-  <button class="mt-btn active" id="mtBottom" onclick="setMode('bottom')">
-    ↑ Investigate Domain
-    <span class="mt-sub">analyze one domain → expand manually</span>
-  </button>
-  <button class="mt-btn" id="mtTop" onclick="setMode('top')">
-    ↓ Expand from Known Node
-    <span class="mt-sub">analyze seed → auto-run first 10 neighbors</span>
-  </button>
-</div>
-<div class="seed-row">
-  <input class="seed-input" id="seedInput" type="text"
-    placeholder="Any domain — cgtn.com, bbc.com, suspicious-news.net…"
-    onkeydown="if(event.key==='Enter')runSeed()">
-  <button class="seed-btn" id="seedBtn" onclick="runSeed()">Analyze →</button>
-</div>
-<div class="seed-hint" id="seedHint">Enter a domain to begin mapping its network.</div>
-
-<!-- GRAPH -->
-<div class="graph-panel">
-  <div class="graph-header">
-    <span class="panel-label">Network <em>Graph</em></span>
-    <div class="graph-stats">
-      <span class="gstat">Nodes: <span id="gNodeCount">0</span></span>
-      <span class="gstat">Edges: <span id="gEdgeCount">0</span></span>
-      <span class="gstat">Analyzed: <span id="gAnalyzedCount">0</span></span>
-    </div>
-    <div class="graph-controls">
-      <button class="gc-btn" onclick="cyFit()">Fit</button>
-      <button class="gc-btn" onclick="cy&&cy.zoom({level:cy.zoom()*1.3,renderedPosition:{x:cy.width()/2,y:cy.height()/2}})">+</button>
-      <button class="gc-btn" onclick="cy&&cy.zoom({level:cy.zoom()*.75,renderedPosition:{x:cy.width()/2,y:cy.height()/2}})">−</button>
-      <button class="gc-btn" onclick="cyFit()">Reset</button>
-      <button class="gc-btn" onclick="cyLayout()">Cluster</button>
-    </div>
-  </div>
-  <div id="cy"></div>
-  <div class="graph-empty" id="graphEmpty">
-    <div class="ge-icon">◎</div>
-    <div class="ge-text">Enter a domain above to begin.<br>The network graph builds here as you analyze.</div>
-  </div>
-  <div class="graph-legend">
-    <div class="gl"><div class="gl-dot" style="background:var(--gold)"></div>Seed/State media</div>
-    <div class="gl"><div class="gl-dot" style="background:var(--red)"></div>High opacity</div>
-    <div class="gl"><div class="gl-dot" style="background:var(--orange)"></div>Moderate</div>
-    <div class="gl"><div class="gl-dot" style="background:var(--green)"></div>Transparent</div>
-    <div class="gl"><div class="gl-dot" style="background:rgba(240,236,228,.2)"></div>Unanalyzed</div>
-    <div class="gl"><div class="gl-line" style="background:var(--blue);opacity:.7"></div>SSL SAN</div>
-    <div class="gl"><div class="gl-line" style="background:var(--orange);opacity:.6"></div>Shared IP</div>
-  </div>
-</div>
-
-<!-- QUEUE + TABLE -->
-<div class="lower-grid">
-  <div class="queue-panel">
-    <div class="queue-header">
-      <span class="panel-label">Domain <em>Queue</em></span>
-      <div class="queue-add">
-        <input class="qa-input" id="qaInput" type="text" placeholder="Add domain…"
-          onkeydown="if(event.key==='Enter')qaAdd()">
-        <button class="qa-btn" onclick="qaAdd()">+ Add</button>
-      </div>
-    </div>
-    <div class="queue-scroll" id="queueScroll">
-      <div class="queue-empty" id="queueEmpty">
-        Neighbors auto-populate here.<br>
-        Use <strong>Run Next 10</strong> to expand in batches.
-      </div>
-    </div>
-    <div class="queue-status" id="queueStatus"></div>
-    <div class="queue-actions">
-      <button class="qa-action qa-run-next" id="qaNextBtn" onclick="qaRunNext()">▶ Run Next 10</button>
-      <button class="qa-action" onclick="qaRunAll()">▶ All</button>
-      <button class="qa-action danger" onclick="qaClear()">Clear</button>
-    </div>
-  </div>
-
-  <div class="table-panel">
-    <div class="table-header">
-      <div class="table-filters">
-        <button class="tf-btn active" onclick="setFilter('all',this)">All</button>
-        <button class="tf-btn" onclick="setFilter('opaque',this)">Opaque ≥6</button>
-        <button class="tf-btn" onclick="setFilter('hidden',this)">Hidden ≥6</button>
-        <button class="tf-btn" onclick="setFilter('state',this)">State ≥6</button>
-        <button class="tf-btn" onclick="setFilter('clean',this)">Clean</button>
-      </div>
-      <div class="table-exports">
-        <button class="exp-btn" onclick="exportCSV()">CSV</button>
-        <button class="exp-btn" onclick="exportGEXF()">GEXF</button>
-        <button class="exp-btn" onclick="exportJSON()">JSON</button>
-      </div>
-    </div>
-    <div class="table-scroll" id="tableScroll">
-      <div class="tbl-empty" id="tableEmpty">No analyzed domains yet.</div>
-    </div>
-  </div>
-</div>
-
-<!-- DETAIL DRAWER -->
-<div class="detail-drawer" id="detailDrawer">
-  <div class="dd-inner" id="detailInner"></div>
-</div>
-
-</div><!-- /page -->
-
-<div class="tooltip" id="tooltip">
-  <div class="tt-domain" id="ttDomain"></div>
-  <div id="ttRows"></div>
-</div>
-
-<script>
-// ══ CONFIG ════════════════════════════════════════════════════════════════════
-const API = 'https://intel-desk-api.onrender.com';
-
-// ══ STATE ════════════════════════════════════════════════════════════════════
-let nodes   = {};  // domain → {id, type, status, analysis}
-let edges   = [];
-let cy      = null;
-let running = false;
-let mode    = 'bottom';
-let filter  = 'all';
-let stepTimers = [];
-
-// ══ STEP ANIMATION ════════════════════════════════════════════════════════════
-const STEP_IDS    = ['rs1','rs2','rs3','rs4','rs5','rs6'];
-const STEP_DELAYS = [0, 900, 1800, 2700, 3600, 4500];
-
-function startSteps() {
-  STEP_IDS.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.className = 'rb-step';
-  });
-  stepTimers.forEach(clearTimeout);
-  stepTimers = [];
-  STEP_IDS.forEach((id, i) => {
-    const t = setTimeout(() => {
-      if (i > 0) {
-        const prev = document.getElementById(STEP_IDS[i-1]);
-        if (prev) prev.className = 'rb-step done';
-      }
-      const el = document.getElementById(id);
-      if (el) el.className = 'rb-step active';
-    }, STEP_DELAYS[i]);
-    stepTimers.push(t);
-  });
+HEADERS = {
+    "User-Agent": "IntelDesk-NetworkAnalyzer/1.0 (https://inteldesk.io; research tool)",
+    "Accept":     "text/html,application/xhtml+xml,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
 }
 
-function stopSteps() {
-  stepTimers.forEach(clearTimeout);
-  stepTimers = [];
-  STEP_IDS.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.className = 'rb-step done';
-  });
-}
+HTTP_TIMEOUT   = 5   # aggressive — Render has 30s request limit
+SCRAPE_TIMEOUT = 6   # scraping must be fast
+SOCKET_TIMEOUT = 4   # DNS resolution
 
-// ══ RUNNING STATE — one simple function controls everything ════════════════
-function setRunning(on, domain) {
-  running = on;
-  document.body.classList.toggle('is-running', on);
-  document.getElementById('seedBtn').disabled = on;
+# Set socket default timeout so gethostbyname can't hang forever
+import socket as _sock
+_sock.setdefaulttimeout(SOCKET_TIMEOUT)
 
-  const rb = document.getElementById('rbDomain');
-  if (rb) rb.textContent = domain || '…';
 
-  if (on) {
-    startSteps();
-  } else {
-    stopSteps();
-  }
-}
+# ── Helpers ────────────────────────────────────────────────────────────────────
 
-// ══ FORCE RESET — the big red button always works ═════════════════════════
-function forceReset() {
-  running = false;
-  document.body.classList.remove('is-running');
-  document.getElementById('seedBtn').disabled = false;
-  stepTimers.forEach(clearTimeout);
-  stepTimers = [];
-  // Reset any stuck nodes
-  for (const n of Object.values(nodes)) {
-    if (n.status === 'running') n.status = 'queued';
-  }
-  renderQueue();
-  clearErr();
-  showHint('Reset. Ready for new analysis.');
-}
+def clean_domain(raw: str) -> str:
+    raw = raw.strip().lower()
+    if not raw.startswith("http"):
+        raw = "https://" + raw
+    parsed = urlparse(raw)
+    domain = parsed.netloc or parsed.path
+    domain = re.sub(r"^www\.", "", domain)
+    return domain.split("/")[0].split("?")[0].split("#")[0]
 
-// ══ ANALYSIS ════════════════════════════════════════════════════════════════
-async function runSeed() {
-  if (running) { showErr('Already running — click CANCEL in the banner above first.'); return; }
-  const domain = cleanDomain(document.getElementById('seedInput').value);
-  if (!domain) { showErr('Enter a domain first.'); return; }
-  clearErr();
-  await analyzeDomain(domain, 'seed');
-  if (mode === 'top') {
-    const pending = Object.values(nodes).filter(n => n.status === 'queued');
-    if (pending.length > 0) {
-      showHint(`Seed done. Auto-expanding ${Math.min(10,pending.length)} neighbors…`);
-      await qaRunNext();
-    }
-  }
-}
 
-async function analyzeDomain(domain, type) {
-  domain = cleanDomain(domain);
-  if (!domain) return;
-  if (nodes[domain]?.status === 'done') { openDetail(domain); return; }
+def safe_get(url: str, timeout: int = HTTP_TIMEOUT, **kwargs):
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=timeout, **kwargs)
+        r.raise_for_status()
+        return r
+    except Exception as e:
+        logger.debug(f"safe_get {url}: {e}")
+        return None
 
-  running = true;
-  setRunning(true, domain);
-  setNode(domain, type || 'queued', 'running', null);
-  renderQueue();
-  updateNode(domain);
 
-  try {
-    const res = await fetch(`${API}/network/analyze`, {
-      method:  'POST',
-      headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify({domain}),
-    });
-    if (!res.ok) throw new Error(`Server ${res.status}`);
-    const data = await res.json();
+# ── Infrastructure collectors ──────────────────────────────────────────────────
 
-    setNode(domain, type || 'queued', 'done', data);
+def resolve_ip(domain: str) -> dict:
+    try:
+        ip = socket.gethostbyname(domain)
+        return {"ip": ip, "error": None}
+    except Exception as e:
+        return {"ip": None, "error": str(e)}
 
-    // Queue neighbors
-    for (const san of (data.ssl_sans || []).slice(0,25)) {
-      if (san !== domain && !nodes[san]) {
-        setNode(san, 'ssl_san', 'queued', null);
-        addEdge(domain, san, 'ssl_san');
-      }
-    }
-    for (const n of (data.reverse_ip || []).slice(0,15)) {
-      if (n !== domain && !nodes[n]) {
-        setNode(n, 'shared_ip', 'queued', null);
-        addEdge(domain, n, 'shared_ip');
-      }
-    }
-    for (const sl of (data.scrape?.state_media_links || [])) {
-      addEdge(domain, sl.domain, 'content');
+
+def get_asn_info(ip: str) -> dict:
+    if not ip:
+        return {}
+    r = safe_get(f"https://ipinfo.io/{ip}/json")
+    if not r:
+        return {}
+    try:
+        d = r.json()
+        org = d.get("org", "")
+        return {
+            "ip":      d.get("ip"),
+            "org":     org,
+            "asn":     org.split()[0] if org else "",
+            "country": d.get("country", ""),
+            "city":    d.get("city", ""),
+            "hostname":d.get("hostname", ""),
+        }
+    except Exception:
+        return {}
+
+
+def get_ssl_sans(domain: str) -> list:
+    r = safe_get(f"https://crt.sh/?q=%25.{domain}&output=json")
+    if not r:
+        return []
+    try:
+        certs = r.json()
+        sans  = set()
+        for cert in certs[:60]:
+            for name in cert.get("name_value", "").split("\n"):
+                name = name.strip().lstrip("*.")
+                if name and "." in name and name != domain:
+                    sans.add(name)
+        return sorted(sans)[:100]
+    except Exception:
+        return []
+
+
+def get_rdap_whois(domain: str) -> dict:
+    r = safe_get(f"https://rdap.org/domain/{domain}")
+    if not r:
+        return {}
+    try:
+        data   = r.json()
+        result = {
+            "registrar":            None,
+            "registrar_country":    None,
+            "registrant_org":       None,
+            "registrant_country":   None,
+            "registrant_email":     None,
+            "privacy_protected":    False,
+            "created":              None,
+            "updated":              None,
+            "nameservers":          [],
+            "status":               [],
+        }
+
+        def extract_vcard(entity):
+            out = {}
+            vcard = entity.get("vcardArray", [])
+            if not vcard or len(vcard) < 2:
+                return out
+            for field in vcard[1]:
+                if not field or len(field) < 4:
+                    continue
+                fn, fv = field[0], field[3]
+                if fn == "fn":
+                    out["name"] = fv
+                elif fn == "org":
+                    out["org"] = fv
+                elif fn == "email":
+                    out["email"] = fv
+                elif fn == "adr":
+                    if isinstance(fv, list) and len(fv) >= 7:
+                        out["country"] = str(fv[6]).strip()
+                    elif isinstance(fv, str):
+                        out["country"] = fv.strip()
+                elif fn == "country-name":
+                    out["country"] = fv
+            return out
+
+        for entity in data.get("entities", []):
+            roles = entity.get("roles", [])
+            vc    = extract_vcard(entity)
+
+            if "registrar" in roles:
+                result["registrar"]         = vc.get("name") or vc.get("org")
+                result["registrar_country"] = vc.get("country")
+
+            if "registrant" in roles:
+                result["registrant_org"]     = vc.get("org") or vc.get("name")
+                result["registrant_country"] = vc.get("country")
+                result["registrant_email"]   = vc.get("email")
+                # Privacy-protected WHOIS: registrant name/org is a proxy service
+                org_lower = (result["registrant_org"] or "").lower()
+                privacy_keywords = [
+                    "privacy", "redacted", "whoisguard", "domains by proxy",
+                    "contact privacy", "withheld", "data protected",
+                    "registrant redacted", "gdpr", "not disclosed",
+                ]
+                if any(kw in org_lower for kw in privacy_keywords):
+                    result["privacy_protected"] = True
+
+            for sub in entity.get("entities", []):
+                sub_vc = extract_vcard(sub)
+                if "registrant" in sub.get("roles", []):
+                    result["registrant_org"]     = result["registrant_org"] or sub_vc.get("org")
+                    result["registrant_country"] = result["registrant_country"] or sub_vc.get("country")
+
+        for event in data.get("events", []):
+            action = event.get("eventAction", "")
+            if action == "registration":
+                result["created"] = event.get("eventDate", "")[:10]
+            elif action == "last changed":
+                result["updated"] = event.get("eventDate", "")[:10]
+
+        result["nameservers"] = [
+            ns.get("ldhName", "").lower()
+            for ns in data.get("nameservers", [])
+        ]
+        result["status"] = data.get("status", [])
+        return result
+    except Exception:
+        return {}
+
+
+def get_reverse_ip(ip: str) -> list:
+    if not ip:
+        return []
+    r = safe_get(f"https://api.hackertarget.com/reverseiplookup/?q={ip}")
+    if not r or "error" in r.text.lower():
+        return []
+    return [d.strip() for d in r.text.strip().split("\n") if "." in d][:50]
+
+
+# ── Page scraper — expanded for new dimensions ─────────────────────────────────
+
+def scrape_page(domain: str) -> dict:
+    """
+    Scrape the domain homepage and up to one internal page (About/Contact).
+    Returns signals for all five scoring dimensions.
+    """
+    result = {
+        "reachable":            False,
+        "status_code":          None,
+        "title":                "",
+        "language":             "",
+        # Analytics
+        "analytics_ids":        [],
+        # Outbound links (all state media, neutral)
+        "state_media_links":    [],   # [{domain, name, category}]
+        # CMS
+        "cms":                  [],
+        # Ownership transparency signals
+        "has_about_page":       False,
+        "has_contact_page":     False,
+        "has_named_authors":    False,
+        "has_bylines":          False,
+        "has_legal_entity":     False,
+        "has_funding_disclosure": False,
+        "editorial_staff_count":  0,
+        # Content sourcing signals
+        "content_sourcing":     [],   # [{type, detail, source}]
+        "avg_article_length":   None,
+        "has_original_reporting_signals": False,
+        # Infrastructure signals (from HTML)
+        "shared_id_signals":    [],   # same analytics ID as known network
+        "error":                None,
     }
 
-    updateNode(domain);
-    updateCentrality();
-    renderQueue();
-    renderTable();
-    updateBadge();
-    openDetail(domain);
-    const q = Object.values(nodes).filter(n => n.status === 'queued').length;
-    showHint(`${domain} done · ${Object.keys(nodes).length} in graph · ${q} queued`);
+    try:
+        url  = f"https://{domain}"
+        resp = requests.get(
+            url, headers=HEADERS, timeout=SCRAPE_TIMEOUT,
+            allow_redirects=True, verify=False,
+        )
+        result["reachable"]   = True
+        result["status_code"] = resp.status_code
+        html  = resp.text
+        soup  = BeautifulSoup(html, "html.parser")
 
-  } catch(err) {
-    setNode(domain, type || 'queued', 'error', null);
-    showErr(`Analysis failed for ${domain}: ${err.message}`);
-    updateNode(domain);
-    renderQueue();
-  }
+        # ── Basic metadata ─────────────────────────────────────────────────────
+        title_tag = soup.find("title")
+        result["title"] = title_tag.get_text(strip=True)[:200] if title_tag else ""
 
-  running = false;
-  setRunning(false);
-}
+        html_tag = soup.find("html")
+        if html_tag and html_tag.get("lang"):
+            result["language"] = html_tag["lang"][:10]
 
-// ══ QUEUE ════════════════════════════════════════════════════════════════════
-function qaAdd() {
-  const val = document.getElementById('qaInput').value.trim();
-  if (!val) return;
-  val.split(/[\s,\n]+/).filter(Boolean).forEach(d => {
-    d = cleanDomain(d);
-    if (d && !nodes[d]) setNode(d, 'manual', 'queued', null);
-  });
-  document.getElementById('qaInput').value = '';
-  renderQueue();
-  updateBadge();
-}
+        # ── Analytics IDs ──────────────────────────────────────────────────────
+        ids_found = []
+        for m in re.findall(r'["\']?(G-[A-Z0-9]{6,}|UA-\d{5,}-\d+)["\']?', html):
+            ids_found.append({"type": "Google Analytics", "id": m})
+        for m in re.findall(r'["\']?(GTM-[A-Z0-9]{5,})["\']?', html):
+            ids_found.append({"type": "Google Tag Manager", "id": m})
+        for m in re.findall(r'ym\((\d{7,}),\s*["\']init["\']', html):
+            ids_found.append({"type": "Yandex Metrica", "id": m})
+        for m in re.findall(r'hm\.baidu\.com/hm\.js\?([a-f0-9]{32})', html):
+            ids_found.append({"type": "Baidu Tongji", "id": m})
+        for m in re.findall(r'["\']?(haimai[_\-]?[a-z0-9]{4,})["\']?', html, re.IGNORECASE):
+            ids_found.append({"type": "Haimai Ad ID", "id": m})
+        # WeChat (Chinese social integration)
+        if "weixin.qq.com" in html or "wx.qq.com" in html:
+            ids_found.append({"type": "WeChat Integration", "id": "weixin.qq.com"})
+        # VK (Russian social)
+        if "vk.com/js" in html or "vk.com/widget" in html:
+            ids_found.append({"type": "VKontakte Integration", "id": "vk.com"})
+        # Deduplicate
+        seen = set()
+        for item in ids_found:
+            key = f"{item['type']}:{item['id']}"
+            if key not in seen:
+                seen.add(key)
+                result["analytics_ids"].append(item)
 
-async function qaRunNext() {
-  if (running) return;
-  const pending = Object.values(nodes).filter(n => n.status === 'queued').slice(0,10);
-  if (!pending.length) { showQueueStatus('complete'); return; }
-  for (const n of pending) {
-    if (!running || document.body.classList.contains('is-running') === false) {
-      // Check if user cancelled
+        # ── State media outbound links — NEUTRAL, covers ALL countries ─────────
+        all_state_media = NET_DB.get("state_media_registry", {})
+        links_found = {}
+        for a in soup.find_all("a", href=True):
+            href = a["href"].lower()
+            for sm_domain, sm_info in all_state_media.items():
+                if sm_domain in href and sm_domain not in links_found:
+                    links_found[sm_domain] = {
+                        "domain":   sm_domain,
+                        "name":     sm_info.get("name", sm_domain),
+                        "country":  sm_info.get("country", "?"),
+                        "category": sm_info.get("category", "state_media"),
+                    }
+        result["state_media_links"] = list(links_found.values())
+
+        # ── CMS fingerprinting ─────────────────────────────────────────────────
+        cms = []
+        if "wpbakery" in html.lower() or "vc_row" in html or "wpb_wrapper" in html:
+            cms.append({"signal": "wpbakery",   "note": "WPBakery (PAPERWALL signature)"})
+        if "wp-content" in html or "wp-includes" in html:
+            cms.append({"signal": "wordpress",  "note": "WordPress"})
+        if "drupal" in html.lower():
+            cms.append({"signal": "drupal",     "note": "Drupal"})
+        if "joomla" in html.lower():
+            cms.append({"signal": "joomla",     "note": "Joomla"})
+        result["cms"] = cms
+
+        # ── Ownership transparency signals ─────────────────────────────────────
+        all_links   = [a.get("href", "").lower() for a in soup.find_all("a", href=True)]
+        all_text    = soup.get_text(separator=" ", strip=True).lower()
+        all_links_s = " ".join(all_links)
+
+        result["has_about_page"]   = bool(re.search(r'/about|/who-we-are|/our-story|/about-us', all_links_s))
+        result["has_contact_page"] = bool(re.search(r'/contact|/reach-us|/write-to-us', all_links_s))
+
+        # Named bylines / author pages
+        byline_els = soup.find_all(attrs={"class": re.compile(
+            r'author|byline|reporter|journalist|contributor|written.by|post.author', re.I
+        )})
+        result["has_bylines"] = len(byline_els) > 0
+
+        # Named staff — look for author links with person-like paths
+        author_links = [a for a in soup.find_all("a", href=True)
+                        if re.search(r'/author/|/reporter/|/journalist/|/staff/', a.get("href",""), re.I)]
+        result["editorial_staff_count"] = len(set(a.get("href") for a in author_links))
+        result["has_named_authors"]     = result["editorial_staff_count"] > 0
+
+        # Legal entity disclosure
+        legal_patterns = [
+            r'\bltd\b', r'\bllc\b', r'\binc\b', r'\bgmbh\b', r'\bs\.a\b',
+            r'registered in', r'company number', r'registered charity',
+            r'press freedom', r'editorial independence',
+        ]
+        result["has_legal_entity"] = any(
+            re.search(p, all_text, re.I) for p in legal_patterns
+        )
+
+        # Funding disclosure
+        funding_patterns = [
+            r'funded by', r'supported by', r'sponsored by',
+            r'license fee', r'public funding', r'government funded',
+            r'independent funding', r'reader supported',
+            r'nonprofit', r'non-profit', r'charitable',
+        ]
+        result["has_funding_disclosure"] = any(
+            re.search(p, all_text, re.I) for p in funding_patterns
+        )
+
+        # ── Content sourcing signals ───────────────────────────────────────────
+        sourcing = []
+
+        # Explicit attribution to state media in article text
+        state_media_names = [
+            sm.get("name", "") for sm in all_state_media.values()
+        ]
+        for name in state_media_names:
+            if name and name.lower() in all_text:
+                # Check context: is it citation or is it the site itself?
+                pattern = rf'(via|source|from|according to|reports?|cited?)\s+{re.escape(name.lower())}'
+                if re.search(pattern, all_text, re.I):
+                    sourcing.append({
+                        "type":   "attributed_republication",
+                        "detail": f"Content attributed to {name}",
+                        "source": "content_analysis",
+                    })
+                else:
+                    sourcing.append({
+                        "type":   "state_media_reference",
+                        "detail": f"Reference to {name} in page text",
+                        "source": "content_analysis",
+                    })
+
+        # Verbatim PAPERWALL article patterns (very specific)
+        paperwall_patterns = [
+            ("yan limeng",          "yan_limeng_article",
+             "Yan Limeng attack article (present on every active PAPERWALL site)", "CL-174"),
+            ("yan li-meng",         "yan_limeng_article",
+             "Yan Limeng attack article variant", "CL-174"),
+            ("haimai",              "haimai_reference",
+             "Haimai (PAPERWALL operator) reference in content", "CL-174"),
+        ]
+        html_lower = html.lower()
+        for pattern, sig_type, note, source in paperwall_patterns:
+            if pattern in html_lower:
+                sourcing.append({
+                    "type":   sig_type,
+                    "detail": note,
+                    "source": source,
+                })
+
+        # AI content signals — look for AI disclosure or AI artifact patterns
+        ai_patterns = [
+            r'generated by ai', r'ai.generated', r'written by ai',
+            r'this article was (created|generated|produced) (by|using|with)',
+        ]
+        if any(re.search(p, all_text, re.I) for p in ai_patterns):
+            sourcing.append({
+                "type":   "ai_generated_content",
+                "detail": "AI content generation disclosure or artifact detected",
+                "source": "content_analysis",
+            })
+
+        # Press release heavy (indicator of paid content laundering)
+        if all_text.count("press release") > 3:
+            sourcing.append({
+                "type":   "press_release_heavy",
+                "detail": "High press release density — possible content laundering",
+                "source": "content_analysis",
+            })
+
+        # Original reporting signals (reduce sourcing score)
+        original_signals = [
+            r'\bexclusive\b', r'\binvestigat', r'\bsource[s]? told\b',
+            r'\bsaid in an? interview\b', r'\bconfirmed to\b',
+            r'\baccording to documents\b', r'\bobtained by\b',
+        ]
+        if any(re.search(p, all_text, re.I) for p in original_signals):
+            sourcing.append({
+                "type":   "original_reporting",
+                "detail": "Indicators of original reporting detected",
+                "source": "content_analysis",
+            })
+            result["has_original_reporting_signals"] = True
+
+        result["content_sourcing"] = sourcing
+
+    except requests.exceptions.SSLError:
+        result["error"]     = "SSL certificate error"
+        result["reachable"] = True
+    except requests.exceptions.ConnectionError as e:
+        result["error"] = f"Connection failed: {str(e)[:120]}"
+    except Exception as e:
+        result["error"] = f"Scrape error: {str(e)[:120]}"
+
+    return result
+
+
+# ── Country attribution ────────────────────────────────────────────────────────
+
+def derive_attribution(domain: str, whois: dict, asn_info: dict) -> dict:
+    signals = {}
+
+    # 1. Registrant country (WHOIS)
+    reg_cc = (whois.get("registrant_country") or "").strip().upper()
+    if reg_cc and len(reg_cc) <= 3:
+        signals["registrant"] = {"value": reg_cc, "confidence": "high",
+                                  "source": "WHOIS registrant record"}
+
+    # 2. TLD
+    tld = domain.rsplit(".", 1)[-1].lower() if "." in domain else ""
+    TLD_MAP = {
+        "cn": "CN", "ru": "RU", "ir": "IR", "kp": "KP",
+        "by": "BY", "ve": "VE", "sy": "SY", "cu": "CU",
     }
-    await analyzeDomain(n.id);
-    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 100)));
-  }
-  const remaining = Object.values(nodes).filter(n => n.status === 'queued').length;
-  showQueueStatus(remaining === 0 ? 'complete' : 'partial');
-}
+    if tld in TLD_MAP:
+        signals["tld"] = {"value": TLD_MAP[tld], "confidence": "high",
+                           "source": f".{tld} country-code TLD"}
 
-async function qaRunAll() {
-  if (running) return;
-  const pending = Object.values(nodes).filter(n => n.status === 'queued');
-  for (const n of pending) {
-    await analyzeDomain(n.id);
-    await new Promise(r => requestAnimationFrame(() => setTimeout(r, 100)));
-  }
-  showQueueStatus('complete');
-}
+    # 3. ASN operator
+    org = (asn_info.get("org") or "").lower()
+    ORG_MAP = [
+        (["alibaba", "aliyun"],                   "CN", "Alibaba Cloud"),
+        (["tencent"],                              "CN", "Tencent Cloud"),
+        (["baidu"],                                "CN", "Baidu Cloud"),
+        (["china telecom","chinanet","ctgnet"],    "CN", "China Telecom (state-owned)"),
+        (["china unicom"],                         "CN", "China Unicom (state-owned)"),
+        (["china mobile"],                         "CN", "China Mobile (state-owned)"),
+        (["tigerweb"],                             "RU", "TigerWeb (Pravda operator)"),
+        (["reg.ru","marosnet","rusonyx"],          "RU", "Russian hosting provider"),
+        (["rostelecom"],                           "RU", "Rostelecom (Russian state)"),
+        (["iranserver","shatel","asiatech"],       "IR", "Iranian hosting provider"),
+        (["belarusian","beltelecom"],              "BY", "Belarusian state telecom"),
+    ]
+    for keywords, cc, label in ORG_MAP:
+        if any(kw in org for kw in keywords):
+            signals["asn_operator"] = {"value": cc, "confidence": "high",
+                                        "source": label}
+            break
 
-function qaClear() {
-  if (running) { showErr('Cancel the running analysis first.'); return; }
-  for (const [d, n] of Object.entries(nodes)) {
-    if (n.status === 'queued') delete nodes[d];
-  }
-  renderQueue();
-  updateBadge();
-  showQueueStatus('cleared');
-}
+    # 4. Hosting country (lowest confidence — may be CDN)
+    asn_cc = (asn_info.get("country") or "").strip().upper()
+    cdn_kws = ["cloudflare","fastly","akamai","amazon","google",
+               "microsoft","digitalocean","linode","vultr","hetzner"]
+    is_cdn  = any(kw in org for kw in cdn_kws)
+    if asn_cc:
+        signals["hosting"] = {
+            "value":      asn_cc,
+            "confidence": "low" if is_cdn else "medium",
+            "source":     "Server location" + (" (CDN — not operator origin)" if is_cdn else ""),
+            "is_cdn":     is_cdn,
+        }
 
-function showQueueStatus(s) {
-  const el = document.getElementById('queueStatus');
-  if (!el) return;
-  const done    = Object.values(nodes).filter(n => n.status === 'done').length;
-  const pending = Object.values(nodes).filter(n => n.status === 'queued').length;
-  const errs    = Object.values(nodes).filter(n => n.status === 'error').length;
-  if (s === 'complete') {
-    el.className = 'queue-status on';
-    el.innerHTML = `<div class="qs-dot" style="background:var(--green)"></div><span style="color:var(--green);font-family:var(--mono);font-size:10px;">Queue complete — no more pending. ${done} analyzed${errs?' · '+errs+' errors':''}</span>`;
-  } else if (s === 'partial') {
-    el.className = 'queue-status on';
-    el.innerHTML = `<div class="qs-dot" style="background:var(--gold)"></div><span style="color:var(--muted);font-family:var(--mono);font-size:10px;">Batch done · <strong style="color:var(--gold)">${pending} still queued</strong> — click Run Next 10 to continue</span>`;
-  } else if (s === 'cleared') {
-    el.className = 'queue-status on';
-    el.innerHTML = `<div class="qs-dot" style="background:var(--dim)"></div><span style="color:var(--dim);font-family:var(--mono);font-size:10px;">Queue cleared.</span>`;
-  } else {
-    el.className = 'queue-status';
-  }
-}
+    # Primary: walk by confidence
+    primary = None
+    for key in ["registrant", "tld", "asn_operator", "hosting"]:
+        if key in signals and not primary:
+            if key == "hosting" and is_cdn:
+                continue
+            primary = signals[key]["value"]
 
-function renderQueue() {
-  const scroll  = document.getElementById('queueScroll');
-  const empty   = document.getElementById('queueEmpty');
-  const nextBtn = document.getElementById('qaNextBtn');
-  const items   = Object.values(nodes);
-  const pending = items.filter(n => n.status === 'queued').length;
-
-  empty.style.display = items.length ? 'none' : '';
-  if (nextBtn) {
-    const n = Math.min(pending, 10);
-    nextBtn.textContent = pending > 0 ? `▶ Run Next ${n} (${pending} queued)` : '▶ Run Next 10';
-    nextBtn.disabled = running || pending === 0;
-  }
-
-  scroll.innerHTML = items.map(node => {
-    const dims = node.analysis?.dimensions || {};
-    const op   = dims.infrastructure_opacity?.score;
-    const scoreHtml = op !== undefined
-      ? `<span style="font-family:var(--mono);font-size:9px;color:${opColor(op)}">${op}/10</span>` : '';
-    return `<div class="q-item">
-      <span class="qi-domain" title="${esc(node.id)}">${esc(node.id)}</span>
-      ${scoreHtml}
-      <span class="qi-status ${node.status}">${node.status}</span>
-      ${node.status === 'queued'
-        ? `<button class="qi-btn" onclick="analyzeDomain('${esc(node.id)}','queued')">▶</button>`
-        : node.status === 'done'
-        ? `<button class="qi-btn" onclick="openDetail('${esc(node.id)}')">⬡</button>`
-        : ''}
-      <button class="qi-btn qi-remove" onclick="removeNode('${esc(node.id)}')">✕</button>
-    </div>`;
-  }).join('');
-}
-
-// ══ TABLE ════════════════════════════════════════════════════════════════════
-function setFilter(f, btn) {
-  filter = f;
-  document.querySelectorAll('.tf-btn').forEach(b => b.classList.remove('active'));
-  btn.classList.add('active');
-  renderTable();
-}
-
-function renderTable() {
-  const scroll = document.getElementById('tableScroll');
-  const empty  = document.getElementById('tableEmpty');
-  const analyzed = Object.values(nodes).filter(n => n.status === 'done');
-  const filtered = analyzed.filter(n => {
-    const d = n.analysis?.dimensions || {};
-    if (filter === 'opaque') return (d.infrastructure_opacity?.score||0) >= 6;
-    if (filter === 'hidden') return (d.ownership_transparency?.score||0) >= 6;
-    if (filter === 'state')  return (d.state_media_proximity?.score||0) >= 6;
-    if (filter === 'clean')  return (d.ownership_transparency?.score||10) <= 3 && (d.infrastructure_opacity?.score||10) <= 3;
-    return true;
-  });
-
-  empty.style.display = filtered.length ? 'none' : '';
-  if (!filtered.length) { scroll.innerHTML = ''; return; }
-
-  const hdr = `<div class="tbl-row hdr">
-    <div class="tbl-hdr" style="text-align:left">Domain</div>
-    <div class="tbl-hdr" title="Infrastructure Opacity">Opac</div>
-    <div class="tbl-hdr" title="Ownership Transparency">Own</div>
-    <div class="tbl-hdr" title="Content Sourcing">Src</div>
-    <div class="tbl-hdr" title="Network Centrality">Net</div>
-    <div class="tbl-hdr" title="State Media Proximity">State</div>
-    <div class="tbl-hdr">Country</div>
-  </div>`;
-
-  scroll.innerHTML = hdr + filtered.map(node => {
-    const d    = node.analysis?.dimensions || {};
-    const attr = node.analysis?.attribution || {};
-    const cc   = attr.primary || '?';
-    const DIMS = ['infrastructure_opacity','ownership_transparency','content_sourcing','network_centrality','state_media_proximity'];
-    const cols = DIMS.map(k => {
-      const s = d[k]?.score ?? null;
-      const c = dimColor(k, s);
-      return `<div class="tbl-dim"><div class="dim-bar">
-        <div class="dim-val" style="color:${c}">${s ?? '—'}</div>
-        <div class="dim-spark"><div class="dim-fill" style="width:${s!==null?s*10:0}%;background:${c}"></div></div>
-      </div></div>`;
-    }).join('');
-    return `<div class="tbl-row" onclick="openDetail('${esc(node.id)}')">
-      <div class="tbl-domain">${esc(node.id)}</div>
-      ${cols}
-      <div style="font-family:var(--mono);font-size:10px;text-align:center;">${cc} ${countryFlag(cc)}</div>
-    </div>`;
-  }).join('');
-}
-
-// ══ GRAPH ════════════════════════════════════════════════════════════════════
-function initCy() {
-  cy = cytoscape({
-    container: document.getElementById('cy'),
-    elements:  [],
-    style: [
-      { selector:'node', style:{
-        'background-color':'data(color)','border-width':'data(bw)','border-color':'data(bc)',
-        'width':'data(size)','height':'data(size)','label':'data(lbl)',
-        'font-family':'DM Mono,monospace','font-size':9,'color':'rgba(240,236,228,0.65)',
-        'text-valign':'bottom','text-margin-y':5,'text-wrap':'none',
-      }},
-      { selector:'node:selected', style:{'border-width':3,'border-color':'#e8d5a3'}},
-      { selector:'edge', style:{
-        'width':'data(w)','line-color':'data(ec)','opacity':0.5,
-        'curve-style':'bezier','target-arrow-shape':'none',
-      }},
-    ],
-    layout:{name:'null'},
-    userZoomingEnabled:true, userPanningEnabled:true, boxSelectionEnabled:false,
-    minZoom:0.05, maxZoom:4,
-  });
-
-  const tip = document.getElementById('tooltip');
-  cy.on('mouseover','node', evt => {
-    const d   = evt.target.data();
-    const dim = d.dims || {};
-    document.getElementById('ttDomain').textContent = d.id;
-    document.getElementById('ttRows').innerHTML = Object.entries(dim)
-      .map(([k,v]) => `<div style="display:flex;justify-content:space-between;gap:10px"><span style="color:var(--dim);font-size:9px">${dimShort(k)}</span><span>${v?.score??'—'}/10</span></div>`)
-      .join('') || `<div style="color:var(--dim);font-size:9px">${d.status}</div>`;
-    tip.classList.add('on');
-  });
-  cy.on('mousemove', e => {
-    tip.style.left = (e.originalEvent.clientX+12)+'px';
-    tip.style.top  = (e.originalEvent.clientY+12)+'px';
-  });
-  cy.on('mouseout','node', () => tip.classList.remove('on'));
-  cy.on('tap','node', evt => {
-    const d = evt.target.data('id');
-    if (nodes[d]?.status === 'done') openDetail(d);
-    else if (nodes[d]?.status === 'queued') analyzeDomain(d);
-  });
-}
-
-function nodeStyle(domain) {
-  const n    = nodes[domain];
-  const st   = n?.status;
-  const dims = n?.analysis?.dimensions || {};
-  const op   = dims.infrastructure_opacity?.score ?? null;
-  const db   = n?.analysis?.db_match || {};
-  const isSeed = n?.type === 'seed' || db.tier === 'tier1';
-
-  let color, size, bw, bc;
-  if      (isSeed)         { color='#c8a96e'; size=36; bw=3; bc='#e8d5a3'; }
-  else if (st==='queued')  { color='rgba(240,236,228,.1)'; size=12; bw=1; bc='rgba(255,255,255,.08)'; }
-  else if (st==='running') { color='rgba(200,169,110,.3)'; size=20; bw=2; bc='#c8a96e'; }
-  else if (st==='error')   { color='rgba(192,57,43,.3)'; size=16; bw=1; bc='rgba(192,57,43,.5)'; }
-  else if (op !== null) {
-    if      (op>=7) { color='#c0392b'; size=24; bw=2; bc='#c0392b'; }
-    else if (op>=4) { color='#e87b4a'; size=20; bw=1; bc='#e87b4a'; }
-    else if (op>=2) { color='#c8a96e'; size=18; bw=1; bc='#c8a96e'; }
-    else            { color='#4ec994'; size=16; bw=1; bc='#4ec994'; }
-  } else            { color='rgba(240,236,228,.2)'; size=16; bw=1; bc='rgba(255,255,255,.12)'; }
-
-  return {
-    color, size, bw, bc,
-    lbl:   truncate(domain, 16),
-    status: st || 'queued',
-    dims:   dims,
-  };
-}
-
-function edgeStyle(type) {
-  if (type==='ssl_san')  return {w:1.5, ec:'rgba(126,184,228,.45)'};
-  if (type==='shared_ip') return {w:1.0, ec:'rgba(232,123,74,.35)'};
-  if (type==='content')  return {w:1.2, ec:'rgba(78,201,148,.35)'};
-  return {w:0.8, ec:'rgba(255,255,255,.10)'};
-}
-
-function updateNode(domain) {
-  if (!cy) return;
-  const ge = document.getElementById('graphEmpty');
-  if (ge) ge.style.display = 'none';
-  const v = nodeStyle(domain);
-  const existing = cy.$id(domain);
-  if (existing.length) { existing.data(v); }
-  else { cy.add({data:{id:domain,...v}}); }
-  // Add edges with both endpoints in graph
-  for (const e of edges) {
-    if (e.source!==domain && e.target!==domain) continue;
-    const eid = `${e.source}--${e.type}--${e.target}`;
-    if (cy.$id(eid).length) continue;
-    const other = e.source===domain ? e.target : e.source;
-    if (cy.$id(other).length) {
-      cy.add({data:{id:eid, source:e.source, target:e.target, ...edgeStyle(e.type)}});
+    return {
+        "primary":            primary or asn_cc or "?",
+        "signals":            signals,
+        "hosting_country":    asn_cc or "?",
+        "hosting_is_cdn":     is_cdn,
+        "registrant_country": signals.get("registrant", {}).get("value", "?"),
     }
-  }
-  if (Object.keys(nodes).length <= 4) cyLayout();
-  updateGraphStats();
-}
 
-function cyLayout() {
-  if (!cy || cy.nodes().length===0) return;
-  cy.layout({name:'cose',idealEdgeLength:100,nodeRepulsion:()=>500000,
-    gravity:60,numIter:500,animate:false,fit:true,padding:40}).run();
-}
-function cyFit() { cy?.fit(40); }
 
-function updateGraphStats() {
-  if (!cy) return;
-  document.getElementById('gNodeCount').textContent    = cy.nodes().length;
-  document.getElementById('gEdgeCount').textContent    = cy.edges().length;
-  document.getElementById('gAnalyzedCount').textContent =
-    Object.values(nodes).filter(n => n.status==='done').length;
-}
+# ── Five-dimension scoring ─────────────────────────────────────────────────────
 
-function updateCentrality() {
-  if (!cy) return;
-  const total = cy.nodes().length;
-  cy.nodes().forEach(n => {
-    const d = n.id();
-    const deg = n.connectedEdges().length;
-    const s = total>1 ? Math.min(10, Math.round((deg/(total-1))*10)) : 0;
-    if (nodes[d]?.analysis?.dimensions?.network_centrality) {
-      nodes[d].analysis.dimensions.network_centrality.score = s;
+def compute_dimensions(domain: str, db_match: dict, asn_info: dict,
+                        attribution: dict, whois: dict,
+                        ssl_san_overlap: list, reverse_ip_overlap: list,
+                        scrape: dict) -> dict:
+    """
+    Returns five independent scores (0–10) plus per-dimension breakdowns.
+    No single "threat score" — the analyst reads across dimensions.
+    """
+
+    def clamp(v, lo=0, hi=10):
+        return max(lo, min(hi, v))
+
+    # ── 1. INFRASTRUCTURE OPACITY (0=transparent, 10=fully hidden) ────────────
+    op_score  = 0
+    op_notes  = []
+
+    if whois.get("privacy_protected"):
+        op_score += 3
+        op_notes.append("WHOIS privacy protection active")
+    if not whois.get("registrant_org"):
+        op_score += 2
+        op_notes.append("No registrant org in WHOIS")
+    if not whois.get("registrant_country"):
+        op_score += 1
+        op_notes.append("No registrant country in WHOIS")
+
+    # Hosting opacity — CN/RU state ASN behind no CDN
+    asn = asn_info.get("asn", "")
+    org = asn_info.get("org", "").lower()
+    state_asns = {"AS37963","AS45090","AS55967","AS4134","AS4837",
+                  "AS58461","AS197695","AS8334"}
+    if asn in state_asns:
+        op_score += 2
+        op_notes.append(f"Hosted on state-affiliated ASN ({asn})")
+    elif attribution.get("hosting_is_cdn") is False and attribution.get("hosting_country") in ("CN","RU","IR","KP","BY"):
+        op_score += 1
+        op_notes.append("Hosted in restricted/sanctioned-media country")
+
+    # Batch-registration pattern (same registrar, 30-day window) — seeded from DB
+    if db_match.get("batch_flag"):
+        op_score += 2
+        op_notes.append("Domain registered in batch with other flagged domains (CL-174)")
+
+    # WPBakery with no other transparency signals (PAPERWALL pattern)
+    cms_names = [c["signal"] for c in scrape.get("cms", [])]
+    if "wpbakery" in cms_names:
+        op_score += 1
+        op_notes.append("WPBakery CMS (consistent with PAPERWALL template — CL-174)")
+
+    # SSL cert with no SAN variety (single domain cert = no cluster)
+    sans_count = len(scrape.get("ssl_sans_count", []))  # injected by caller if needed
+
+    # ── 2. OWNERSHIP TRANSPARENCY (0=fully disclosed, 10=completely hidden) ──
+    ow_score = 10  # start opaque, subtract for each transparency signal
+    ow_notes = []
+
+    if scrape.get("has_about_page"):
+        ow_score -= 2
+        ow_notes.append("About page present")
+    if scrape.get("has_contact_page"):
+        ow_score -= 1
+        ow_notes.append("Contact page present")
+    if scrape.get("has_named_authors") or scrape.get("has_bylines"):
+        ow_score -= 2
+        ow_notes.append(f"Named authors/bylines ({scrape.get('editorial_staff_count',0)} found)")
+    if scrape.get("has_legal_entity"):
+        ow_score -= 2
+        ow_notes.append("Legal entity disclosure detected")
+    if scrape.get("has_funding_disclosure"):
+        ow_score -= 2
+        ow_notes.append("Funding/ownership disclosure detected")
+    if db_match.get("tier") == "tier1":
+        # Known overt state media — fully disclosed by definition
+        ow_score  = 1
+        ow_notes  = ["Confirmed overt state media — ownership publicly disclosed"]
+
+    ow_score = clamp(ow_score)
+
+    # ── 3. CONTENT SOURCING (0=original reporting, 10=covert AI/state republication) ──
+    cs_score = 0
+    cs_notes = []
+    sourcing = scrape.get("content_sourcing", [])
+    types    = [s["type"] for s in sourcing]
+
+    if "original_reporting" in types:
+        cs_score -= 2
+        cs_notes.append("Original reporting signals detected")
+    if "attributed_republication" in types:
+        cs_score += 1
+        cs_notes.append("Attributed republication of external sources")
+    if "state_media_reference" in types:
+        cs_score += 2
+        cs_notes.append("State media content referenced without clear attribution")
+    if "press_release_heavy" in types:
+        cs_score += 2
+        cs_notes.append("High press release density — possible content laundering")
+    if "ai_generated_content" in types:
+        cs_score += 2
+        cs_notes.append("AI content generation detected")
+    if "yan_limeng_article" in types:
+        cs_score += 4
+        cs_notes.append("PAPERWALL verbatim attack article detected (CL-174)")
+    if len(scrape.get("state_media_links", [])) > 3:
+        cs_score += 1
+        cs_notes.append(f"{len(scrape['state_media_links'])} state media outbound links")
+
+    cs_score = clamp(cs_score)
+
+    # ── 4. NETWORK CENTRALITY (seeded at 0 — computed client-side as graph builds) ──
+    nc_score = 0
+    nc_notes = ["Centrality computed dynamically as investigation graph grows"]
+    # Seed hints for client
+    nc_hints = {
+        "ssl_san_count":        0,   # populated from ssl_sans
+        "reverse_ip_count":     0,   # populated from reverse_ip
+        "known_overlap_count":  len(ssl_san_overlap) + len(reverse_ip_overlap),
     }
-  });
-}
 
-// ══ DETAIL DRAWER ════════════════════════════════════════════════════════════
-function openDetail(domain) {
-  const node = nodes[domain];
-  if (!node?.analysis) return;
-  const data  = node.analysis;
-  const dims  = data.dimensions || {};
-  const attr  = data.attribution || {};
-  const whois = data.whois || {};
-  const asn   = data.asn_info || {};
-  const db    = data.db_match || {};
-  const cc    = attr.primary || '?';
+    # ── 5. STATE MEDIA PROXIMITY (0=no connection, 10=deeply embedded) ────────
+    sm_score = 0
+    sm_notes = []
+    state_links = scrape.get("state_media_links", [])
 
-  const DIMS = ['infrastructure_opacity','ownership_transparency','content_sourcing','network_centrality','state_media_proximity'];
-  const cards = DIMS.map(k => {
-    const d = dims[k] || {};
-    const s = d.score ?? 0;
-    const c = dimColor(k, s);
-    return `<div class="dd-dim-card">
-      <div class="ddc-name">${(d.dimension||k).replace(/_/g,' ')}</div>
-      <span class="ddc-score" style="color:${c}">${s}</span><span style="font-family:var(--mono);font-size:9px;color:var(--dim)">/10</span>
-      <div class="ddc-label">${esc(d.label||'')}</div>
-      <div class="ddc-bar"><div class="ddc-fill" style="width:${s*10}%;background:${c}"></div></div>
-      ${(d.notes||[]).map(n=>`<div class="ddc-note">${esc(n)}</div>`).join('')}
-    </div>`;
-  }).join('');
+    if state_links:
+        sm_score += min(len(state_links) * 2, 4)
+        names = [l["name"] for l in state_links[:4]]
+        sm_notes.append(f"Links to: {', '.join(names)}")
 
-  const dbBadge = db.tier
-    ? `<span style="font-family:var(--mono);font-size:9px;border:1px solid ${db.overt?'var(--gold)':'var(--orange)'};color:${db.overt?'var(--gold)':'var(--orange)'};padding:2px 8px;">${db.overt?'◈ Overt':'⚠ Covert'} — ${esc(db.name||'')} (${esc(db.source||'')})</span>`
-    : '';
+    if ssl_san_overlap:
+        sm_score += min(len(ssl_san_overlap) * 2, 4)
+        sm_notes.append(f"SSL cert shares domains with: {', '.join(ssl_san_overlap[:3])}")
 
-  document.getElementById('detailInner').innerHTML = `
-    <div class="dd-top">
-      <div><div class="dd-domain">${esc(domain)}</div><div style="margin-top:5px;">${dbBadge}</div></div>
-      <div class="dd-meta">
-        <div class="dd-meta-row"><span class="dd-lbl">Origin</span><span class="dd-val" style="color:var(--gold2)">${cc} ${countryFlag(cc)}</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">Registrant</span><span class="dd-val">${esc(attr.registrant_country||'?')} — ${esc(whois.registrant_org||'—')}</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">Hosting</span><span class="dd-val">${esc(attr.hosting_country||'?')}${attr.hosting_is_cdn?' <span style="color:var(--dim);font-size:9px">(CDN)</span>':''}</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">ASN</span><span class="dd-val">${esc(asn.org||'—')}</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">Registrar</span><span class="dd-val">${esc(whois.registrar||'—')}</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">Created</span><span class="dd-val">${esc(whois.created||'—')}</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">SSL SANs</span><span class="dd-val">${(data.ssl_sans||[]).length} · ${(data.ssl_san_overlap||[]).length} known</span></div>
-        <div class="dd-meta-row"><span class="dd-lbl">IP Neighbors</span><span class="dd-val">${(data.reverse_ip||[]).length} · ${(data.reverse_ip_overlap||[]).length} known</span></div>
-      </div>
-    </div>
-    <div class="dd-dims">${cards}</div>
-    <button class="dd-close" onclick="closeDetail()">Close ✕</button>`;
+    if reverse_ip_overlap:
+        sm_score += min(len(reverse_ip_overlap) * 2, 3)
+        sm_notes.append(f"Shares IP with: {', '.join(reverse_ip_overlap[:3])}")
 
-  const drawer = document.getElementById('detailDrawer');
-  drawer.classList.add('open');
-  drawer.scrollIntoView({behavior:'smooth',block:'start'});
-}
+    if db_match.get("tier") == "tier1":
+        sm_score  = 10
+        sm_notes  = [f"This IS a tier-1 state media outlet ({db_match.get('name','')})"]
+    elif db_match.get("tier") == "tier2":
+        sm_score  = max(sm_score, 7)
+        sm_notes.insert(0, f"Confirmed affiliate — {db_match.get('notes','')[:80]}")
 
-function closeDetail() {
-  document.getElementById('detailDrawer').classList.remove('open');
-}
+    sm_score = clamp(sm_score)
 
-// ══ EXPORTS ══════════════════════════════════════════════════════════════════
-function exportCSV() {
-  const done = Object.values(nodes).filter(n=>n.status==='done');
-  if (!done.length) return alert('No analyzed domains.');
-  const hdr = 'domain,origin,registrant_cc,hosting_cc,asn,opacity,ownership,content,centrality,state_prox,db_tier\n';
-  const rows = done.map(n => {
-    const d = n.analysis; const di = d?.dimensions||{}; const at = d?.attribution||{}; const db = d?.db_match||{}; const as = d?.asn_info||{};
-    const g = k => di[k]?.score??'';
-    return `"${n.id}","${at.primary||''}","${at.registrant_country||''}","${at.hosting_country||''}","${as.org||''}",${g('infrastructure_opacity')},${g('ownership_transparency')},${g('content_sourcing')},${g('network_centrality')},${g('state_media_proximity')},"${db.tier||''}"`;
-  }).join('\n');
-  dl(hdr+rows,'network-analyzer.csv','text/csv');
-}
+    # ── Assemble result ────────────────────────────────────────────────────────
+    return {
+        "infrastructure_opacity": {
+            "score": clamp(op_score), "max": 10,
+            "label": _opacity_label(op_score),
+            "notes": op_notes,
+            "dimension": "Infrastructure Opacity",
+            "description": "How hidden is the domain's ownership and hosting chain?",
+        },
+        "ownership_transparency": {
+            "score": clamp(ow_score), "max": 10,
+            "label": _transparency_label(ow_score),
+            "notes": ow_notes,
+            "dimension": "Ownership Transparency",
+            "description": "Does the site disclose who runs it, who funds it, and who writes for it?",
+        },
+        "content_sourcing": {
+            "score": cs_score, "max": 10,
+            "label": _sourcing_label(cs_score),
+            "notes": cs_notes,
+            "dimension": "Content Sourcing",
+            "description": "Is content original reporting, attributed republication, or covert laundering?",
+        },
+        "network_centrality": {
+            "score": nc_score, "max": 10,
+            "label": "Computed when graph is built",
+            "notes": nc_notes,
+            "hints": nc_hints,
+            "dimension": "Network Centrality",
+            "description": "How central is this domain in the network you are building?",
+        },
+        "state_media_proximity": {
+            "score": sm_score, "max": 10,
+            "label": _proximity_label(sm_score),
+            "notes": sm_notes,
+            "dimension": "State Media Proximity",
+            "description": "How closely is this domain connected to known state media outlets? (Neutral — applies to all countries.)",
+        },
+    }
 
-function exportGEXF() {
-  if (!cy) return;
-  let ns='',es='';
-  cy.nodes().forEach(n=>{const d=n.data();ns+=`<node id="${esc(d.id)}" label="${esc(d.lbl||d.id)}"/>\n`;});
-  cy.edges().forEach(e=>{const d=e.data();es+=`<edge source="${esc(d.source)}" target="${esc(d.target)}"/>\n`;});
-  dl(`<?xml version="1.0"?><gexf xmlns="http://gexf.net/1.3"><graph defaultedgetype="undirected"><nodes>${ns}</nodes><edges>${es}</edges></graph></gexf>`,'network.gexf','application/xml');
-}
 
-function exportJSON() {
-  dl(JSON.stringify({nodes:Object.values(nodes),edges},null,2),'network.json','application/json');
-}
+def _opacity_label(s):
+    if s >= 7: return "Highly opaque"
+    if s >= 4: return "Partially hidden"
+    if s >= 2: return "Some opacity"
+    return "Largely transparent"
 
-function dl(content,filename,mime) {
-  const a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([content],{type:mime}));
-  a.download=filename; a.click(); URL.revokeObjectURL(a.href);
-}
+def _transparency_label(s):
+    if s >= 8: return "No disclosure"
+    if s >= 5: return "Minimal disclosure"
+    if s >= 2: return "Partial disclosure"
+    return "Fully disclosed"
 
-// ══ STATE HELPERS ═════════════════════════════════════════════════════════════
-function setNode(domain, type, status, analysis) {
-  nodes[domain] = { id:domain, type:nodes[domain]?.type||type, status, analysis };
-}
-function addEdge(source, target, type) {
-  if (!edges.find(e=>(e.source===source&&e.target===target)||(e.source===target&&e.target===source)))
-    edges.push({source,target,type});
-}
-function removeNode(domain) {
-  delete nodes[domain];
-  edges = edges.filter(e=>e.source!==domain&&e.target!==domain);
-  cy?.$id(domain).remove();
-  renderQueue(); renderTable(); updateGraphStats(); updateBadge();
-}
-function clearSession() {
-  if (running) { showErr('Cancel the running analysis first.'); return; }
-  if (Object.keys(nodes).length && !confirm('Clear everything?')) return;
-  nodes = {}; edges = [];
-  if (cy) cy.elements().remove();
-  renderQueue(); renderTable(); closeDetail(); updateBadge();
-  const ge = document.getElementById('graphEmpty');
-  if (ge) ge.style.display = '';
-  document.getElementById('seedInput').value = '';
-  document.getElementById('gNodeCount').textContent = '0';
-  document.getElementById('gEdgeCount').textContent = '0';
-  document.getElementById('gAnalyzedCount').textContent = '0';
-  showHint('Cleared. Enter a new domain to start.');
-}
+def _sourcing_label(s):
+    if s >= 7: return "Covert republication"
+    if s >= 4: return "Mixed / aggregated"
+    if s >= 2: return "Attributed sourcing"
+    return "Original reporting"
 
-// ══ UTILS ════════════════════════════════════════════════════════════════════
-function cleanDomain(raw) {
-  raw=(raw||'').trim().toLowerCase();
-  if (!raw) return '';
-  if (!raw.startsWith('http')) raw='https://'+raw;
-  try { return new URL(raw).hostname.replace(/^www\./,''); }
-  catch { return raw.replace(/^www\./,'').split('/')[0]; }
-}
-function truncate(s,n){return s.length>n?s.slice(0,n-1)+'…':s;}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-function countryFlag(cc){if(!cc||cc.length!==2)return '';const pts=[...cc.toUpperCase()].map(c=>0x1F1E6+c.charCodeAt(0)-65);return String.fromCodePoint(...pts);}
-function dimColor(key,score){
-  if(score===null||score===undefined)return 'var(--dim)';
-  if(key==='state_media_proximity'||key==='network_centrality'){
-    return score>=7?'var(--gold2)':score>=4?'var(--gold)':'var(--muted)';
-  }
-  return score>=7?'var(--red)':score>=4?'var(--orange)':score>=2?'var(--gold)':'var(--green)';
-}
-function opColor(s){return s>=7?'var(--red)':s>=4?'var(--orange)':s>=2?'var(--gold)':'var(--green)';}
-function dimShort(k){const m={infrastructure_opacity:'Opacity',ownership_transparency:'Ownership',content_sourcing:'Content',network_centrality:'Centrality',state_media_proximity:'State Prox'};return m[k]||k;}
-function showErr(m){const b=document.getElementById('errBar');b.textContent=m;b.classList.add('on');}
-function clearErr(){document.getElementById('errBar').classList.remove('on');}
-function showHint(m){document.getElementById('seedHint').textContent=m;}
-function updateBadge(){
-  const total=Object.keys(nodes).length;
-  const done=Object.values(nodes).filter(n=>n.status==='done').length;
-  const q=Object.values(nodes).filter(n=>n.status==='queued').length;
-  document.getElementById('sessionCount').textContent=total===0?'0 domains':`${done} analyzed · ${q} queued`;
-}
-function setMode(m){
-  mode=m;
-  document.getElementById('mtBottom').classList.toggle('active',m==='bottom');
-  document.getElementById('mtTop').classList.toggle('active',m==='top');
-  document.getElementById('seedInput').placeholder=m==='bottom'
-    ?'Any domain — cgtn.com, bbc.com, suspicious-news.net…'
-    :'Enter root domain to expand from — cgtn.com, rt.com, timesnewswire.com…';
-}
-function toggleAbout(){
-  const b=document.getElementById('aboutBody');
-  const btn=document.getElementById('aboutToggleBtn');
-  const open=b.classList.toggle('open');
-  btn.textContent=open?'Close ▲':'About ▾';
-}
+def _proximity_label(s):
+    if s >= 8: return "State media node"
+    if s >= 5: return "Closely connected"
+    if s >= 2: return "Some proximity"
+    return "No significant proximity"
 
-// ══ INIT ════════════════════════════════════════════════════════════════════
-window.onerror = function(msg,src,line,col,err){
-  showHint('⚠ Error line '+line+': '+msg);
-  running=false;
-  document.body.classList.remove('is-running');
-  document.getElementById('seedBtn').disabled=false;
-  return false;
-};
 
-document.addEventListener('DOMContentLoaded', () => {
-  running = false;
-  document.body.classList.remove('is-running');
-  initCy();
+# ── Database lookup — nation-neutral ──────────────────────────────────────────
 
-  fetch(`${API}/network/ping`)
-    .then(r=>r.json())
-    .then(d=>{
-      if(d.status==='ok') showHint(`Backend live · ${d.state_media} state media outlets · ${d.covert_affiliates} known covert affiliates`);
+def check_database(domain: str) -> dict:
+    """
+    Check against state media registry (all countries, neutral).
+    Returns tier, nation, name, source.
+    """
+    registry = NET_DB.get("state_media_registry", {})
+
+    # Direct match
+    if domain in registry:
+        entry = registry[domain]
+        return {
+            "tier":   "tier1",
+            "nation": entry.get("country", "?"),
+            "name":   entry.get("name", domain),
+            "source": entry.get("source", "public-record"),
+            "notes":  f"Confirmed state media — {entry.get('category','overt')}",
+            "overt":  entry.get("overt", True),
+        }
+
+    # Subdomain match
+    for reg_domain, entry in registry.items():
+        if domain.endswith("." + reg_domain):
+            return {
+                "tier":   "tier1",
+                "nation": entry.get("country", "?"),
+                "name":   entry.get("name", domain),
+                "source": entry.get("source", "public-record"),
+                "notes":  f"Subdomain of confirmed state media {reg_domain}",
+                "overt":  entry.get("overt", True),
+            }
+
+    # Known covert affiliates
+    for aff in NET_DB.get("covert_affiliates", []):
+        if aff["domain"] == domain:
+            return {
+                "tier":   "tier2",
+                "nation": aff.get("nation", "?"),
+                "name":   aff.get("name", domain),
+                "source": aff.get("source", ""),
+                "notes":  aff.get("notes", ""),
+                "overt":  False,
+            }
+
+    return {"tier": None, "nation": None, "name": None, "source": None,
+            "notes": None, "overt": None}
+
+
+def find_san_overlap(sans: list) -> list:
+    registry = NET_DB.get("state_media_registry", {})
+    known    = set(registry.keys())
+    for aff in NET_DB.get("covert_affiliates", []):
+        known.add(aff["domain"])
+    return [s for s in sans if any(s == k or s.endswith("." + k) for k in known)]
+
+
+def find_rip_overlap(neighbors: list) -> list:
+    registry = NET_DB.get("state_media_registry", {})
+    known    = set(registry.keys())
+    return [n for n in neighbors if any(n == k or n.endswith("." + k) for k in known)]
+
+
+# ── Main pipeline ──────────────────────────────────────────────────────────────
+
+def analyze_domain(domain: str) -> dict:
+    domain = clean_domain(domain)
+    result = {
+        "domain":       domain,
+        "timestamp":    time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "db_match":     {},
+        "ip_info":      {},
+        "asn_info":     {},
+        "attribution":  {},
+        "whois":        {},
+        "ssl_sans":     [],
+        "ssl_san_overlap":    [],
+        "reverse_ip":         [],
+        "reverse_ip_overlap": [],
+        "scrape":       {},
+        "dimensions":   {},
+        "error":        None,
+    }
+
+    try:
+        # Step 1: DB check (instant) + parallel network calls
+        result["db_match"] = check_database(domain)
+        ip_res             = resolve_ip(domain)
+        result["ip_info"]  = ip_res
+        ip                 = ip_res.get("ip")
+
+        # Step 2: Run slow external calls in parallel (max 20s total)
+        with ThreadPoolExecutor(max_workers=4) as ex:
+            f_asn   = ex.submit(get_asn_info,    ip)    if ip   else None
+            f_whois = ex.submit(get_rdap_whois,  domain)
+            f_sans  = ex.submit(get_ssl_sans,    domain)
+            f_rip   = ex.submit(get_reverse_ip,  ip)    if ip   else None
+            f_scrape= ex.submit(scrape_page,     domain)
+
+            def safe_result(f, default):
+                if f is None: return default
+                try:   return f.result(timeout=18)
+                except Exception: return default
+
+            result["asn_info"]   = safe_result(f_asn,    {})
+            result["whois"]      = safe_result(f_whois,  {})
+            sans                 = safe_result(f_sans,   [])
+            rip                  = safe_result(f_rip,    [])
+            result["scrape"]     = safe_result(f_scrape, {})
+
+        result["ssl_sans"]           = sans
+        result["ssl_san_overlap"]    = find_san_overlap(sans)
+        result["reverse_ip"]         = rip
+        result["reverse_ip_overlap"] = find_rip_overlap(rip)
+        result["attribution"]        = derive_attribution(domain, result["whois"], result["asn_info"])
+
+        result["dimensions"] = compute_dimensions(
+            domain             = domain,
+            db_match           = result["db_match"],
+            asn_info           = result["asn_info"],
+            attribution        = result["attribution"],
+            whois              = result["whois"],
+            ssl_san_overlap    = result["ssl_san_overlap"],
+            reverse_ip_overlap = result["reverse_ip_overlap"],
+            scrape             = result["scrape"],
+        )
+
+    except Exception as e:
+        result["error"] = str(e)
+        logger.exception(f"analyze_domain({domain})")
+
+    return result
+
+
+def expand_from_seed(seed_domain: str) -> dict:
+    """
+    Analyze seed domain and collect infrastructure neighbors for graph expansion.
+    Returns graph-ready nodes and edges.
+    """
+    seed_domain = clean_domain(seed_domain)
+    seed_result = analyze_domain(seed_domain)
+
+    nodes = [{
+        "id":       seed_domain,
+        "type":     "seed",
+        "analysis": seed_result,
+    }]
+    edges = []
+
+    # SSL SAN neighbors → add as unanalyzed nodes
+    for san in seed_result.get("ssl_sans", [])[:30]:
+        if san == seed_domain:
+            continue
+        nodes.append({"id": san, "type": "ssl_san", "analysis": None})
+        edges.append({
+            "source": seed_domain, "target": san,
+            "type": "ssl_san", "label": "SSL SAN",
+        })
+
+    # Reverse IP neighbors
+    for n in seed_result.get("reverse_ip", [])[:20]:
+        if n == seed_domain or any(nd["id"] == n for nd in nodes):
+            continue
+        nodes.append({"id": n, "type": "shared_ip", "analysis": None})
+        edges.append({
+            "source": seed_domain, "target": n,
+            "type": "shared_ip", "label": "Shared IP",
+        })
+
+    return {
+        "seed":      seed_domain,
+        "nodes":     nodes,
+        "edges":     edges,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+
+# ── Flask routes ───────────────────────────────────────────────────────────────
+
+def _corsify(r):
+    from flask import Response
+    resp = Response(r)
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "POST, GET, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return resp
+
+
+@network_bp.route("/ping", methods=["GET"])
+def ping():
+    registry = NET_DB.get("state_media_registry", {})
+    return jsonify({
+        "status":          "ok",
+        "db_loaded":       bool(NET_DB),
+        "state_media":     len(registry),
+        "covert_affiliates": len(NET_DB.get("covert_affiliates", [])),
+        "countries_covered": len(set(v.get("country","") for v in registry.values())),
     })
-    .catch(()=>showHint('Backend offline — deploy network_analyzer.py to Render first.'));
-});
-</script>
-</body>
-</html>
+
+
+@network_bp.route("/analyze", methods=["POST","OPTIONS"])
+def analyze():
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+    data   = request.get_json(force=True, silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    if len(domain) > 253 or not re.match(r'^[a-zA-Z0-9._\-/:\[\]]+$', domain):
+        return jsonify({"error": "Invalid domain format"}), 400
+    result = analyze_domain(domain)
+    resp   = jsonify(result)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@network_bp.route("/expand", methods=["POST","OPTIONS"])
+def expand():
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+    data   = request.get_json(force=True, silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    result = expand_from_seed(domain)
+    resp   = jsonify(result)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
