@@ -407,6 +407,10 @@ h1 em{font-style:italic;color:var(--gold);}
   border:1px solid rgba(192,57,43,.18);padding:3px 10px;
   cursor:pointer;transition:all .15s;margin-left:4px;}
 .sb-clear:hover{color:var(--red);border-color:rgba(192,57,43,.45);}
+.seed-cancel-btn{background:rgba(192,57,43,.12)!important;
+  border-left:1px solid rgba(192,57,43,.25)!important;
+  color:rgba(192,57,43,.7)!important;letter-spacing:.14em;}
+.seed-cancel-btn:hover{background:rgba(192,57,43,.22)!important;color:var(--red)!important;}
 @media(max-width:860px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -480,6 +484,7 @@ h1 em{font-style:italic;color:var(--gold);}
     placeholder="Any domain — cgtn.com, bbc.com, that-sketchy-news-site.net…"
     onkeydown="if(event.key==='Enter')runSeed()">
   <button class="seed-btn" id="seedBtn" onclick="document.getElementById('seedHint').textContent='Click received…';runSeed()">Analyze →</button>
+  <button class="seed-btn seed-cancel-btn" id="cancelBtn" onclick="forceReset()" title="Cancel / reset if stuck" style="display:none;">✕ Cancel</button>
 </div>
 <div class="seed-hint" id="seedHint">Investigate: analyze one domain and manually expand. Expand: analyze seed then automatically run first 10 neighbors.</div>
 
@@ -677,8 +682,7 @@ function loadSession() {
   } catch(e) { /* no session */ }
 }
 
-// Auto-save every 60s
-setInterval(saveSession, 60000);
+// Auto-save started in DOMContentLoaded
 
 // ══════════════════════════════════════════════════════════════════════════════
 // ANALYSIS
@@ -1614,8 +1618,10 @@ let ghostCancelled     = false;
 let ghostProgressTimer = null;
 
 function setLoading(on, domain = '') {
-  const overlay = document.getElementById('graphLoading');
+  const overlay    = document.getElementById('graphLoading');
+  const cancelBtn  = document.getElementById('cancelBtn');
   document.getElementById('seedBtn').disabled = on;
+  if (cancelBtn) cancelBtn.style.display = on ? '' : 'none';
 
   if (on) {
     ghostCancelled = false;
@@ -1668,6 +1674,28 @@ function setLoading(on, domain = '') {
       document.getElementById(last)?.classList.replace('active','done');
     }, 350);
   }
+}
+
+
+// ── FORCE RESET — breaks out of any stuck state ───────────────────────────────
+function forceReset() {
+  isRunning      = false;
+  ghostCancelled = true;
+  clearInterval(ghostMsgInterval);
+  clearInterval(ghostProgressTimer);
+  document.getElementById('graphLoading').classList.remove('on');
+  document.getElementById('seedBtn').disabled   = false;
+  const cancelBtn = document.getElementById('cancelBtn');
+  if (cancelBtn) cancelBtn.style.display = 'none';
+  setQueueRunning(false);
+  // Reset any stuck running nodes
+  for (const node of Object.values(state.nodes)) {
+    if (node.status === 'running') node.status = 'queued';
+  }
+  renderQueue();
+  showHint('Reset complete — ready for a new analysis.');
+  const errBar = document.getElementById('errBar');
+  if (errBar) errBar.classList.remove('on');
 }
 
 function cancelLoading() {
@@ -1729,6 +1757,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   initCy();
   loadSession();
+  // Final hard reset — nothing from session should leave isRunning=true
+  isRunning      = false;
+  ghostCancelled = false;
+  document.getElementById('graphLoading').classList.remove('on');
+  document.getElementById('seedBtn').disabled = false;
+  // Auto-save every 60s — started here so DOM is guaranteed ready
+  setInterval(saveSession, 60000);
   // Ping backend
   fetch(`${API}/network/ping`)
     .then(r => r.json())
