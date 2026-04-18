@@ -1538,7 +1538,6 @@ function updateSessionBadge() {
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 // ── INPUT MODE TOGGLE ─────────────────────────────────────────────────────────
-let inputMode = 'bottom';
 function setInputMode(mode) {
   inputMode = mode;
   document.getElementById('mtBottom').classList.toggle('active', mode === 'bottom');
