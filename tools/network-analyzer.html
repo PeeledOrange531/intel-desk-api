@@ -484,7 +484,7 @@ h1 em{font-style:italic;color:var(--gold);}
     placeholder="Any domain — cgtn.com, bbc.com, that-sketchy-news-site.net…"
     onkeydown="if(event.key==='Enter')runSeed()">
   <button class="seed-btn" id="seedBtn" onclick="document.getElementById('seedHint').textContent='Click received…';runSeed()">Analyze →</button>
-  <button class="seed-btn seed-cancel-btn" id="cancelBtn" onclick="forceReset()" title="Cancel / reset if stuck" style="display:none;">✕ Cancel</button>
+  <button class="seed-btn seed-cancel-btn" id="cancelBtn" onclick="forceReset()">✕ Reset</button>
 </div>
 <div class="seed-hint" id="seedHint">Investigate: analyze one domain and manually expand. Expand: analyze seed then automatically run first 10 neighbors.</div>
 
@@ -587,7 +587,6 @@ h1 em{font-style:italic;color:var(--gold);}
         <button class="exp-btn" onclick="exportCSV()">CSV</button>
         <button class="exp-btn" onclick="exportGEXF()">GEXF</button>
         <button class="exp-btn" onclick="exportJSON()">JSON</button>
-        <button class="exp-btn" onclick="saveSession()">💾 Save</button>
       </div>
     </div>
     <div class="table-scroll" id="tableScroll">
@@ -651,35 +650,13 @@ let inputMode   = 'bottom';
 // SESSION PERSISTENCE
 // ══════════════════════════════════════════════════════════════════════════════
 function saveSession() {
-  try {
-    const snap = {
-      nodes: state.nodes,
-      edges: state.edges,
-      ts:    Date.now(),
-    };
-    localStorage.setItem(LS_KEY, JSON.stringify(snap));
-    showHint('Session saved to browser storage.');
-  } catch(e) { showErr('Could not save: ' + e.message); }
+  // Session persistence disabled — prevents stuck-state issues
 }
 
 function loadSession() {
-  try {
-    const raw = localStorage.getItem(LS_KEY);
-    if (!raw) return;
-    const snap = JSON.parse(raw);
-    state.nodes = snap.nodes || {};
-    state.edges = snap.edges || [];
-    // Reset any nodes stuck as 'running' from a previous crashed session
-    for (const node of Object.values(state.nodes)) {
-      if (node.status === 'running') node.status = 'queued';
-    }
-    isRunning = false; // always start fresh
-    rebuildGraphFromState();
-    renderQueue();
-    renderTable();
-    updateSessionBadge();
-    showHint('Previous session restored.');
-  } catch(e) { /* no session */ }
+  // Session persistence disabled — always starts fresh
+  // Clear any leftover localStorage to prevent stuck states
+  try { localStorage.removeItem(LS_KEY); } catch(e) {}
 }
 
 // Auto-save started in DOMContentLoaded
@@ -1619,9 +1596,7 @@ let ghostProgressTimer = null;
 
 function setLoading(on, domain = '') {
   const overlay    = document.getElementById('graphLoading');
-  const cancelBtn  = document.getElementById('cancelBtn');
   document.getElementById('seedBtn').disabled = on;
-  if (cancelBtn) cancelBtn.style.display = on ? '' : 'none';
 
   if (on) {
     ghostCancelled = false;
@@ -1685,8 +1660,6 @@ function forceReset() {
   clearInterval(ghostProgressTimer);
   document.getElementById('graphLoading').classList.remove('on');
   document.getElementById('seedBtn').disabled   = false;
-  const cancelBtn = document.getElementById('cancelBtn');
-  if (cancelBtn) cancelBtn.style.display = 'none';
   setQueueRunning(false);
   // Reset any stuck running nodes
   for (const node of Object.values(state.nodes)) {
@@ -1763,7 +1736,6 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('graphLoading').classList.remove('on');
   document.getElementById('seedBtn').disabled = false;
   // Auto-save every 60s — started here so DOM is guaranteed ready
-  setInterval(saveSession, 60000);
   // Ping backend
   fetch(`${API}/network/ping`)
     .then(r => r.json())
