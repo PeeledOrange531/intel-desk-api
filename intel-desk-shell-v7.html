@@ -1032,6 +1032,21 @@ const CATEGORIES = [
   },
 
   {
+    id: 'influence',
+    label: 'Influence Operations',
+    tools: [
+      {
+        id:'influence-tracer', icon:'🕸️', live:true,
+        name:'Influence Network Tracer',
+        desc:'CGTN affiliates · ASN · SSL · Content signals',
+        url:`${BASE}/influence-tracer.html`,
+        datasets: 4,
+        seo:`Trace state media affiliate networks using infrastructure forensics. Detects CGTN-linked and Kremlin-affiliated domains through shared hosting ASNs (Alibaba Cloud, Tencent Cloud), SSL certificate Subject Alternative Name overlap, analytics ID matching, WHOIS batch registration patterns, and content signals. Methodology sourced from Citizen Lab PAPERWALL report, Graphika Falsos Amigos, and DFRLab Pravda Network investigation. Outputs a confidence-scored verdict, force-directed network graph, signal breakdown with source citations, and domain table. Export as CSV, GEXF, or JSON.`,
+      },
+    ],
+  },
+
+  {
     id: 'identity',
     label: 'Identity & People',
     tools: [
@@ -1303,6 +1318,7 @@ function buildWelcome() {
     'identity':     '👤',
     'ip-domain':    '🔗',
     'image-forensics': '🔍',
+    'influence':       '🕸️',
   };
   document.getElementById('welcomeCats').innerHTML = CATEGORIES.map(function(cat) {
     const icon = CAT_ICONS[cat.id] || '◈';
