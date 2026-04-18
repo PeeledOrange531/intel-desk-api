@@ -142,16 +142,16 @@ h1 em{font-style:italic;color:var(--gold);}
   text-align:center;line-height:1.9;max-width:320px;}
 
 /* graph loading overlay */
-.graph-loading{position:absolute;inset:0;background:rgba(5,5,5,.82);
+.graph-loading{position:absolute;inset:0;background:rgba(5,5,5,.88);
   display:none;flex-direction:column;align-items:center;
-  justify-content:center;gap:12px;z-index:10;backdrop-filter:blur(3px);}
+  justify-content:center;gap:8px;z-index:10;backdrop-filter:blur(4px);}
 .graph-loading.on{display:flex;}
+/* keep old spinner/step classes for fallback */
 .gl-spinner{width:36px;height:36px;border:2px solid rgba(200,169,110,.15);
   border-top-color:var(--gold);border-radius:50%;
   animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
-.gl-label{font-family:var(--mono);font-size:11px;color:var(--muted);
-  letter-spacing:.08em;}
+.gl-label{font-family:var(--mono);font-size:11px;color:var(--muted);letter-spacing:.08em;}
 .gl-steps{display:flex;flex-direction:column;gap:4px;margin-top:4px;}
 .gl-step{font-family:var(--mono);font-size:10px;color:var(--dim);
   display:flex;align-items:center;gap:7px;transition:color .25s;}
@@ -161,95 +161,62 @@ h1 em{font-style:italic;color:var(--gold);}
 .gl-step.active{color:var(--gold);}
 .gl-step.active::before{content:'◉';}
 
-/* ── FULL-PAGE GHOST LOADING OVERLAY ── */
-.ghost-overlay{
-  position:fixed;inset:0;
-  background:rgba(5,5,5,.92);
-  backdrop-filter:blur(6px);
-  z-index:999;
-  display:none;
-  flex-direction:column;
-  align-items:center;
-  justify-content:center;
-  gap:0;
-}
-.ghost-overlay.on{display:flex;}
+/* ── GHOST (lives inside graph panel) ── */
+.ghost-domain-lbl{font-family:var(--mono);font-size:11px;font-weight:500;
+  color:var(--gold2);letter-spacing:.06em;margin-bottom:4px;}
 .ghost-stage{
-  width:340px;height:80px;
-  position:relative;margin-bottom:28px;
+  width:300px;height:64px;
+  position:relative;margin-bottom:8px;flex-shrink:0;
 }
 .ghost-runner{
-  position:absolute;
-  font-size:36px;
+  position:absolute;font-size:32px;
   top:50%;transform:translateY(-50%);
   animation:ghostRun 2.2s ease-in-out infinite;
-  filter:drop-shadow(0 0 12px rgba(200,169,110,.6));
-  will-change:left;
+  filter:drop-shadow(0 0 10px rgba(200,169,110,.55));
 }
 @keyframes ghostRun{
   0%  {left:0;   transform:translateY(-50%) scaleX(1);}
-  45% {left:calc(100% - 40px); transform:translateY(-50%) scaleX(1);}
-  50% {left:calc(100% - 40px); transform:translateY(-50%) scaleX(-1);}
+  45% {left:calc(100% - 36px);transform:translateY(-50%) scaleX(1);}
+  50% {left:calc(100% - 36px);transform:translateY(-50%) scaleX(-1);}
   95% {left:0;   transform:translateY(-50%) scaleX(-1);}
   100%{left:0;   transform:translateY(-50%) scaleX(1);}
 }
-/* little dots trailing the ghost */
 .ghost-dots{
-  position:absolute;bottom:8px;left:0;right:0;
-  display:flex;justify-content:center;gap:6px;
+  position:absolute;bottom:4px;left:0;right:0;
+  display:flex;justify-content:center;gap:5px;
 }
-.ghost-dot{
-  width:5px;height:5px;border-radius:50%;
-  background:rgba(200,169,110,.25);
-  animation:dotFade 2.2s ease-in-out infinite;
-}
+.ghost-dot{width:4px;height:4px;border-radius:50%;
+  background:rgba(200,169,110,.22);
+  animation:dotFade 2.2s ease-in-out infinite;}
 .ghost-dot:nth-child(1){animation-delay:0s;}
 .ghost-dot:nth-child(2){animation-delay:.15s;}
 .ghost-dot:nth-child(3){animation-delay:.30s;}
 .ghost-dot:nth-child(4){animation-delay:.45s;}
 .ghost-dot:nth-child(5){animation-delay:.60s;}
 @keyframes dotFade{0%,100%{opacity:.15;}50%{opacity:.7;}}
-
-.ghost-domain{
-  font-family:var(--mono);font-size:12px;font-weight:500;
-  color:var(--gold2);letter-spacing:.06em;
-  margin-bottom:8px;
-}
-.ghost-msg{
-  font-family:var(--serif);font-size:22px;font-weight:300;font-style:italic;
-  color:rgba(240,236,228,.65);
-  margin-bottom:20px;
-  text-align:center;
-  min-height:32px;
-  transition:opacity .4s ease;
-}
-.ghost-steps-wrap{display:flex;flex-direction:column;gap:5px;margin-bottom:20px;}
-.ghost-step{
-  font-family:var(--mono);font-size:10px;color:var(--dim);
-  display:flex;align-items:center;gap:8px;transition:color .25s;
-  letter-spacing:.06em;
-}
+.ghost-progress-bar{width:260px;height:2px;background:rgba(255,255,255,.06);
+  border-radius:2px;overflow:hidden;margin-bottom:6px;flex-shrink:0;}
+.ghost-progress-fill{height:100%;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));
+  width:0%;transition:width .6s ease;border-radius:2px;
+  box-shadow:0 0 8px rgba(200,169,110,.5);}
+.ghost-msg{font-family:var(--serif);font-size:18px;font-weight:300;
+  font-style:italic;color:rgba(240,236,228,.6);text-align:center;
+  min-height:26px;transition:opacity .4s ease;margin-bottom:8px;}
+.ghost-steps-wrap{display:flex;flex-direction:column;gap:4px;margin-bottom:8px;}
+.ghost-step{font-family:var(--mono);font-size:10px;color:var(--dim);
+  display:flex;align-items:center;gap:7px;transition:color .25s;
+  letter-spacing:.05em;}
 .ghost-step::before{content:'○';font-size:8px;flex-shrink:0;}
 .ghost-step.done{color:var(--green);}
 .ghost-step.done::before{content:'●';}
 .ghost-step.active{color:var(--gold);}
 .ghost-step.active::before{content:'◉';}
-.ghost-cancel{
-  font-family:var(--mono);font-size:9px;text-transform:uppercase;
-  letter-spacing:.14em;color:rgba(192,57,43,.5);
-  background:transparent;border:1px solid rgba(192,57,43,.22);
-  padding:6px 16px;cursor:pointer;transition:all .2s;margin-top:4px;
-}
+.ghost-cancel{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.14em;color:rgba(192,57,43,.45);background:transparent;
+  border:1px solid rgba(192,57,43,.20);padding:5px 14px;
+  cursor:pointer;transition:all .2s;}
 .ghost-cancel:hover{color:var(--red);border-color:rgba(192,57,43,.5);}
-.ghost-progress-bar{
-  width:280px;height:2px;background:rgba(255,255,255,.06);
-  border-radius:2px;overflow:hidden;margin-bottom:8px;
-}
-.ghost-progress-fill{
-  height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));
-  width:0%;transition:width .6s ease;border-radius:2px;
-  box-shadow:0 0 8px rgba(200,169,110,.5);
-}
 
 /* ── QUEUE + TABLE GRID ── */
 .lower-grid{display:grid;grid-template-columns:360px 1fr;gap:12px;margin-bottom:12px;}
@@ -426,11 +393,14 @@ h1 em{font-style:italic;color:var(--gold);}
 .mt-sub{font-size:9px;display:block;margin-top:3px;text-transform:none;
   letter-spacing:.02em;color:var(--dim);font-weight:400;}
 .mt-btn.active .mt-sub{color:rgba(200,169,110,.55);}
-/* actor dropdown */
-.actor-select{flex:1;background:var(--bg3);border:none;outline:none;
-  font-family:var(--mono);font-size:12px;color:var(--muted);
-  padding:0 16px;cursor:pointer;border-right:1px solid var(--border);}
-.actor-select option{background:var(--bg2);}
+.queue-status{padding:8px 14px;font-family:var(--mono);font-size:10px;
+  border-top:1px solid var(--border);flex-shrink:0;
+  display:flex;align-items:center;gap:8px;}
+.qs-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0;}
+.qs-text{flex:1;}
+.qa-run-next{color:var(--gold2);border-color:rgba(200,169,110,.25);}
+.qa-run-next:hover{color:var(--gold2);background:rgba(200,169,110,.08);}
+.qa-run-next:disabled{opacity:.3;cursor:not-allowed;}
 /* clear session button */
 .sb-clear{font-family:var(--mono);font-size:9px;text-transform:uppercase;
   letter-spacing:.12em;color:rgba(192,57,43,.45);background:transparent;
@@ -498,47 +468,20 @@ h1 em{font-style:italic;color:var(--gold);}
 <div class="mode-toggle">
   <button class="mt-btn active" id="mtBottom" onclick="setInputMode('bottom')">
     ↑ Investigate Domain
-    <span class="mt-sub">suspicious site → trace network</span>
+    <span class="mt-sub">enter any domain → trace its network outward</span>
   </button>
   <button class="mt-btn" id="mtTop" onclick="setInputMode('top')">
-    ↓ Map from State Actor
-    <span class="mt-sub">known outlet → find affiliates</span>
+    ↓ Expand from Known Node
+    <span class="mt-sub">enter any domain → auto-run first tier of neighbors</span>
   </button>
 </div>
 <div class="seed-row">
   <input class="seed-input" id="seedInput" type="text"
-    placeholder="Enter any domain — cgtn.com, bbc.com, suspicious-news.net…"
+    placeholder="Any domain — cgtn.com, bbc.com, that-sketchy-news-site.net…"
     onkeydown="if(event.key==='Enter')runSeed()">
-  <select class="actor-select" id="actorSelect" style="display:none;">
-    <option value="">— Select state actor —</option>
-    <optgroup label="Chinese State Media">
-      <option value="cgtn.com">CGTN (China)</option>
-      <option value="xinhuanet.com">Xinhua (China)</option>
-      <option value="globaltimes.cn">Global Times (China)</option>
-      <option value="chinadaily.com.cn">China Daily (China)</option>
-      <option value="timesnewswire.com">Times Newswire (PAPERWALL hub)</option>
-    </optgroup>
-    <optgroup label="Russian State Media">
-      <option value="rt.com">RT (Russia)</option>
-      <option value="tass.ru">TASS (Russia)</option>
-      <option value="sputniknews.com">Sputnik (Russia)</option>
-      <option value="news-pravda.com">Pravda Network (Russia)</option>
-    </optgroup>
-    <optgroup label="Western / Gulf State Media">
-      <option value="bbc.com">BBC (UK)</option>
-      <option value="voanews.com">Voice of America (US)</option>
-      <option value="france24.com">France 24 (France)</option>
-      <option value="dw.com">Deutsche Welle (Germany)</option>
-      <option value="aljazeera.com">Al Jazeera (Qatar)</option>
-    </optgroup>
-    <optgroup label="Other">
-      <option value="presstv.ir">Press TV (Iran)</option>
-      <option value="telesurtv.net">teleSUR (Venezuela)</option>
-    </optgroup>
-  </select>
   <button class="seed-btn" id="seedBtn" onclick="runSeed()">Analyze →</button>
 </div>
-<div class="seed-hint" id="seedHint">Enter a seed domain to begin mapping its network. Neighbors are auto-queued for expansion.</div>
+<div class="seed-hint" id="seedHint">Investigate: analyze one domain and manually expand. Expand: analyze seed then automatically run first 10 neighbors.</div>
 
 <!-- GRAPH -->
 <div class="graph-panel">
@@ -574,16 +517,28 @@ h1 em{font-style:italic;color:var(--gold);}
     <div class="gl"><div class="gl-line" style="background:var(--green);opacity:.4"></div>Content link</div>
   </div>
   <div class="graph-loading" id="graphLoading">
-    <div class="gl-spinner"></div>
-    <div class="gl-label" id="loadingLabel">Analyzing…</div>
-    <div class="gl-steps" id="loadingSteps">
-      <div class="gl-step" id="ls1">Resolving IP &amp; ASN</div>
-      <div class="gl-step" id="ls2">Harvesting SSL certificates</div>
-      <div class="gl-step" id="ls3">WHOIS / RDAP lookup</div>
-      <div class="gl-step" id="ls4">Reverse IP neighbors</div>
-      <div class="gl-step" id="ls5">Scraping content signals</div>
-      <div class="gl-step" id="ls6">Computing dimensions</div>
+    <div class="ghost-domain-lbl" id="ghostDomain"></div>
+    <div class="ghost-stage">
+      <div class="ghost-runner">👻</div>
+      <div class="ghost-dots">
+        <div class="ghost-dot"></div>
+        <div class="ghost-dot"></div>
+        <div class="ghost-dot"></div>
+        <div class="ghost-dot"></div>
+        <div class="ghost-dot"></div>
+      </div>
     </div>
+    <div class="ghost-progress-bar"><div class="ghost-progress-fill" id="ghostProgress"></div></div>
+    <div class="ghost-msg" id="ghostMsg">Great things come to those who wait…</div>
+    <div class="ghost-steps-wrap">
+      <div class="ghost-step" id="gs1">Resolving IP &amp; ASN</div>
+      <div class="ghost-step" id="gs2">Harvesting SSL certificates</div>
+      <div class="ghost-step" id="gs3">WHOIS / RDAP lookup</div>
+      <div class="ghost-step" id="gs4">Reverse IP neighbors</div>
+      <div class="ghost-step" id="gs5">Scraping content signals</div>
+      <div class="ghost-step" id="gs6">Computing five dimensions</div>
+    </div>
+    <button class="ghost-cancel" onclick="cancelLoading()">✕ Cancel</button>
   </div>
 </div>
 
@@ -603,13 +558,14 @@ h1 em{font-style:italic;color:var(--gold);}
     <div class="queue-scroll" id="queueScroll">
       <div class="queue-empty" id="queueEmpty">
         Neighbors auto-populate here as you analyze.<br>
-        <strong>Run All</strong> to expand the full network.
+        Use <strong>Run Next 10</strong> to expand the network in batches.
       </div>
     </div>
+    <div class="queue-status" id="queueStatus" style="display:none;"></div>
     <div class="queue-actions">
+      <button class="qa-action qa-run-next" id="qaRunNextBtn" onclick="qaRunNext()">▶ Run Next 10</button>
       <button class="qa-action" onclick="qaRunAll()">▶ Run All</button>
-      <button class="qa-action" onclick="qaRunPending()">▶ Pending</button>
-      <button class="qa-action danger" onclick="qaClear()">Clear</button>
+      <button class="qa-action danger" onclick="qaClear()">Clear Queue</button>
     </div>
   </div>
 
@@ -642,31 +598,6 @@ h1 em{font-style:italic;color:var(--gold);}
   <div class="dd-inner" id="detailInner"></div>
 </div>
 
-<!-- GHOST LOADING OVERLAY -->
-<div class="ghost-overlay" id="ghostOverlay">
-  <div class="ghost-domain" id="ghostDomain"></div>
-  <div class="ghost-stage">
-    <div class="ghost-runner" id="ghostRunner">👻</div>
-    <div class="ghost-dots">
-      <div class="ghost-dot"></div>
-      <div class="ghost-dot"></div>
-      <div class="ghost-dot"></div>
-      <div class="ghost-dot"></div>
-      <div class="ghost-dot"></div>
-    </div>
-  </div>
-  <div class="ghost-progress-bar"><div class="ghost-progress-fill" id="ghostProgress"></div></div>
-  <div class="ghost-msg" id="ghostMsg">Great things come to those who wait…</div>
-  <div class="ghost-steps-wrap">
-    <div class="ghost-step" id="gs1">Resolving IP &amp; ASN</div>
-    <div class="ghost-step" id="gs2">Harvesting SSL certificates</div>
-    <div class="ghost-step" id="gs3">WHOIS / RDAP lookup</div>
-    <div class="ghost-step" id="gs4">Reverse IP neighbors</div>
-    <div class="ghost-step" id="gs5">Scraping content signals</div>
-    <div class="ghost-step" id="gs6">Computing five dimensions</div>
-  </div>
-  <button class="ghost-cancel" onclick="cancelLoading()">✕ Cancel</button>
-</div>
 
 </div><!-- /page -->
 
@@ -687,13 +618,15 @@ const LS_KEY = 'inteldesk_network_v1';
 // STATE
 // ══════════════════════════════════════════════════════════════════════════════
 let state = {
-  nodes:    {},  // domain → {id, type, analysis, status}
-  edges:    [],  // [{source, target, type}]
+  nodes:    {},
+  edges:    [],
   filter:   'all',
   selected: null,
 };
-let cy = null;
+let cy          = null;
 let activeFilter = 'all';
+let isRunning   = false;  // global lock — prevents double-runs and UI freeze
+let inputMode   = 'bottom';
 
 // ══════════════════════════════════════════════════════════════════════════════
 // SESSION PERSISTENCE
@@ -735,19 +668,19 @@ async function analyzeDomain(domain, nodeType = 'queued') {
   domain = cleanDomain(domain);
   if (!domain) return;
 
-  // Already done
+  // Already done — just show detail
   if (state.nodes[domain]?.status === 'done') {
     openDetail(domain);
     return;
   }
 
-  // Mark running
+  // Lock — prevents double-tap freezes
+  isRunning = true;
+
   addOrUpdateNode(domain, nodeType, 'running', null);
   renderQueue();
   updateGraphNode(domain);
-
   setLoading(true, domain);
-  startLoadingSteps();
 
   try {
     const res = await fetch(`${API}/network/analyze`, {
@@ -760,19 +693,21 @@ async function analyzeDomain(domain, nodeType = 'queued') {
 
     addOrUpdateNode(domain, nodeType, 'done', data);
 
-    // Auto-queue neighbors
+    // Auto-queue SSL SAN neighbors
     for (const san of (data.ssl_sans || []).slice(0, 25)) {
       if (san !== domain) {
         addNeighborToQueue(san, 'ssl_san', domain);
         addEdge(domain, san, 'ssl_san');
       }
     }
+    // Auto-queue reverse IP neighbors
     for (const n of (data.reverse_ip || []).slice(0, 15)) {
       if (n !== domain && !state.nodes[n]) {
         addNeighborToQueue(n, 'shared_ip', domain);
         addEdge(domain, n, 'shared_ip');
       }
     }
+    // Content links
     for (const sl of (data.scrape?.state_media_links || [])) {
       addEdge(domain, sl.domain, 'content_link');
     }
@@ -783,7 +718,9 @@ async function analyzeDomain(domain, nodeType = 'queued') {
     renderTable();
     updateSessionBadge();
     openDetail(domain);
-    showHint(`${domain} analyzed — ${Object.keys(state.nodes).length} domains in graph.`);
+
+    const pending = Object.values(state.nodes).filter(n => n.status === 'queued').length;
+    showHint(`${domain} analyzed · ${Object.keys(state.nodes).length} in graph · ${pending} queued`);
 
   } catch(err) {
     addOrUpdateNode(domain, nodeType, 'error', null);
@@ -791,6 +728,7 @@ async function analyzeDomain(domain, nodeType = 'queued') {
     updateGraphNode(domain);
     renderQueue();
   } finally {
+    isRunning = false;
     setLoading(false);
   }
 }
@@ -1099,39 +1037,112 @@ function qaAddManual() {
   updateSessionBadge();
 }
 
-async function qaRunAll() {
+async function qaRunNext() {
+  if (isRunning) return;
   const pending = Object.values(state.nodes).filter(n => n.status === 'queued');
-  for (const node of pending) {
-    await analyzeDomain(node.id);
-    await sleep(350);
+  if (!pending.length) {
+    updateQueueStatus('complete');
+    return;
   }
+  const batch = pending.slice(0, 10);
+  setQueueRunning(true);
+  for (const node of batch) {
+    if (ghostCancelled) break;
+    await analyzeDomain(node.id);
+    await yieldFrame(); // let browser breathe between each domain
+  }
+  setQueueRunning(false);
+  updateQueueStatus(
+    Object.values(state.nodes).filter(n => n.status === 'queued').length === 0
+      ? 'complete'
+      : 'partial'
+  );
 }
 
-async function qaRunPending() {
-  const pending = Object.values(state.nodes)
-    .filter(n => n.status === 'queued')
-    .slice(0, 10); // cap at 10 per run
+async function qaRunAll() {
+  if (isRunning) return;
+  const pending = Object.values(state.nodes).filter(n => n.status === 'queued');
+  if (!pending.length) { updateQueueStatus('complete'); return; }
+  setQueueRunning(true);
   for (const node of pending) {
+    if (ghostCancelled) break;
     await analyzeDomain(node.id);
-    await sleep(350);
+    await yieldFrame();
   }
+  setQueueRunning(false);
+  updateQueueStatus('complete');
 }
+
+// Legacy alias kept for internal calls
+async function qaRunPending() { await qaRunNext(); }
 
 function qaClear() {
-  if (!confirm('Clear all queued (unanalyzed) domains?')) return;
+  if (isRunning) { showErr('Please wait for the current analysis to finish or cancel it first.'); return; }
   for (const [d, n] of Object.entries(state.nodes)) {
     if (n.status === 'queued') delete state.nodes[d];
   }
+  updateQueueStatus('cleared');
   renderQueue();
   updateSessionBadge();
+}
+
+function setQueueRunning(on) {
+  const btn = document.getElementById('qaRunNextBtn');
+  if (btn) btn.disabled = on;
+  const runAllBtns = document.querySelectorAll('.qa-action:not(.danger):not(.qa-run-next)');
+  runAllBtns.forEach(b => b.disabled = on);
+}
+
+function updateQueueStatus(state_) {
+  const el  = document.getElementById('queueStatus');
+  if (!el) return;
+  const pending = Object.values(state.nodes).filter(n => n.status === 'queued').length;
+  const done    = Object.values(state.nodes).filter(n => n.status === 'done').length;
+  const errors  = Object.values(state.nodes).filter(n => n.status === 'error').length;
+
+  if (state_ === 'complete' && pending === 0) {
+    el.style.display = '';
+    el.innerHTML = `
+      <div class="qs-dot" style="background:var(--green)"></div>
+      <span class="qs-text" style="color:var(--green)">Queue complete — no more pending domains.</span>
+      <span style="font-family:var(--mono);font-size:9px;color:var(--dim)">${done} done${errors ? ` · ${errors} errors` : ''}</span>`;
+  } else if (state_ === 'partial') {
+    el.style.display = '';
+    el.innerHTML = `
+      <div class="qs-dot" style="background:var(--gold)"></div>
+      <span class="qs-text" style="color:var(--muted)">Batch done — <strong style="color:var(--gold)">${pending} more queued</strong>. Run next 10 to continue.</span>`;
+  } else if (state_ === 'cleared') {
+    el.style.display = '';
+    el.innerHTML = `
+      <div class="qs-dot" style="background:var(--dim)"></div>
+      <span class="qs-text" style="color:var(--dim)">Queue cleared.</span>`;
+  } else {
+    el.style.display = 'none';
+  }
+}
+
+// Yield control back to browser between heavy async ops — fixes UI freeze
+function yieldFrame() {
+  return new Promise(resolve => requestAnimationFrame(() => setTimeout(resolve, 50)));
 }
 
 function renderQueue() {
   const scroll = document.getElementById('queueScroll');
   const empty  = document.getElementById('queueEmpty');
   const items  = Object.values(state.nodes);
+  const pending = items.filter(n => n.status === 'queued').length;
 
   empty.style.display = items.length ? 'none' : '';
+
+  // Update run-next button label with count
+  const btn = document.getElementById('qaRunNextBtn');
+  if (btn) {
+    const next = Math.min(pending, 10);
+    btn.textContent = pending > 0
+      ? `▶ Run Next ${next} (${pending} queued)`
+      : '▶ Run Next 10';
+    btn.disabled = isRunning || pending === 0;
+  }
 
   const html = items.map(node => {
     const statusCls = node.status;
@@ -1143,15 +1154,15 @@ function renderQueue() {
       ${scoreStr ? `<span style="font-family:var(--mono);font-size:9px;color:${opColor(op)}">${scoreStr}</span>` : ''}
       <span class="qi-status ${statusCls}">${statusCls}</span>
       ${node.status === 'queued'
-        ? `<button class="qi-run" onclick="analyzeDomain('${esc(node.id)}')" title="Run">▶</button>`
+        ? `<button class="qi-run" onclick="analyzeDomain('${esc(node.id)}')" title="Run this domain">▶</button>`
         : node.status === 'done'
-        ? `<button class="qi-run" onclick="openDetail('${esc(node.id)}')" title="View">⬡</button>`
+        ? `<button class="qi-run" onclick="openDetail('${esc(node.id)}')" title="View detail">⬡</button>`
         : ''}
       <button class="qi-remove" onclick="removeNode('${esc(node.id)}')" title="Remove">✕</button>
     </div>`;
   }).join('');
 
-  scroll.innerHTML = (items.length ? '' : '') + html;
+  scroll.innerHTML = html;
 }
 
 function removeNode(domain) {
@@ -1509,8 +1520,12 @@ function showHint(msg) {
   document.getElementById('seedHint').textContent = msg;
 }
 function updateSessionBadge() {
-  const n = Object.keys(state.nodes).length;
-  document.getElementById('sessionCount').textContent = `${n} domain${n!==1?'s':''}`;
+  const total   = Object.keys(state.nodes).length;
+  const done    = Object.values(state.nodes).filter(n => n.status === 'done').length;
+  const pending = Object.values(state.nodes).filter(n => n.status === 'queued').length;
+  document.getElementById('sessionCount').textContent =
+    total === 0 ? '0 domains'
+    : `${done} analyzed · ${pending} queued`;
 }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
@@ -1521,39 +1536,39 @@ function setInputMode(mode) {
   document.getElementById('mtBottom').classList.toggle('active', mode === 'bottom');
   document.getElementById('mtTop').classList.toggle('active', mode === 'top');
   const inp = document.getElementById('seedInput');
-  const sel = document.getElementById('actorSelect');
   if (mode === 'bottom') {
-    inp.style.display = ''; sel.style.display = 'none';
+    inp.placeholder = 'Any domain — cgtn.com, bbc.com, that-sketchy-news-site.net…';
     document.getElementById('seedHint').textContent =
-      'Enter any domain to investigate its infrastructure and map its network outward.';
+      'Investigate: analyze one domain, then manually decide which neighbors to expand.';
   } else {
-    inp.style.display = 'none'; sel.style.display = '';
+    inp.placeholder = 'Enter any domain to use as expansion root…';
     document.getElementById('seedHint').textContent =
-      'Select a known state media outlet to map its affiliate network via shared infrastructure.';
+      'Expand: analyze seed domain then automatically run the first 10 neighbors to map the network outward.';
   }
 }
 
 // ── CLEAR SESSION ─────────────────────────────────────────────────────────────
 function clearSession() {
+  if (isRunning) { showErr('Analysis in progress — cancel it first before clearing.'); return; }
   if (Object.keys(state.nodes).length > 0) {
     if (!confirm('Clear everything and start a fresh investigation?')) return;
   }
   state.nodes = {};
   state.edges = [];
   state.selected = null;
+  ghostCancelled = true;
   if (cy) { cy.elements().remove(); }
   renderQueue();
   renderTable();
   closeDetail();
   updateSessionBadge();
+  updateQueueStatus(null);
   document.getElementById('graphEmpty').style.display = '';
   document.getElementById('seedInput').value = '';
-  document.getElementById('actorSelect').value = '';
   localStorage.removeItem(LS_KEY);
   showHint('Session cleared. Enter a new domain to start fresh.');
-  // Reset graph stats
-  document.getElementById('gNodeCount').textContent    = '0';
-  document.getElementById('gEdgeCount').textContent    = '0';
+  document.getElementById('gNodeCount').textContent     = '0';
+  document.getElementById('gEdgeCount').textContent     = '0';
   document.getElementById('gAnalyzedCount').textContent = '0';
 }
 
@@ -1577,18 +1592,18 @@ let ghostCancelled     = false;
 let ghostProgressTimer = null;
 
 function setLoading(on, domain = '') {
-  const overlay = document.getElementById('ghostOverlay');
+  const overlay = document.getElementById('graphLoading');
   document.getElementById('seedBtn').disabled = on;
 
   if (on) {
     ghostCancelled = false;
     overlay.classList.add('on');
 
-    // Domain label
+    // Domain label inside panel
     document.getElementById('ghostDomain').textContent =
-      domain ? `Analyzing: ${truncate(domain, 40)}` : 'Analyzing…';
+      domain ? `Analyzing: ${truncate(domain, 36)}` : 'Analyzing…';
 
-    // Rotate messages every 3.5s
+    // Rotate witty messages every 3.5s
     let msgIdx = 0;
     document.getElementById('ghostMsg').textContent = GHOST_MESSAGES[0];
     ghostMsgInterval = setInterval(() => {
@@ -1601,11 +1616,11 @@ function setLoading(on, domain = '') {
       }, 400);
     }, 3500);
 
-    // Progress bar — creeps to 90% over ~45s, never reaches 100 until done
+    // Progress bar creeps to 90%, never hits 100 until done
     let progress = 0;
     document.getElementById('ghostProgress').style.width = '0%';
     ghostProgressTimer = setInterval(() => {
-      progress = Math.min(progress + (Math.random() * 3), 90);
+      progress = Math.min(progress + (Math.random() * 3.5), 90);
       document.getElementById('ghostProgress').style.width = progress + '%';
     }, 800);
 
@@ -1622,13 +1637,11 @@ function setLoading(on, domain = '') {
     });
 
   } else {
-    // Flash to 100% then hide
     clearInterval(ghostMsgInterval);
     clearInterval(ghostProgressTimer);
     document.getElementById('ghostProgress').style.width = '100%';
     setTimeout(() => {
       overlay.classList.remove('on');
-      // Mark last step done
       const last = GHOST_STEP_IDS[GHOST_STEP_IDS.length - 1];
       document.getElementById(last)?.classList.replace('active','done');
     }, 350);
@@ -1637,11 +1650,18 @@ function setLoading(on, domain = '') {
 
 function cancelLoading() {
   ghostCancelled = true;
+  isRunning      = false;  // release lock so buttons work again
   clearInterval(ghostMsgInterval);
   clearInterval(ghostProgressTimer);
-  document.getElementById('ghostOverlay').classList.remove('on');
+  document.getElementById('graphLoading').classList.remove('on');
   document.getElementById('seedBtn').disabled = false;
-  showHint('Analysis cancelled. Enter a domain to try again.');
+  setQueueRunning(false);
+  // Reset any stuck 'running' nodes back to 'queued' so they can be retried
+  for (const node of Object.values(state.nodes)) {
+    if (node.status === 'running') node.status = 'queued';
+  }
+  renderQueue();
+  showHint('Cancelled. Domains reset to queued — you can retry them.');
 }
 
 // Keep old step IDs working (graph panel still uses them as backup)
@@ -1649,15 +1669,23 @@ function startLoadingSteps() { /* handled by ghost overlay now */ }
 
 // ── SEED INPUT ────────────────────────────────────────────────────────────────
 async function runSeed() {
-  const domain = inputMode === 'bottom'
-    ? cleanDomain(document.getElementById('seedInput').value)
-    : cleanDomain(document.getElementById('actorSelect').value);
-  if (!domain) {
-    showErr(inputMode === 'bottom' ? 'Enter a domain first.' : 'Select a state actor first.');
-    return;
-  }
+  if (isRunning) { showErr('Analysis in progress — wait or cancel first.'); return; }
+  const domain = cleanDomain(document.getElementById('seedInput').value);
+  if (!domain) { showErr('Enter a domain first.'); return; }
   clearErr();
   await analyzeDomain(domain, 'seed');
+
+  // Top-down mode: automatically kick off first batch of neighbors
+  if (inputMode === 'top') {
+    const pending = Object.values(state.nodes).filter(n => n.status === 'queued');
+    if (pending.length > 0) {
+      showHint(`Seed done. Auto-running first ${Math.min(10, pending.length)} neighbors…`);
+      await yieldFrame();
+      await qaRunNext();
+    } else {
+      updateQueueStatus('complete');
+    }
+  }
 }
 
 // About toggle
