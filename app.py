@@ -10,7 +10,7 @@ from functools import wraps
 from flask import Flask, Response, request, jsonify
 from flask_cors import CORS
 import requests
-rom network_analyzer import network_bp
+from network_analyzer import network_bp
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
