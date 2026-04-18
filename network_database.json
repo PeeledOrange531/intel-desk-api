@@ -1,0 +1,107 @@
+{
+  "_meta": {
+    "version": "2.0",
+    "last_updated": "2026-04-18",
+    "philosophy": "Nation-neutral. Every state media outlet from every country is listed equally. High state_media_proximity score is descriptive, not accusatory. The tool maps networks — analysts interpret.",
+    "sources": {
+      "CL-174":     "Citizen Lab Report No. 174 — PAPERWALL (Feb 2024)",
+      "GRAPHIKA-FA":"Graphika — Falsos Amigos (Aug 2025)",
+      "DFRLAB-PV":  "DFRLab/CheckFirst — Pravda Network (Feb 2025)",
+      "VIGINUM-PK": "VIGINUM — Portal Kombat (Feb 2024)",
+      "PR":         "Public record — outlet publicly identifies as state-funded"
+    }
+  },
+
+  "state_media_registry": {
+
+    "cgtn.com":            {"name":"CGTN",               "country":"CN","category":"state_broadcast","overt":true,"source":"PR"},
+    "xinhuanet.com":       {"name":"Xinhua",              "country":"CN","category":"state_newswire", "overt":true,"source":"PR"},
+    "globaltimes.cn":      {"name":"Global Times",        "country":"CN","category":"state_print",    "overt":true,"source":"PR"},
+    "chinadaily.com.cn":   {"name":"China Daily",         "country":"CN","category":"state_print",    "overt":true,"source":"PR"},
+    "people.com.cn":       {"name":"People's Daily",      "country":"CN","category":"state_print",    "overt":true,"source":"PR"},
+    "cri.cn":              {"name":"China Radio Intl",    "country":"CN","category":"state_broadcast","overt":true,"source":"PR"},
+
+    "rt.com":              {"name":"RT",                  "country":"RU","category":"state_broadcast","overt":true,"source":"PR"},
+    "tass.ru":             {"name":"TASS",                "country":"RU","category":"state_newswire", "overt":true,"source":"PR"},
+    "sputniknews.com":     {"name":"Sputnik",             "country":"RU","category":"state_broadcast","overt":true,"source":"PR"},
+    "ria.ru":              {"name":"RIA Novosti",         "country":"RU","category":"state_newswire", "overt":true,"source":"PR"},
+    "lenta.ru":            {"name":"Lenta.ru",            "country":"RU","category":"state_aligned",  "overt":true,"source":"PR"},
+    "iz.ru":               {"name":"Izvestia",            "country":"RU","category":"state_aligned",  "overt":true,"source":"PR"},
+
+    "bbc.com":             {"name":"BBC",                 "country":"GB","category":"public_broadcaster","overt":true,"source":"PR"},
+    "bbc.co.uk":           {"name":"BBC",                 "country":"GB","category":"public_broadcaster","overt":true,"source":"PR"},
+
+    "voanews.com":         {"name":"Voice of America",   "country":"US","category":"state_broadcast","overt":true,"source":"PR"},
+    "rferl.org":           {"name":"Radio Free Europe",  "country":"US","category":"state_broadcast","overt":true,"source":"PR"},
+    "apnews.com":          {"name":"AP News",            "country":"US","category":"wire_service",    "overt":true,"source":"PR"},
+
+    "france24.com":        {"name":"France 24",          "country":"FR","category":"state_broadcast","overt":true,"source":"PR"},
+    "rfi.fr":              {"name":"RFI",                "country":"FR","category":"state_broadcast","overt":true,"source":"PR"},
+
+    "dw.com":              {"name":"Deutsche Welle",     "country":"DE","category":"public_broadcaster","overt":true,"source":"PR"},
+
+    "aljazeera.com":       {"name":"Al Jazeera",         "country":"QA","category":"state_broadcast","overt":true,"source":"PR"},
+
+    "presstv.ir":          {"name":"Press TV",           "country":"IR","category":"state_broadcast","overt":true,"source":"PR"},
+    "irna.ir":             {"name":"IRNA",               "country":"IR","category":"state_newswire", "overt":true,"source":"PR"},
+
+    "kcna.kp":             {"name":"KCNA",               "country":"KP","category":"state_newswire", "overt":true,"source":"PR"},
+    "rodong.rep.kp":       {"name":"Rodong Sinmun",      "country":"KP","category":"state_print",    "overt":true,"source":"PR"},
+
+    "venezolanadetv.gob.ve":{"name":"VTV Venezuela",    "country":"VE","category":"state_broadcast","overt":true,"source":"PR"},
+    "telesurtv.net":       {"name":"teleSUR",            "country":"VE","category":"state_broadcast","overt":true,"source":"PR"},
+
+    "timesnewswire.com":   {"name":"Times Newswire",     "country":"CN","category":"covert_hub",     "overt":false,"source":"CL-174",
+                            "notes":"Central content hub for PAPERWALL. Backlinked by 98/123 domains. Linked to HaiEnergy op."},
+
+    "news-pravda.com":     {"name":"Pravda Network hub", "country":"RU","category":"covert_hub",     "overt":false,"source":"DFRLAB-PV",
+                            "notes":"Central domain for Pravda/Portal Kombat network. 140+ subdomains targeting 83+ countries."}
+  },
+
+  "covert_affiliates": [
+    {"domain":"wdpp.org",           "nation":"CN","name":"World Development Press",
+     "source":"CL-174","notes":"Key attribution pivot. Shared Tencent IP with 16 PAPERWALL domains."},
+    {"domain":"updatenews.info",    "nation":"CN","name":"Update News",
+     "source":"CL-174","notes":"First registered PAPERWALL domain (July 2019). Targeted US audiences."},
+    {"domain":"cappadociapost.com", "nation":"CN","name":"Cappadocia Post",
+     "source":"CL-174","notes":"PAPERWALL — Turkey-targeted fake local news."},
+    {"domain":"seoulpr.com",        "nation":"CN","name":"Seoul PR",
+     "source":"CL-174","notes":"PAPERWALL — South Korea-targeted."},
+    {"domain":"daegujournal.com",   "nation":"CN","name":"Daegu Journal",
+     "source":"CL-174","notes":"PAPERWALL — South Korea-targeted."},
+    {"domain":"nikkonews.com",      "nation":"CN","name":"Nikko News",
+     "source":"CL-174","notes":"PAPERWALL — Japan-targeted."},
+    {"domain":"fujiyamatimes.com",  "nation":"CN","name":"Fujiyama Times",
+     "source":"CL-174","notes":"PAPERWALL — Japan-targeted."},
+    {"domain":"financieropost.com", "nation":"CN","name":"Financiero Post",
+     "source":"CL-174","notes":"PAPERWALL — Brazil-targeted."},
+    {"domain":"boicpost.com",       "nation":"CN","name":"Boic Post",
+     "source":"CL-174","notes":"PAPERWALL — Belgium-targeted (Dutch-language)."},
+    {"domain":"gauljournal.com",    "nation":"CN","name":"Gaul Journal",
+     "source":"CL-174","notes":"PAPERWALL — Luxembourg-targeted."}
+  ],
+
+  "hosting_asns": {
+    "covert_cn": [
+      {"asn":"AS37963","name":"Alibaba Cloud","notes":"All 11 Falsos Amigos domains — GRAPHIKA-FA"},
+      {"asn":"AS45090","name":"Tencent Cloud","notes":"PAPERWALL Italian domains — CL-174"},
+      {"asn":"AS55967","name":"Baidu Cloud",  "notes":"Chinese state-linked cloud"},
+      {"asn":"AS4134", "name":"ChinaNet",     "notes":"China Telecom state-owned"},
+      {"asn":"AS4837", "name":"China Unicom", "notes":"State-owned"}
+    ],
+    "covert_ru": [
+      {"asn":"AS197695","name":"Reg.ru/TigerWeb","notes":"TigerWeb = Pravda operator — DFRLAB-PV"},
+      {"asn":"AS8334",  "name":"MAROSNET",       "notes":"Russian hosting flagged in Pravda investigation"}
+    ]
+  },
+
+  "batch_registration_windows": {
+    "_notes": "Domains registered within tight windows — from CL-174 appendix and published reports",
+    "source": "CL-174",
+    "windows": [
+      {"date":"2020-07","domains":["nikkonews.com","fujiyamatimes.com"],"target":"Japan"},
+      {"date":"2021-03","domains":["seoulpr.com","daegujournal.com"],   "target":"South Korea"},
+      {"date":"2024-12","domains":["boicpost.com","gauljournal.com"],   "target":"Belgium/Luxembourg"}
+    ]
+  }
+}
