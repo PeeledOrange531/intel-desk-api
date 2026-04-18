@@ -199,7 +199,47 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:
   .graph-panel{grid-row:3;}
   .table-panel{grid-row:4;}
   .page{padding:16px;}
+  .ws-add-input{width:140px;}
 }
+/* ── INVESTIGATION WORKSPACE ── */
+.workspace-panel{margin-top:12px;background:var(--bg2);border:1px solid var(--border);border-top:2px solid rgba(200,169,110,0.35);}
+.ws-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--bg3);gap:12px;flex-wrap:wrap;}
+.ws-header-left{display:flex;align-items:center;gap:12px;}
+.ws-header-right{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.ws-count{font-family:var(--mono);font-size:10px;color:var(--gold);padding:2px 8px;border:1px solid rgba(200,169,110,0.25);background:rgba(200,169,110,0.06);}
+.ws-add-input{background:var(--bg);border:1px solid var(--border);outline:none;font-family:var(--mono);font-size:11px;color:var(--text);padding:6px 10px;width:200px;transition:border-color .2s;}
+.ws-add-input:focus{border-color:rgba(200,169,110,0.40);}
+.ws-add-input::placeholder{color:var(--dim);}
+.ws-add-btn{background:rgba(200,169,110,0.15);border:1px solid rgba(200,169,110,0.30);color:var(--gold);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;padding:6px 12px;cursor:pointer;transition:all .15s;}
+.ws-add-btn:hover{background:rgba(200,169,110,0.25);}
+.ws-btn{background:transparent;border:1px solid var(--border);color:var(--muted);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.12em;padding:6px 12px;cursor:pointer;transition:all .15s;}
+.ws-btn:hover{color:var(--text);border-color:var(--border-hi);}
+.ws-btn-clear{color:rgba(192,57,43,0.6);}
+.ws-btn-clear:hover{color:var(--red);border-color:rgba(192,57,43,0.35);}
+.ws-body{padding:14px 16px;}
+.ws-empty{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;padding:20px;line-height:1.8;}
+.ws-empty strong{color:var(--muted);}
+.ws-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.ws-chip{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;background:var(--bg3);border:1px solid var(--border);font-family:var(--mono);font-size:11px;cursor:default;transition:border-color .15s;position:relative;}
+.ws-chip:hover{border-color:var(--border-hi);}
+.ws-chip.queued{border-color:rgba(200,169,110,0.20);}
+.ws-chip.running{border-color:rgba(200,169,110,0.50);animation:chipPulse 1s ease-in-out infinite;}
+.ws-chip.done-high{border-color:rgba(192,57,43,0.45);}
+.ws-chip.done-medium{border-color:rgba(232,123,74,0.45);}
+.ws-chip.done-low{border-color:rgba(200,169,110,0.25);}
+.ws-chip.done-clean{border-color:rgba(78,201,148,0.30);}
+@keyframes chipPulse{0%,100%{opacity:1;}50%{opacity:0.6;}}
+.wsc-domain{color:var(--muted);max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.wsc-score{font-size:10px;font-weight:500;padding:1px 5px;font-family:var(--mono);}
+.wsc-country{font-size:11px;}
+.wsc-status{font-size:9px;color:var(--dim);text-transform:uppercase;letter-spacing:0.10em;}
+.wsc-actions{display:flex;gap:4px;}
+.wsc-btn{background:transparent;border:none;color:var(--dim);font-size:11px;cursor:pointer;padding:0 2px;transition:color .15s;line-height:1;}
+.wsc-btn:hover{color:var(--gold);}
+.wsc-remove{color:rgba(192,57,43,0.4);}
+.wsc-remove:hover{color:var(--red)!important;}
+.add-to-ws-btn{display:inline-flex;align-items:center;gap:5px;font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.12em;color:rgba(200,169,110,0.55);background:transparent;border:1px solid rgba(200,169,110,0.20);padding:3px 8px;cursor:pointer;transition:all .15s;margin-top:8px;}
+.add-to-ws-btn:hover{color:var(--gold);border-color:rgba(200,169,110,0.50);background:rgba(200,169,110,0.06);}
 </style>
 </head>
 <body>
@@ -384,6 +424,32 @@ html,body{background:var(--bg);color:var(--text);font-family:var(--sans);height:
     </div>
 
   </div><!-- /main-grid -->
+
+  <!-- INVESTIGATION WORKSPACE -->
+  <div class="workspace-panel" id="workspacePanel">
+    <div class="ws-header">
+      <div class="ws-header-left">
+        <span class="panel-label">Investigation <span class="panel-label-accent">Workspace</span></span>
+        <span class="ws-count" id="wsCount">0 domains</span>
+      </div>
+      <div class="ws-header-right">
+        <input class="ws-add-input" id="wsAddInput" type="text" placeholder="Add domain manually…"
+          onkeydown="if(event.key==='Enter')wsAddManual()">
+        <button class="ws-add-btn" onclick="wsAddManual()">+ Add</button>
+        <button class="ws-btn" onclick="wsRunAll()">▶ Run All</button>
+        <button class="ws-btn" onclick="wsExportAll()">Export All</button>
+        <button class="ws-btn ws-btn-clear" onclick="wsClear()">Clear</button>
+      </div>
+    </div>
+    <div class="ws-body" id="wsBody">
+      <div class="ws-empty" id="wsEmpty">
+        Add domains manually or click <strong>+ Add to Investigation</strong> on any result to build your network here.
+        Run all queued domains at once to populate the full network graph.
+      </div>
+      <div class="ws-grid" id="wsGrid" style="display:none;"></div>
+    </div>
+  </div>
+
 </div><!-- /page -->
 
 <!-- TOOLTIP -->
@@ -571,12 +637,30 @@ function renderVerdictCard(data, score, asn, whois, scrape) {
   const s     = score.score || 0;
   const color = score.color || '#4ec994';
   const cls   = scoreClass(s);
+  const attr  = data.attribution || {};
 
   const gauge = buildGaugeSVG(s, color);
 
   const cms      = (scrape.cms_signals || []).map(c => c.signal).join(', ') || '—';
   const outbound = (scrape.outbound_links || []).join(', ') || 'None detected';
   const ts       = data.timestamp ? data.timestamp.replace('T',' ').replace('Z','') + ' UTC' : '';
+
+  // Country display — show registrant vs hosting separately
+  const primaryCountry   = attr.primary || '?';
+  const registrantCC     = attr.registrant_country || '?';
+  const hostingCC        = attr.hosting_country || asn.country || '?';
+  const isCDN            = attr.hosting_is_cdn || false;
+  const hostingLabel     = isCDN ? `${hostingCC} ${countryFlag(hostingCC)} <span style="color:var(--dim);font-size:9px;">(CDN — not operator)</span>`
+                                 : `${hostingCC} ${countryFlag(hostingCC)}`;
+  const primaryLabel     = `${primaryCountry} ${countryFlag(primaryCountry)}`;
+
+  // Attribution source summary
+  const attrSignals = attr.signals || {};
+  const attrSource  = attrSignals.registrant_country?.source
+                   || attrSignals.tld?.source
+                   || attrSignals.asn_operator?.source
+                   || attrSignals.hosting_country?.source
+                   || '—';
 
   document.getElementById('verdictTimestamp').textContent = ts;
   document.getElementById('verdictContent').innerHTML = `
@@ -591,12 +675,20 @@ function renderVerdictCard(data, score, asn, whois, scrape) {
         <div class="verdict-classification" style="color:${color}">${score.icon || ''} ${escHtml(score.label || 'Analyzed')}</div>
         <div class="verdict-meta">
           <div class="verdict-meta-row">
-            <span class="vmr-label">ASN / Host</span>
-            <span class="vmr-value">${escHtml(asn.org || '—')}</span>
+            <span class="vmr-label">Origin</span>
+            <span class="vmr-value" style="color:var(--gold2);font-weight:500;">${primaryLabel}</span>
           </div>
           <div class="verdict-meta-row">
-            <span class="vmr-label">Country</span>
-            <span class="vmr-value">${escHtml(asn.country || '—')} ${countryFlag(asn.country)}</span>
+            <span class="vmr-label">Registrant</span>
+            <span class="vmr-value">${registrantCC !== '?' ? registrantCC + ' ' + countryFlag(registrantCC) : '—'} <span style="color:var(--dim);font-size:9px;">${escHtml(whois.registrant_org || '')}</span></span>
+          </div>
+          <div class="verdict-meta-row">
+            <span class="vmr-label">Hosting</span>
+            <span class="vmr-value">${hostingLabel}</span>
+          </div>
+          <div class="verdict-meta-row">
+            <span class="vmr-label">ASN / Org</span>
+            <span class="vmr-value">${escHtml(asn.org || '—')}</span>
           </div>
           <div class="verdict-meta-row">
             <span class="vmr-label">Registrar</span>
@@ -613,6 +705,10 @@ function renderVerdictCard(data, score, asn, whois, scrape) {
           <div class="verdict-meta-row">
             <span class="vmr-label">State links</span>
             <span class="vmr-value" style="color:${outbound !== 'None detected' ? 'var(--orange)' : 'var(--muted)'}">${escHtml(outbound)}</span>
+          </div>
+          <div class="verdict-meta-row">
+            <span class="vmr-label">Attr. basis</span>
+            <span class="vmr-value" style="color:var(--dim);font-size:10px;">${escHtml(attrSource)}</span>
           </div>
         </div>
       </div>
@@ -1076,11 +1172,15 @@ function countryFlag(cc) {
   return String.fromCodePoint(...pts);
 }
 function detectNation(data) {
+  // Use the backend's multi-signal attribution — NOT just the hosting country
+  const primary = (data.attribution?.primary || '').toUpperCase();
+  if (primary && primary !== '?') return primary;
+  // Fallback: ASN operator signals
   const org = (data.asn_info?.org || '').toLowerCase();
-  const cc  = (data.asn_info?.country || '').toUpperCase();
-  if (cc === 'CN' || org.includes('alibaba') || org.includes('tencent')) return 'CN';
-  if (cc === 'RU' || org.includes('tigerweb') || org.includes('reg.ru')) return 'RU';
-  return cc || '?';
+  if (org.includes('alibaba') || org.includes('tencent') || org.includes('baidu')) return 'CN';
+  if (org.includes('tigerweb') || org.includes('reg.ru')) return 'RU';
+  // Last resort: hosting country (lowest confidence — label it)
+  return (data.asn_info?.country || '?').toUpperCase();
 }
 function showError(msg) {
   const bar = document.getElementById('errorBar');
@@ -1091,7 +1191,222 @@ function clearError() {
   document.getElementById('errorBar').classList.remove('visible');
 }
 
-// ── INIT ──────────────────────────────────────────────────────────────────────
+
+// ── INVESTIGATION WORKSPACE ──────────────────────────────────────────────────
+// Persists in memory for the session. Each entry: {domain, status, result}
+let wsItems = []; // [{id, domain, status:'queued'|'running'|'done'|'error', result}]
+
+function wsAddDomain(domain) {
+  domain = domain.trim().toLowerCase().replace(/^https?:\/\//,'').replace(/\/.*$/,'');
+  if (!domain || wsItems.find(i => i.domain === domain)) return;
+  wsItems.push({ id: Date.now() + Math.random(), domain, status: 'queued', result: null });
+  wsRender();
+}
+
+function wsAddManual() {
+  const val = document.getElementById('wsAddInput').value.trim();
+  if (!val) return;
+  val.split(/[\s,\n]+/).forEach(d => { if(d) wsAddDomain(d); });
+  document.getElementById('wsAddInput').value = '';
+}
+
+function wsAddFromResult(domain) {
+  wsAddDomain(domain);
+  // Scroll to workspace
+  document.getElementById('workspacePanel').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function wsRemove(id) {
+  wsItems = wsItems.filter(i => i.id !== id);
+  wsRender();
+}
+
+function wsClear() {
+  if (wsItems.length && !confirm('Clear all domains from the workspace?')) return;
+  wsItems = [];
+  wsRender();
+}
+
+async function wsRunAll() {
+  const queued = wsItems.filter(i => i.status === 'queued');
+  if (!queued.length) { alert('No queued domains to run.'); return; }
+  for (const item of queued) {
+    item.status = 'running';
+    wsRender();
+    try {
+      const res = await fetch(`${API_BASE}/influence/analyze`, {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({domain: item.domain}),
+      });
+      item.result = await res.json();
+      item.status = 'done';
+      // Merge into allDomains for graph + table
+      const s = item.result?.score || {};
+      const existing = allDomains.find(d => d.domain === item.domain);
+      const entry = {
+        domain:   item.domain,
+        score:    s.score ?? null,
+        label:    s.label || '',
+        color:    s.color || '#4ec994',
+        signals:  (s.breakdown || []).length,
+        nation:   detectNation(item.result || {}),
+        country:  item.result?.attribution?.primary || item.result?.asn_info?.country || '?',
+        asn:      item.result?.asn_info?.org || '—',
+        type:     'workspace',
+        analysis: item.result,
+      };
+      if (existing) Object.assign(existing, entry);
+      else allDomains.push(entry);
+    } catch(e) {
+      item.status = 'error';
+      item.error  = e.message;
+    }
+    wsRender();
+    await new Promise(r => setTimeout(r, 400)); // slight delay between requests
+  }
+  // Refresh graph and table with all workspace results
+  if (allDomains.length > 1) renderGraph_workspace();
+  renderTable();
+}
+
+function wsRender() {
+  const count = wsItems.length;
+  document.getElementById('wsCount').textContent = `${count} domain${count !== 1 ? 's' : ''}`;
+  document.getElementById('wsEmpty').style.display  = count ? 'none' : '';
+  document.getElementById('wsGrid').style.display   = count ? '' : 'none';
+
+  document.getElementById('wsGrid').innerHTML = wsItems.map(item => {
+    const s     = item.result?.score;
+    const attr  = item.result?.attribution;
+    const score = s?.score ?? null;
+    const color = s?.color || 'var(--dim)';
+    const cc    = attr?.primary || item.result?.asn_info?.country || '?';
+    const flag  = countryFlag(cc);
+
+    const chipClass = item.status === 'running'  ? 'ws-chip running'
+                    : score === null              ? 'ws-chip queued'
+                    : score >= 75                ? 'ws-chip done-high'
+                    : score >= 50                ? 'ws-chip done-medium'
+                    : score >= 25                ? 'ws-chip done-low'
+                    : 'ws-chip done-clean';
+
+    const scoreHtml = score !== null
+      ? `<span class="wsc-score" style="color:${color}">${score}</span>`
+      : `<span class="wsc-status">${item.status}</span>`;
+
+    return `<div class="${chipClass}" title="${escHtml(item.domain)}">
+      <span class="wsc-domain">${escHtml(item.domain)}</span>
+      ${scoreHtml}
+      <span class="wsc-country">${flag}</span>
+      <span class="wsc-actions">
+        ${score !== null ? `<button class="wsc-btn" onclick="wsLoadResult('${item.id}')" title="View result">⬡</button>` : ''}
+        <button class="wsc-btn wsc-remove" onclick="wsRemove('${item.id}')" title="Remove">✕</button>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+function wsLoadResult(id) {
+  const item = wsItems.find(i => String(i.id) === String(id));
+  if (!item?.result) return;
+  const data   = item.result;
+  const score  = data.score || {};
+  const asn    = data.asn_info || {};
+  const whois  = data.whois || {};
+  const scrape = data.scrape || {};
+  renderVerdictCard(data, score, asn, whois, scrape);
+  renderSignals(score.breakdown || []);
+  document.querySelector('.verdict-panel').scrollIntoView({behavior:'smooth'});
+}
+
+function wsExportAll() {
+  const done = wsItems.filter(i => i.result);
+  if (!done.length) { alert('No completed results to export.'); return; }
+  const header = 'domain,score,label,origin_country,registrant_country,hosting_country,asn,signals,registrar,created\n';
+  const rows   = done.map(i => {
+    const s = i.result?.score || {};
+    const a = i.result?.attribution || {};
+    const w = i.result?.whois || {};
+    const n = i.result?.asn_info || {};
+    return `"${i.domain}",${s.score ?? ''},"${s.label || ''}","${a.primary || ''}","${a.registrant_country || ''}","${a.hosting_country || ''}","${n.org || ''}",${(s.breakdown||[]).length},"${w.registrar || ''}","${w.created || ''}"`;
+  }).join('\n');
+  downloadFile(header + rows, 'investigation-workspace.csv', 'text/csv');
+}
+
+function renderGraph_workspace() {
+  // Build a combined graph from all allDomains entries
+  const elements = [];
+  const added    = new Set();
+
+  for (const d of allDomains) {
+    if (added.has(d.domain)) continue;
+    added.add(d.domain);
+    const isRoot   = d.type === 'root';
+    const score    = d.score ?? null;
+    const color    = isRoot ? '#c8a96e' : (d.color || 'rgba(240,236,228,0.25)');
+    const size     = isRoot ? 40 : score !== null && score >= 50 ? 24 : 16;
+    elements.push({ data: {
+      id:          d.domain,
+      domain:      d.domain,
+      shortLabel:  truncateDomain(d.domain),
+      type:        d.type,
+      color, size,
+      borderWidth: isRoot ? 3 : 1,
+      borderColor: color,
+      score,
+      scoreLabel:  d.label || '',
+      signals:     d.signals || 0,
+      breakdown:   d.analysis?.score?.breakdown || [],
+    }});
+  }
+
+  // Add edges from SSL SAN and reverse IP relationships
+  for (const d of allDomains) {
+    if (!d.analysis) continue;
+    for (const san of (d.analysis.ssl_sans || []).slice(0,15)) {
+      if (added.has(san) && san !== d.domain) {
+        const eid = `${d.domain}--san--${san}`;
+        if (!elements.find(e => e.data?.id === eid)) {
+          elements.push({ data: { id: eid, source: d.domain, target: san, weight: 1.2, edgeColor: 'rgba(126,184,228,0.25)' }});
+        }
+      }
+    }
+    for (const n of (d.analysis.reverse_ip || []).slice(0,10)) {
+      if (added.has(n) && n !== d.domain) {
+        const eid = `${d.domain}--rip--${n}`;
+        if (!elements.find(e => e.data?.id === eid)) {
+          elements.push({ data: { id: eid, source: d.domain, target: n, weight: 0.8, edgeColor: 'rgba(255,255,255,0.07)' }});
+        }
+      }
+    }
+  }
+
+  if (elements.filter(e => e.data.source === undefined).length > 0) {
+    initCy(elements);
+  }
+}
+
+// Patch renderInvestigate to add "Add to investigation" button
+const _origRenderInvestigate = renderInvestigate;
+window.renderInvestigate = function(data) {
+  _origRenderInvestigate(data);
+  // Add button to verdict panel after render
+  setTimeout(() => {
+    const vc = document.getElementById('verdictContent');
+    if (vc && data.domain) {
+      const existing = vc.querySelector('.add-to-ws-btn');
+      if (!existing) {
+        const btn = document.createElement('button');
+        btn.className = 'add-to-ws-btn';
+        btn.innerHTML = '+ Add to Investigation';
+        btn.onclick = () => wsAddFromResult(data.domain);
+        vc.appendChild(btn);
+      }
+    }
+  }, 50);
+};
+
 document.addEventListener('DOMContentLoaded', () => {
   // Init empty graph placeholder
   cy = cytoscape({
