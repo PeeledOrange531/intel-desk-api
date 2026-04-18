@@ -144,8 +144,9 @@ def get_ssl_sans(domain: str) -> list[str]:
 
 def get_rdap_whois(domain: str) -> dict:
     """
-    RDAP lookup via rdap.org — registrar, registrant org, creation date.
-    Free, no key. Returns partial data gracefully on failure.
+    RDAP lookup via rdap.org — registrar, registrant org+country, creation date.
+    Extracts registrant country from vCard adr field and country field.
+    This is the REGISTRATION country — not where the server is hosted.
     """
     r = safe_get(f"https://rdap.org/domain/{domain}")
     if not r:
@@ -153,34 +154,74 @@ def get_rdap_whois(domain: str) -> dict:
     try:
         data = r.json()
         result = {
-            "registrar":       None,
-            "registrant_org":  None,
-            "created":         None,
-            "updated":         None,
-            "nameservers":     [],
-            "status":          [],
+            "registrar":            None,
+            "registrar_country":    None,
+            "registrant_org":       None,
+            "registrant_country":   None,  # PRIMARY — where domain was registered
+            "registrant_email":     None,
+            "created":              None,
+            "updated":              None,
+            "nameservers":          [],
+            "status":               [],
         }
-        # Registrar
+
+        def extract_vcard(entity: dict) -> dict:
+            """Pull all useful fields from an RDAP vCard array."""
+            out = {}
+            vcard = entity.get("vcardArray", [])
+            if not vcard or len(vcard) < 2:
+                return out
+            for field in vcard[1]:
+                if not field or len(field) < 4:
+                    continue
+                fname = field[0]
+                fval  = field[3] if len(field) > 3 else ""
+                if fname == "fn":
+                    out["name"] = fval
+                elif fname == "org":
+                    out["org"] = fval
+                elif fname == "email":
+                    out["email"] = fval
+                elif fname == "adr":
+                    # vCard adr: [pobox, ext, street, city, region, postal, country]
+                    # country is the last element
+                    if isinstance(fval, list) and len(fval) >= 7:
+                        out["country"] = str(fval[6]).strip()
+                    elif isinstance(fval, str) and fval.strip():
+                        out["country"] = fval.strip()
+                elif fname == "country-name":
+                    out["country"] = fval
+            return out
+
         for entity in data.get("entities", []):
             roles = entity.get("roles", [])
+            vc    = extract_vcard(entity)
+
             if "registrar" in roles:
-                vcard = entity.get("vcardArray", [])
-                if vcard and len(vcard) > 1:
-                    for field in vcard[1]:
-                        if field[0] == "fn":
-                            result["registrar"] = field[3]
+                result["registrar"]         = vc.get("name") or vc.get("org")
+                result["registrar_country"] = vc.get("country")
+
             if "registrant" in roles:
-                vcard = entity.get("vcardArray", [])
-                if vcard and len(vcard) > 1:
-                    for field in vcard[1]:
-                        if field[0] == "org":
-                            result["registrant_org"] = field[3]
+                result["registrant_org"]     = vc.get("org") or vc.get("name")
+                result["registrant_country"] = vc.get("country")
+                result["registrant_email"]   = vc.get("email")
+
+            # Some registries nest the registrant inside the registrar entity
+            for sub in entity.get("entities", []):
+                sub_roles = sub.get("roles", [])
+                sub_vc    = extract_vcard(sub)
+                if "registrant" in sub_roles:
+                    result["registrant_org"]     = result["registrant_org"] or sub_vc.get("org")
+                    result["registrant_country"] = result["registrant_country"] or sub_vc.get("country")
+
         # Dates
         for event in data.get("events", []):
-            if event.get("eventAction") == "registration":
+            action = event.get("eventAction", "")
+            if action == "registration":
                 result["created"] = event.get("eventDate", "")[:10]
-            if event.get("eventAction") == "last changed":
+            elif action == "last changed":
                 result["updated"] = event.get("eventDate", "")[:10]
+
         # Nameservers
         result["nameservers"] = [
             ns.get("ldhName", "").lower()
@@ -543,6 +584,117 @@ def find_rip_overlap(neighbors: list[str]) -> list[str]:
 
 # ── Main analysis pipeline ─────────────────────────────────────────────────────
 
+def derive_attribution_country(domain: str, whois: dict, asn_info: dict) -> dict:
+    """
+    Derive the most likely OPERATIONAL country from multiple independent signals.
+    Returns a dict with each signal and a primary attribution.
+
+    Priority order (highest to lowest confidence):
+      1. Registrant country from WHOIS (where domain was registered BY)
+      2. TLD — .cn, .ru, .ir etc. are near-definitive
+      3. ASN org string — "Alibaba Cloud" → CN, "TigerWeb" → RU
+      4. ASN country — where the server physically is (LOWEST weight,
+         can be US due to CDN even for CN/RU ops — label it clearly)
+      5. Registrar country
+
+    NOTE: Hosting country (ASN) is explicitly NOT used as the primary
+    attribution signal — a Chinese op on Cloudflare US shows US hosting,
+    not US origin. This function separates those concepts.
+    """
+    signals = {}
+
+    # 1. Registrant country from WHOIS
+    reg_country = (whois.get("registrant_country") or "").strip().upper()
+    if reg_country and len(reg_country) <= 3:
+        signals["registrant_country"] = {
+            "value":      reg_country,
+            "confidence": "high",
+            "source":     "WHOIS/RDAP registrant record",
+        }
+
+    # 2. TLD-based inference
+    tld = domain.rsplit(".", 1)[-1].lower() if "." in domain else ""
+    TLD_MAP = {
+        "cn": "CN", "com.cn": "CN", "net.cn": "CN",
+        "ru": "RU", "su": "RU",
+        "ir": "IR", "kp": "KP",
+        "by": "BY", "ve": "VE",
+        "ua": "UA", "eu": "EU",
+    }
+    if tld in TLD_MAP:
+        signals["tld"] = {
+            "value":      TLD_MAP[tld],
+            "confidence": "high",
+            "source":     f".{tld} country-code TLD",
+        }
+
+    # 3. ASN org string — operator-level inference
+    org = (asn_info.get("org") or "").lower()
+    ORG_MAP = [
+        (["alibaba", "aliyun"],                    "CN", "Alibaba Cloud (CN operator)"),
+        (["tencent"],                               "CN", "Tencent Cloud (CN operator)"),
+        (["baidu"],                                 "CN", "Baidu Cloud (CN operator)"),
+        (["china telecom", "chinanet", "ctgnet"],  "CN", "China Telecom (state-owned)"),
+        (["china unicom"],                          "CN", "China Unicom (state-owned)"),
+        (["china mobile"],                          "CN", "China Mobile (state-owned)"),
+        (["tigerweb"],                              "RU", "TigerWeb (Pravda network operator)"),
+        (["reg.ru", "marosnet"],                   "RU", "Russian hosting provider"),
+        (["rostelecom"],                            "RU", "Rostelecom (Russian state-owned)"),
+        (["iranserver", "shatel", "asiatech"],     "IR", "Iranian hosting provider"),
+    ]
+    for keywords, country, label in ORG_MAP:
+        if any(kw in org for kw in keywords):
+            signals["asn_operator"] = {
+                "value":      country,
+                "confidence": "high",
+                "source":     label,
+            }
+            break
+
+    # 4. ASN physical hosting country — LOWEST confidence, label as "hosting"
+    asn_country = (asn_info.get("country") or "").strip().upper()
+    if asn_country:
+        # Only meaningful if it's a known state-linked country and no CDN detected
+        cdn_keywords = ["cloudflare", "fastly", "akamai", "amazon", "google",
+                        "microsoft", "digitalocean", "linode", "vultr"]
+        is_cdn = any(kw in org for kw in cdn_keywords)
+        signals["hosting_country"] = {
+            "value":      asn_country,
+            "confidence": "low" if is_cdn else "medium",
+            "source":     "Server hosting location" + (" (CDN — not operator origin)" if is_cdn else ""),
+            "is_cdn":     is_cdn,
+        }
+
+    # 5. Registrar country
+    reg_country2 = (whois.get("registrar_country") or "").strip().upper()
+    if reg_country2 and len(reg_country2) <= 3:
+        signals["registrar_country"] = {
+            "value":      reg_country2,
+            "confidence": "medium",
+            "source":     "Registrar country",
+        }
+
+    # ── Derive primary attribution ────────────────────────────────────────────
+    # Walk in priority order: registrant > TLD > ASN operator > registrar > hosting
+    primary = None
+    for key in ["registrant_country", "tld", "asn_operator", "registrar_country", "hosting_country"]:
+        if key in signals and signals[key]["confidence"] in ("high", "medium"):
+            # Skip hosting_country if it's a CDN and we have nothing else
+            if key == "hosting_country" and signals[key].get("is_cdn") and primary:
+                continue
+            if primary is None:
+                primary = signals[key]["value"]
+
+    return {
+        "primary":            primary or asn_country or "?",
+        "signals":            signals,
+        "hosting_is_cdn":     signals.get("hosting_country", {}).get("is_cdn", False),
+        "hosting_country":    asn_country or "?",
+        "registrant_country": signals.get("registrant_country", {}).get("value", "?"),
+    }
+
+
+
 def analyze_domain(domain: str) -> dict:
     """
     Full pipeline for a single domain.
@@ -550,19 +702,20 @@ def analyze_domain(domain: str) -> dict:
     """
     domain = clean_domain(domain)
     result = {
-        "domain":       domain,
-        "timestamp":    time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "db_match":     {},
-        "ip_info":      {},
-        "asn_info":     {},
-        "whois":        {},
-        "ssl_sans":     [],
-        "ssl_san_overlap": [],
-        "reverse_ip":   [],
+        "domain":             domain,
+        "timestamp":          time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "db_match":           {},
+        "ip_info":            {},
+        "asn_info":           {},
+        "attribution":        {},
+        "whois":              {},
+        "ssl_sans":           [],
+        "ssl_san_overlap":    [],
+        "reverse_ip":         [],
         "reverse_ip_overlap": [],
-        "scrape":       {},
-        "score":        {},
-        "error":        None,
+        "scrape":             {},
+        "score":              {},
+        "error":              None,
     }
 
     try:
@@ -577,28 +730,34 @@ def analyze_domain(domain: str) -> dict:
         if ip_result["ip"]:
             result["asn_info"] = get_asn_info(ip_result["ip"])
 
-        # 4. WHOIS/RDAP
+        # 4. WHOIS/RDAP (now extracts registrant country)
         result["whois"] = get_rdap_whois(domain)
 
-        # 5. SSL SANs
+        # 5. Multi-signal country attribution
+        result["attribution"] = derive_attribution_country(
+            domain, result["whois"], result["asn_info"]
+        )
+
+        # 6. SSL SANs
         sans = get_ssl_sans(domain)
         result["ssl_sans"] = sans
         result["ssl_san_overlap"] = find_san_overlap(sans)
 
-        # 6. Reverse IP
+        # 7. Reverse IP
         if ip_result["ip"]:
             neighbors = get_reverse_ip(ip_result["ip"])
             result["reverse_ip"] = neighbors
             result["reverse_ip_overlap"] = find_rip_overlap(neighbors)
 
-        # 7. HTML scrape
+        # 8. HTML scrape
         result["scrape"] = scrape_page_signals(domain)
 
-        # 8. Score
+        # 9. Score
         result["score"] = compute_score({
             "domain":               domain,
             "db_match":             result["db_match"],
             "asn_info":             result["asn_info"],
+            "attribution":          result["attribution"],
             "ssl_san_overlap":      result["ssl_san_overlap"],
             "reverse_ip_overlap":   result["reverse_ip_overlap"],
             "scrape":               result["scrape"],
