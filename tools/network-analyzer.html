@@ -1566,7 +1566,8 @@ function clearSession() {
   closeDetail();
   updateSessionBadge();
   updateQueueStatus(null);
-  document.getElementById('graphEmpty').style.display = '';
+  const geEl = document.getElementById('graphEmpty');
+  if (geEl) geEl.style.display = '';
   document.getElementById('seedInput').value = '';
   localStorage.removeItem(LS_KEY);
   showHint('Session cleared. Enter a new domain to start fresh.');
@@ -1603,28 +1604,33 @@ function setLoading(on, domain = '') {
     overlay.classList.add('on');
 
     // Domain label inside panel
-    document.getElementById('ghostDomain').textContent =
-      domain ? `Analyzing: ${truncate(domain, 36)}` : 'Analyzing…';
+    const gdEl = document.getElementById('ghostDomain');
+    if (gdEl) gdEl.textContent = domain ? `Analyzing: ${truncate(domain, 36)}` : 'Analyzing…';
 
     // Rotate witty messages every 3.5s
     let msgIdx = 0;
-    document.getElementById('ghostMsg').textContent = GHOST_MESSAGES[0];
+    const gmEl0 = document.getElementById('ghostMsg');
+    if (gmEl0) gmEl0.textContent = GHOST_MESSAGES[0];
     ghostMsgInterval = setInterval(() => {
       msgIdx = (msgIdx + 1) % GHOST_MESSAGES.length;
       const el = document.getElementById('ghostMsg');
-      el.style.opacity = '0';
-      setTimeout(() => {
-        el.textContent = GHOST_MESSAGES[msgIdx];
-        el.style.opacity = '1';
-      }, 400);
+      if (el) {
+        el.style.opacity = '0';
+        setTimeout(() => {
+          el.textContent = GHOST_MESSAGES[msgIdx];
+          el.style.opacity = '1';
+        }, 400);
+      }
     }, 3500);
 
     // Progress bar creeps to 90%, never hits 100 until done
     let progress = 0;
-    document.getElementById('ghostProgress').style.width = '0%';
+    const gpEl = document.getElementById('ghostProgress');
+    if (gpEl) gpEl.style.width = '0%';
     ghostProgressTimer = setInterval(() => {
       progress = Math.min(progress + (Math.random() * 3.5), 90);
-      document.getElementById('ghostProgress').style.width = progress + '%';
+      const gp2 = document.getElementById('ghostProgress');
+      if (gp2) gp2.style.width = progress + '%';
     }, 800);
 
     // Steps
@@ -1642,7 +1648,8 @@ function setLoading(on, domain = '') {
   } else {
     clearInterval(ghostMsgInterval);
     clearInterval(ghostProgressTimer);
-    document.getElementById('ghostProgress').style.width = '100%';
+    const gpFinal = document.getElementById('ghostProgress');
+    if (gpFinal) gpFinal.style.width = '100%';
     setTimeout(() => {
       overlay.classList.remove('on');
       const last = GHOST_STEP_IDS[GHOST_STEP_IDS.length - 1];
