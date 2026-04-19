@@ -579,20 +579,21 @@ async function analyzeDomain(domain, type) {
 
     updateNode(domain);
     updateCentrality();
-    renderQueue();
-    renderTable();
-    updateBadge();
-    openDetail(domain);
+    try { renderQueue(); } catch(e) { console.warn('renderQueue err', e); }
+    try { renderTable(); } catch(e) { console.warn('renderTable err', e); }
+    try { updateBadge(); } catch(e) { console.warn('updateBadge err', e); }
+    try { openDetail(domain); } catch(e) { console.warn('openDetail err', e); }
     const q = Object.values(nodes).filter(n => n.status === 'queued').length;
     showHint(`${domain} done · ${Object.keys(nodes).length} in graph · ${q} queued`);
 
   } catch(err) {
     setNode(domain, type || 'queued', 'error', null);
     showErr(`Analysis failed for ${domain}: ${err.message}`);
-    updateNode(domain);
-    renderQueue();
+    try { updateNode(domain); } catch(e) {}
+    try { renderQueue(); } catch(e) {}
   }
 
+  // Always runs — no crash can leave the banner stuck
   running = false;
   setRunning(false);
 }
@@ -672,7 +673,7 @@ function renderQueue() {
   const items   = Object.values(nodes);
   const pending = items.filter(n => n.status === 'queued').length;
 
-  empty.style.display = items.length ? 'none' : '';
+  if (empty) empty.style.display = items.length ? 'none' : '';
   if (nextBtn) {
     const n = Math.min(pending, 10);
     nextBtn.textContent = pending > 0 ? `▶ Run Next ${n} (${pending} queued)` : '▶ Run Next 10';
@@ -719,7 +720,7 @@ function renderTable() {
     return true;
   });
 
-  empty.style.display = filtered.length ? 'none' : '';
+  if (empty) empty.style.display = filtered.length ? 'none' : '';
   if (!filtered.length) { scroll.innerHTML = ''; return; }
 
   const hdr = `<div class="tbl-row hdr">
