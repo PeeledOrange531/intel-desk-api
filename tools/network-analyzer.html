@@ -818,28 +818,32 @@ async function analyzeDomain(domain, type) {
 
     setNode(domain, type || 'queued', 'done', data);
 
-    // SSL SANs + Reverse IP → staging in Investigate mode, queue in Expand mode
-    const goToQueue = (mode === 'top' || type === 'queued');
+    // ALL neighbors always go to staging first
+    // In Expand mode they are then auto-promoted to queue
+    let sanStaged = 0, ripStaged = 0;
     for (const san of (data.ssl_sans || []).slice(0,25)) {
       if (san === domain) continue;
-      if (goToQueue) {
-        if (!nodes[san]) { setNode(san,'ssl_san','queued',null,'ssl_cert'); addEdge(domain,san,'ssl_san'); }
-      } else {
-        addEdge(domain, san, 'ssl_san'); // always add edge to graph
-        if (!nodes[san]) addToStaging('ssl_cert', san, `SSL SAN of ${domain}`);
-      }
+      addEdge(domain, san, 'ssl_san');
+      if (!nodes[san]) { addToStaging('ssl_cert', san, `SSL SAN of ${domain}`); sanStaged++; }
     }
     for (const n of (data.reverse_ip || []).slice(0,15)) {
       if (n === domain) continue;
-      if (goToQueue) {
-        if (!nodes[n]) { setNode(n,'shared_ip','queued',null,'reverse_ip'); addEdge(domain,n,'shared_ip'); }
-      } else {
-        addEdge(domain, n, 'shared_ip');
-        if (!nodes[n]) addToStaging('reverse_ip', n, `Shares IP with ${domain}`);
-      }
+      addEdge(domain, n, 'shared_ip');
+      if (!nodes[n]) { addToStaging('reverse_ip', n, `Shares IP with ${domain}`); ripStaged++; }
     }
     for (const sl of (data.scrape?.state_media_links || [])) {
       addEdge(domain, sl.domain, 'content');
+    }
+    // Expand mode: auto-promote all staged neighbors to queue immediately
+    if (mode === 'top') {
+      for (const tool of ['ssl_cert','reverse_ip']) {
+        if (staging[tool]) {
+          for (const item of [...staging[tool].items]) {
+            setNode(item.domain, tool, 'queued', null, tool);
+          }
+          delete staging[tool];
+        }
+      }
     }
 
     // Render — each step isolated so nothing blocks the finally
