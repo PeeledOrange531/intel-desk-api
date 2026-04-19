@@ -278,6 +278,82 @@ h1 em{font-style:italic;color:var(--gold);}
   letter-spacing:.08em;padding:1px 5px;border-radius:1px;flex-shrink:0;
   opacity:.85;}
 
+
+/* ── ID SEARCH ── */
+.id-search-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.14em;background:rgba(126,184,228,.10);color:var(--blue);
+  border:1px solid rgba(126,184,228,.25);padding:6px 14px;cursor:pointer;
+  transition:all .2s;margin-right:6px;}
+.id-search-btn:hover{background:rgba(126,184,228,.20);border-color:rgba(126,184,228,.5);}
+.id-search-btn:disabled{opacity:.35;cursor:not-allowed;}
+.id-results{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;}
+.id-results-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.18em;color:var(--gold);margin-bottom:8px;}
+.id-group{margin-bottom:12px;}
+.id-group-label{font-family:var(--mono);font-size:9px;color:var(--muted);
+  margin-bottom:5px;display:flex;align-items:center;gap:8px;}
+.id-group-value{font-family:var(--mono);font-size:10px;color:var(--gold2);
+  padding:1px 6px;border:1px solid rgba(200,169,110,.25);}
+.id-affiliate{display:flex;align-items:center;gap:8px;padding:5px 0;
+  border-bottom:1px solid rgba(255,255,255,.03);}
+.id-affiliate:last-child{border-bottom:none;}
+.id-aff-domain{font-family:var(--mono);font-size:11px;color:var(--muted);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.id-aff-add{font-family:var(--mono);font-size:9px;background:transparent;
+  border:1px solid var(--border);color:var(--dim);padding:2px 8px;
+  cursor:pointer;transition:all .15s;}
+.id-aff-add:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
+.id-spinner{display:inline-block;width:10px;height:10px;
+  border:1px solid rgba(126,184,228,.2);border-top-color:var(--blue);
+  border-radius:50%;animation:spin .6s linear infinite;margin-right:6px;}
+
+
+/* ── DISCOVERY METHOD TAGS ── */
+.dm-tag{display:inline-flex;align-items:center;gap:3px;font-family:var(--mono);
+  font-size:8px;text-transform:uppercase;letter-spacing:.07em;
+  padding:1px 5px;border-radius:1px;flex-shrink:0;white-space:nowrap;}
+.dm-ssl    {background:rgba(126,184,228,.12);color:#7eb8e4;border-left:2px solid #7eb8e4;}
+.dm-rip    {background:rgba(232,123,74,.12); color:#e87b4a;border-left:2px solid #e87b4a;}
+.dm-tracking{background:rgba(176,136,249,.12);color:#b088f9;border-left:2px solid #b088f9;}
+.dm-nameserver{background:rgba(78,201,148,.12);color:#4ec994;border-left:2px solid #4ec994;}
+.dm-whois  {background:rgba(200,169,110,.12);color:#c8a96e;border-left:2px solid #c8a96e;}
+.dm-manual {background:rgba(240,236,228,.07);color:var(--dim);border-left:2px solid var(--dim);}
+.dm-multi  {background:rgba(176,136,249,.18);color:#b088f9;border-left:3px solid #b088f9;font-weight:600;}
+/* multi-method glow — highest priority signal */
+.q-item.multi-method{border-left:3px solid #b088f9;}
+
+/* ── CHECKBOXES ── */
+.qi-check{width:13px;height:13px;accent-color:var(--gold);cursor:pointer;flex-shrink:0;margin-right:2px;}
+.queue-select-bar{display:flex;align-items:center;gap:6px;padding:6px 12px;
+  border-bottom:1px solid var(--border);background:var(--bg3);flex-shrink:0;flex-wrap:wrap;}
+.qs-count{font-family:var(--mono);font-size:10px;color:var(--muted);flex:1;}
+.qs-count strong{color:var(--gold2);}
+.qs-selall{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;color:var(--dim);background:transparent;
+  border:1px solid var(--border);padding:3px 8px;cursor:pointer;transition:all .15s;}
+.qs-selall:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
+
+/* ── BULK ACTION BAR — slides in when selection > 0 ── */
+.bulk-bar{display:none;align-items:center;gap:8px;padding:8px 12px;
+  background:rgba(200,169,110,.08);border-top:1px solid rgba(200,169,110,.22);
+  flex-shrink:0;flex-wrap:wrap;}
+.bulk-bar.on{display:flex;}
+.bulk-label{font-family:var(--mono);font-size:10px;color:var(--gold2);flex-shrink:0;}
+.bulk-tool-select{background:var(--bg3);border:1px solid var(--border);
+  font-family:var(--mono);font-size:10px;color:var(--muted);
+  padding:5px 10px;outline:none;cursor:pointer;}
+.bulk-tool-select option{background:var(--bg2);}
+.bulk-run{background:var(--gold);color:var(--bg);border:none;
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.12em;
+  padding:6px 14px;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
+.bulk-run:hover{opacity:.85;}
+.bulk-run:disabled{opacity:.35;cursor:not-allowed;}
+.bulk-deselect{font-family:var(--mono);font-size:9px;color:var(--dim);
+  background:transparent;border:1px solid var(--border);
+  padding:5px 8px;cursor:pointer;transition:all .15s;}
+.bulk-deselect:hover{color:var(--red);}
+
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -428,6 +504,7 @@ h1 em{font-style:italic;color:var(--gold);}
     <div class="gl"><div class="gl-dot" style="background:rgba(240,236,228,.1)"></div>Unanalyzed</div>
     <div class="gl"><div class="gl-line" style="background:var(--blue);opacity:.7"></div>SSL SAN</div>
     <div class="gl"><div class="gl-line" style="background:var(--orange);opacity:.6"></div>Shared IP</div>
+    <div class="gl"><div class="gl-line" style="background:var(--blue)"></div>Shared Tracking ID</div>
   </div>
 </div>
 
@@ -442,6 +519,11 @@ h1 em{font-style:italic;color:var(--gold);}
         <button class="qa-btn" onclick="qaAdd()">+ Add</button>
       </div>
     </div>
+    <div class="queue-select-bar">
+      <input type="checkbox" class="qi-check" id="selectAllCheck" onchange="toggleSelectAll(this.checked)" title="Select all">
+      <span class="qs-count" id="selCount">0 selected</span>
+      <button class="qs-selall" onclick="selectByMethod()">By Method</button>
+    </div>
     <div class="queue-scroll" id="queueScroll">
       <div class="queue-empty" id="queueEmpty">
         Neighbors auto-populate here.<br>
@@ -449,6 +531,23 @@ h1 em{font-style:italic;color:var(--gold);}
       </div>
     </div>
     <div class="queue-status" id="queueStatus"></div>
+    <div class="bulk-bar" id="bulkBar">
+      <span class="bulk-label" id="bulkCount">0 selected</span>
+      <select class="bulk-tool-select" id="bulkToolSelect">
+        <optgroup label="Investigation Tools">
+          <option value="ssl_cert">🔍 SSL Certificate Tracer</option>
+          <option value="nameserver">🌐 Nameserver Tracker</option>
+          <option value="reverse_ip">📡 Reverse IP Mapper</option>
+          <option value="tracking_id">🏷 Tracking ID Hunter</option>
+          <option value="whois_batch">📋 WHOIS Batch Detector</option>
+        </optgroup>
+        <optgroup label="Standard">
+          <option value="analyze">▶ Full Analysis</option>
+        </optgroup>
+      </select>
+      <button class="bulk-run" onclick="runBulkTool()">Run on Selected →</button>
+      <button class="bulk-deselect" onclick="clearSelection()">✕ Deselect</button>
+    </div>
     <div class="queue-actions">
       <button class="qa-action qa-run-next" id="qaNextBtn" onclick="qaRunNext()">▶ Run Next 10</button>
       <button class="qa-action" onclick="qaRunAll()">▶ All</button>
@@ -617,13 +716,13 @@ async function analyzeDomain(domain, type) {
     // Queue neighbors
     for (const san of (data.ssl_sans || []).slice(0,25)) {
       if (san !== domain && !nodes[san]) {
-        setNode(san, 'ssl_san', 'queued', null);
+        setNode(san, 'ssl_san', 'queued', null, 'ssl_cert');
         addEdge(domain, san, 'ssl_san');
       }
     }
     for (const n of (data.reverse_ip || []).slice(0,15)) {
       if (n !== domain && !nodes[n]) {
-        setNode(n, 'shared_ip', 'queued', null);
+        setNode(n, 'shared_ip', 'queued', null, 'reverse_ip');
         addEdge(domain, n, 'shared_ip');
       }
     }
@@ -659,7 +758,7 @@ function qaAdd() {
   if (!val) return;
   val.split(/[\s,\n]+/).filter(Boolean).forEach(d => {
     d = cleanDomain(d);
-    if (d && !nodes[d]) setNode(d, 'manual', 'queued', null);
+    if (d && !nodes[d]) setNode(d, 'manual', 'queued', null, 'manual');
   });
   document.getElementById('qaInput').value = '';
   renderQueue();
@@ -745,10 +844,18 @@ function renderQueue() {
     const op      = dims.infrastructure_opacity?.score;
     const cat     = classifyDomain(node.id, node);
     const catHtml = getCategoryBadgeHtml(cat);
+    const methods = node.discovery_methods || [];
+    const isMulti = methods.length > 1;
+    const methodsHtml = isMulti
+      ? `<span class="dm-tag dm-multi" title="${methods.join(' + ')}">⚡ ${methods.length} methods</span>`
+      : methods.map(m => `<span class="dm-tag dm-${m.replace('_','-')}">${dmLabel(m)}</span>`).join('');
     const scoreHtml = op !== undefined
       ? `<span style="font-family:var(--mono);font-size:9px;color:${opColor(op)}">${op}/10</span>` : '';
-    return `<div class="q-item">
+    const isChecked = selectedDomains.has(node.id);
+    return `<div class="q-item${isMulti?' multi-method':''}" data-domain="${esc(node.id)}">
+      <input type="checkbox" class="qi-check" ${isChecked?'checked':''} onchange="toggleSelect('${esc(node.id)}',this.checked)">
       <span class="qi-domain" title="${esc(node.id)}">${esc(node.id)}</span>
+      ${methodsHtml}
       ${catHtml}
       ${scoreHtml}
       <span class="qi-status ${node.status}">${node.status}</span>
@@ -760,6 +867,7 @@ function renderQueue() {
       <button class="qi-btn qi-remove" onclick="removeNode('${esc(node.id)}')">✕</button>
     </div>`;
   }).join('');
+  updateSelectionUI();
 }
 
 // ══ TABLE ════════════════════════════════════════════════════════════════════
@@ -906,6 +1014,7 @@ function edgeStyle(type) {
   if (type==='ssl_san')  return {w:1.5, ec:'rgba(126,184,228,.45)'};
   if (type==='shared_ip') return {w:1.0, ec:'rgba(232,123,74,.35)'};
   if (type==='content')  return {w:1.2, ec:'rgba(78,201,148,.35)'};
+  if (type==='shared_id') return {w:2.0, ec:'rgba(126,184,228,.7)'};
   return {w:0.8, ec:'rgba(255,255,255,.10)'};
 }
 
@@ -1009,10 +1118,181 @@ function openDetail(domain) {
       </div>
     </div>
     <div class="dd-dims">${cards}</div>
-    <button class="dd-close" onclick="closeDetail()">Close ✕</button>`;
+    ${(() => {
+      const ids = (data.scrape?.analytics_ids || []);
+      if (!ids.length) return '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:10px;">No trackable IDs found in page source.</div>';
+      const idList = ids.map(id =>
+        '<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;' +
+        'background:rgba(126,184,228,.08);border:1px solid rgba(126,184,228,.18);' +
+        'color:var(--blue);margin-right:4px;margin-bottom:4px;display:inline-block;">' +
+        esc(id.type) + ': <strong>' + esc(id.id) + '</strong></span>'
+      ).join('');
+      return '<div style="margin-bottom:12px;">' +
+        '<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Tracking IDs Found</div>' +
+        '<div>' + idList + '</div></div>';
+    })()}
+    <div id="idSearchResults-${esc(domain)}"></div>
+    <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
+      ${(data.scrape?.analytics_ids||[]).length > 0
+        ? '<button class="id-search-btn" id="idSearchBtn-' + esc(domain) + '" onclick="runIdSearch(\'' + esc(domain) + '\')">🔍 Find Sites Sharing These IDs</button>'
+        : ''
+      }
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+      <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--gold);margin-bottom:8px;">Investigation Toolkit</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="id-search-btn" style="background:rgba(126,184,228,.08);color:#7eb8e4;border-color:rgba(126,184,228,.2);"
+          onclick="runInvestigationTool('${esc(domain)}','ssl_cert').then(()=>{renderQueue();updateCatBar();})">
+          🔍 SSL Certificate Tracer
+        </button>
+        <button class="id-search-btn" style="background:rgba(78,201,148,.08);color:#4ec994;border-color:rgba(78,201,148,.2);"
+          onclick="runInvestigationTool('${esc(domain)}','nameserver').then(()=>{renderQueue();updateCatBar();})">
+          🌐 Nameserver Tracker
+        </button>
+        <button class="id-search-btn" style="background:rgba(232,123,74,.08);color:#e87b4a;border-color:rgba(232,123,74,.2);"
+          onclick="runInvestigationTool('${esc(domain)}','reverse_ip').then(()=>{renderQueue();updateCatBar();})">
+          📡 Reverse IP Mapper
+        </button>
+        <button class="id-search-btn" style="background:rgba(176,136,249,.08);color:#b088f9;border-color:rgba(176,136,249,.2);"
+          onclick="runInvestigationTool('${esc(domain)}','whois_batch').then(()=>{renderQueue();updateCatBar();})">
+          📋 WHOIS Batch Detector
+        </button>
+      </div>
+    </div>
+    <button class="dd-close" onclick="closeDetail()">Close ✕</button>
+    </div>`;
 
   const drawer = document.getElementById('detailDrawer');
   drawer.classList.add('open');
+}
+
+
+// ══ ID SEARCH — Find sites sharing tracking/analytics IDs ════════════════
+async function runIdSearch(domain) {
+  const btn = document.getElementById(`idSearchBtn-${domain}`);
+  const resultsEl = document.getElementById(`idSearchResults-${domain}`);
+  if (!btn || !resultsEl) return;
+
+  btn.disabled = true;
+  btn.innerHTML = '<span class="id-spinner"></span>Searching PublicWWW…';
+  resultsEl.innerHTML = '';
+
+  try {
+    const res = await fetch(`${API}/network/id-search`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({domain}),
+    });
+    if (!res.ok) throw new Error(`Server ${res.status}`);
+    const data = await res.json();
+
+    if (data.error) throw new Error(data.error);
+
+    const affiliates = data.affiliates || [];
+    const errors     = data.errors || [];
+
+    if (!affiliates.length && !errors.length) {
+      resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:8px 0;">
+        No matching sites found on PublicWWW for these IDs.</div>`;
+      btn.textContent = '🔍 Find Sites Sharing These IDs';
+      btn.disabled = false;
+      return;
+    }
+
+    // Group by ID value
+    const byId = {};
+    for (const aff of affiliates) {
+      const key = `${aff.id_type}:${aff.id_value}`;
+      if (!byId[key]) byId[key] = { type: aff.id_type, value: aff.id_value, domains: [] };
+      byId[key].domains.push(aff.domain);
+    }
+
+    let html = `<div class="id-results">
+      <div class="id-results-hdr">
+        🔗 ${affiliates.length} site${affiliates.length!==1?'s':''} found sharing tracking IDs with ${esc(domain)}
+      </div>`;
+
+    for (const [key, group] of Object.entries(byId)) {
+      html += `<div class="id-group">
+        <div class="id-group-label">
+          ${esc(group.type)}
+          <span class="id-group-value">${esc(group.value)}</span>
+          <span style="color:var(--dim);font-size:9px;">${group.domains.length} site${group.domains.length!==1?'s':''}</span>
+        </div>`;
+      for (const d of group.domains) {
+        const alreadyInGraph = !!nodes[d];
+        html += `<div class="id-affiliate">
+          <span class="id-aff-domain" title="${esc(d)}">${esc(d)}</span>
+          ${alreadyInGraph
+            ? `<span style="font-family:var(--mono);font-size:9px;color:var(--green)">In graph</span>`
+            : `<button class="id-aff-add" onclick="addAffiliateFromId('${esc(d)}','${esc(group.value)}','${esc(group.type)}')">+ Add to queue</button>`
+          }
+        </div>`;
+      }
+      html += `</div>`;
+    }
+
+    if (errors.length) {
+      html += `<div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px;">
+        Note: ${esc(errors.join(' · '))}</div>`;
+    }
+
+    html += `<button style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.12em;color:var(--gold);background:rgba(200,169,110,.08);
+      border:1px solid rgba(200,169,110,.25);padding:6px 14px;cursor:pointer;
+      margin-top:8px;" onclick="addAllAffiliates('${esc(domain)}')">
+      + Add All to Queue
+    </button>`;
+
+    html += `</div>`;
+    resultsEl.innerHTML = html;
+
+    // Store affiliates on the node for bulk-add
+    if (nodes[domain]?.analysis) {
+      nodes[domain].analysis._id_affiliates = affiliates;
+    }
+
+    btn.textContent = `✓ Found ${affiliates.length} sites`;
+
+  } catch(err) {
+    resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--red);padding:8px 0;">
+      ID search failed: ${esc(err.message)}</div>`;
+    btn.textContent = '🔍 Find Sites Sharing These IDs';
+    btn.disabled = false;
+  }
+}
+
+function addAffiliateFromId(domain, idValue, idType) {
+  if (!nodes[domain]) {
+    setNode(domain, 'id_affiliate', 'queued', null, 'tracking_id');
+    // Mark the edge as a shared-ID connection
+    addEdge(nodes[domain]?.analysis?._seed || Object.keys(nodes)[0], domain, 'shared_id');
+  }
+  try { updateNode(domain); } catch(e) {}
+  renderQueue();
+  updateBadge();
+  updateCatBar();
+  showHint(`${domain} added to queue via shared ${idType} (${idValue})`);
+}
+
+function addAllAffiliates(sourceDomain) {
+  const affiliates = nodes[sourceDomain]?.analysis?._id_affiliates || [];
+  let added = 0;
+  for (const aff of affiliates) {
+    if (!nodes[aff.domain]) {
+      setNode(aff.domain, 'id_affiliate', 'queued', null);
+      addEdge(sourceDomain, aff.domain, 'shared_id');
+      added++;
+    }
+  }
+  try {
+    for (const aff of affiliates) {
+      if (nodes[aff.domain]?.status === 'queued') updateNode(aff.domain);
+    }
+  } catch(e) {}
+  renderQueue();
+  updateBadge();
+  updateCatBar();
+  showHint(`${added} sites added to queue from shared ID search on ${sourceDomain}`);
 }
 
 function closeDetail() {
@@ -1151,9 +1431,179 @@ function setCatFilter(cat, btn) {
   renderQueue();
 }
 
+
+// ══ SELECTION & BULK TOOLS ════════════════════════════════════════════════════
+let selectedDomains = new Set();
+
+const DM_LABELS = {
+  ssl_cert:   'SSL Cert',
+  reverse_ip: 'Rev IP',
+  tracking_id:'Track ID',
+  nameserver: 'Namesvr',
+  whois:      'WHOIS',
+  manual:     'Manual',
+  shared_id:  'Shared ID',
+};
+function dmLabel(m) { return DM_LABELS[m] || m; }
+
+function toggleSelect(domain, checked) {
+  if (checked) selectedDomains.add(domain);
+  else selectedDomains.delete(domain);
+  updateSelectionUI();
+}
+
+function toggleSelectAll(checked) {
+  const items = Object.values(nodes);
+  const visible = catFilter === 'all' ? items : items.filter(n => classifyDomain(n.id,n) === catFilter);
+  if (checked) visible.forEach(n => selectedDomains.add(n.id));
+  else selectedDomains.clear();
+  renderQueue();
+}
+
+function selectByMethod() {
+  // Cycle through methods: none → ssl → nameserver → tracking → multi
+  const methods = ['ssl_cert','nameserver','tracking_id','reverse_ip','whois'];
+  // Show a tiny popover — pick method to select by
+  const sel = prompt('Select all domains found by which method?\n\nOptions:\n  ssl_cert\n  nameserver\n  tracking_id\n  reverse_ip\n  manual\n  multi (found by 2+ methods)');
+  if (!sel) return;
+  selectedDomains.clear();
+  Object.values(nodes).forEach(n => {
+    const methods = n.discovery_methods || [];
+    if (sel === 'multi' && methods.length > 1) selectedDomains.add(n.id);
+    else if (methods.includes(sel)) selectedDomains.add(n.id);
+  });
+  renderQueue();
+}
+
+function clearSelection() {
+  selectedDomains.clear();
+  const allCheck = document.getElementById('selectAllCheck');
+  if (allCheck) allCheck.checked = false;
+  renderQueue();
+}
+
+function updateSelectionUI() {
+  const n   = selectedDomains.size;
+  const bar = document.getElementById('bulkBar');
+  const cnt = document.getElementById('bulkCount');
+  const selCnt = document.getElementById('selCount');
+  if (bar)    bar.classList.toggle('on', n > 0);
+  if (cnt)    cnt.textContent = `${n} domain${n!==1?'s':''} selected`;
+  if (selCnt) selCnt.innerHTML = n > 0
+    ? `<strong>${n}</strong> selected`
+    : `0 selected`;
+}
+
+async function runBulkTool() {
+  if (!selectedDomains.size) return;
+  const tool   = document.getElementById('bulkToolSelect')?.value;
+  const domains = [...selectedDomains];
+
+  if (tool === 'analyze') {
+    // Standard full analysis
+    showHint(`Running full analysis on ${domains.length} domains…`);
+    clearSelection();
+    for (const d of domains) {
+      await analyzeDomain(d);
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 100)));
+    }
+    return;
+  }
+
+  if (tool === 'tracking_id') {
+    showHint(`Running Tracking ID Hunter on ${domains.length} domains…`);
+    clearSelection();
+    for (const d of domains) {
+      // Only run if analyzed
+      if (nodes[d]?.status !== 'done') {
+        showHint(`Skipping ${d} — analyze it first before running Tracking ID Hunter`);
+        continue;
+      }
+      openDetail(d);
+      await runIdSearch(d);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    return;
+  }
+
+  if (tool === 'ssl_cert' || tool === 'reverse_ip' || tool === 'nameserver' || tool === 'whois_batch') {
+    // These run via the backend — call the appropriate endpoint
+    showHint(`Running ${toolName(tool)} on ${domains.length} domains…`);
+    clearSelection();
+    for (const d of domains) {
+      await runInvestigationTool(d, tool);
+      await new Promise(r => requestAnimationFrame(() => setTimeout(r, 200)));
+    }
+    renderQueue();
+    updateBadge();
+    updateCatBar();
+    return;
+  }
+}
+
+function toolName(tool) {
+  const names = {
+    ssl_cert:   '🔍 SSL Certificate Tracer',
+    nameserver: '🌐 Nameserver Tracker',
+    reverse_ip: '📡 Reverse IP Mapper',
+    tracking_id:'🏷 Tracking ID Hunter',
+    whois_batch:'📋 WHOIS Batch Detector',
+    analyze:    '▶ Full Analysis',
+  };
+  return names[tool] || tool;
+}
+
+// Run a single investigation tool against a domain
+// Adds results to queue with proper discovery method tag
+async function runInvestigationTool(domain, tool) {
+  domain = cleanDomain(domain);
+  if (!domain) return;
+  showHint(`${toolName(tool)} → ${domain}…`);
+  try {
+    const res = await fetch(`${API}/network/tool-expand`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({domain, tool}),
+    });
+    if (!res.ok) throw new Error(`Server ${res.status}`);
+    const data = await res.json();
+
+    let added = 0;
+    for (const found of (data.results || [])) {
+      const d = cleanDomain(found.domain || found);
+      if (!d || d === domain) continue;
+      if (!nodes[d]) {
+        setNode(d, tool, 'queued', null, tool);
+        addEdge(domain, d, tool);
+        try { updateNode(d); } catch(e) {}
+        added++;
+      } else {
+        // Domain already known — just add the discovery method
+        const existing = nodes[d];
+        const methods  = existing.discovery_methods || [];
+        if (!methods.includes(tool)) {
+          methods.push(tool);
+          existing.discovery_methods = methods;
+        }
+      }
+    }
+    showHint(`${toolName(tool)} found ${added} new domains from ${domain}`);
+  } catch(err) {
+    showErr(`${toolName(tool)} failed for ${domain}: ${err.message}`);
+  }
+}
+
 // ══ STATE HELPERS ═════════════════════════════════════════════════════════════
-function setNode(domain, type, status, analysis) {
-  nodes[domain] = { id:domain, type:nodes[domain]?.type||type, status, analysis };
+function setNode(domain, type, status, analysis, discoveryMethod) {
+  const existing = nodes[domain];
+  const methods  = existing?.discovery_methods || [];
+  if (discoveryMethod && !methods.includes(discoveryMethod)) methods.push(discoveryMethod);
+  nodes[domain] = {
+    id: domain,
+    type: existing?.type || type,
+    status, analysis,
+    discovery_methods: methods,
+  };
 }
 function addEdge(source, target, type) {
   if (!edges.find(e=>(e.source===source&&e.target===target)||(e.source===target&&e.target===source)))
