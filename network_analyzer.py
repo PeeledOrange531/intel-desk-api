@@ -960,6 +960,46 @@ def ping():
     })
 
 
+@network_bp.route("/debug", methods=["GET"])
+def debug():
+    """Returns a synthetic result with known structure — for frontend testing."""
+    from flask import Response
+    import json
+    synthetic = {
+        "domain": "debug-test.example.com",
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "db_match": {"tier": None, "nation": None, "name": None, "source": None, "notes": None, "overt": None},
+        "ip_info": {"ip": "1.2.3.4", "error": None},
+        "asn_info": {"ip": "1.2.3.4", "org": "AS12345 Test Hosting", "asn": "AS12345", "country": "US", "city": "Test City", "hostname": ""},
+        "attribution": {"primary": "US", "signals": {}, "hosting_country": "US", "hosting_is_cdn": False, "registrant_country": "US"},
+        "whois": {"registrar": "Test Registrar", "registrant_org": "Test Org", "registrant_country": "US", "privacy_protected": False, "created": "2020-01-01", "updated": "2023-01-01", "nameservers": [], "status": []},
+        "ssl_sans": ["neighbor1.example.com", "neighbor2.example.com"],
+        "ssl_san_overlap": [],
+        "reverse_ip": ["cohost1.example.com", "cohost2.example.com"],
+        "reverse_ip_overlap": [],
+        "scrape": {
+            "reachable": True, "status_code": 200, "title": "Debug Test Site",
+            "language": "en", "analytics_ids": [], "state_media_links": [],
+            "cms": [], "has_about_page": True, "has_contact_page": True,
+            "has_named_authors": True, "has_bylines": True, "has_legal_entity": True,
+            "has_funding_disclosure": False, "editorial_staff_count": 3,
+            "content_sourcing": [{"type": "original_reporting", "detail": "Test", "source": "test"}],
+            "has_original_reporting_signals": True, "shared_id_signals": [], "error": None
+        },
+        "dimensions": {
+            "infrastructure_opacity": {"score": 2, "max": 10, "label": "Some opacity", "notes": ["Test note"], "dimension": "Infrastructure Opacity", "description": "Test"},
+            "ownership_transparency": {"score": 3, "max": 10, "label": "Partial disclosure", "notes": ["About page present"], "dimension": "Ownership Transparency", "description": "Test"},
+            "content_sourcing": {"score": 0, "max": 10, "label": "Original reporting", "notes": ["Original reporting signals"], "dimension": "Content Sourcing", "description": "Test"},
+            "network_centrality": {"score": 0, "max": 10, "label": "Computed when graph is built", "notes": ["Centrality computed dynamically"], "dimension": "Network Centrality", "description": "Test", "hints": {"ssl_san_count": 2, "reverse_ip_count": 2, "known_overlap_count": 0}},
+            "state_media_proximity": {"score": 0, "max": 10, "label": "No significant proximity", "notes": [], "dimension": "State Media Proximity", "description": "Test"}
+        },
+        "error": None
+    }
+    r = Response(json.dumps(synthetic), mimetype="application/json")
+    r.headers["Access-Control-Allow-Origin"] = "*"
+    return r
+
+
 @network_bp.route("/analyze", methods=["POST","OPTIONS"])
 def analyze():
     if request.method == "OPTIONS":
@@ -970,8 +1010,32 @@ def analyze():
         return jsonify({"error": "domain required"}), 400
     if len(domain) > 253 or not re.match(r'^[a-zA-Z0-9._\-/:\[\]]+$', domain):
         return jsonify({"error": "Invalid domain format"}), 400
-    result = analyze_domain(domain)
-    resp   = jsonify(result)
+
+    # Hard 25-second wall-clock timeout — Render kills at 30s
+    from concurrent.futures import ThreadPoolExecutor, TimeoutError as FT
+    with ThreadPoolExecutor(max_workers=1) as ex:
+        future = ex.submit(analyze_domain, domain)
+        try:
+            result = future.result(timeout=25)
+        except FT:
+            result = {
+                "domain": domain, "error": "Analysis timed out after 25s",
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "db_match": check_database(domain),
+                "ip_info": {}, "asn_info": {}, "attribution": {}, "whois": {},
+                "ssl_sans": [], "ssl_san_overlap": [], "reverse_ip": [], "reverse_ip_overlap": [],
+                "scrape": {}, "dimensions": {}
+            }
+        except Exception as e:
+            result = {
+                "domain": domain, "error": str(e),
+                "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+                "db_match": {}, "ip_info": {}, "asn_info": {}, "attribution": {}, "whois": {},
+                "ssl_sans": [], "ssl_san_overlap": [], "reverse_ip": [], "reverse_ip_overlap": [],
+                "scrape": {}, "dimensions": {}
+            }
+
+    resp = jsonify(result)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
