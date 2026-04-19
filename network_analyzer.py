@@ -62,9 +62,10 @@ HEADERS = {
     "Accept-Language": "en-US,en;q=0.5",
 }
 
-HTTP_TIMEOUT   = 5   # aggressive — Render has 30s request limit
-SCRAPE_TIMEOUT = 6   # scraping must be fast
+HTTP_TIMEOUT   = 8   # balanced — enough for slow APIs
+SCRAPE_TIMEOUT = 8   # scraping
 SOCKET_TIMEOUT = 4   # DNS resolution
+CRT_TIMEOUT    = 15  # crt.sh is slow for busy domains
 
 # Set socket default timeout so gethostbyname can't hang forever
 import socket as _sock
@@ -125,7 +126,7 @@ def get_asn_info(ip: str) -> dict:
 
 
 def get_ssl_sans(domain: str) -> list:
-    r = safe_get(f"https://crt.sh/?q=%25.{domain}&output=json")
+    r = safe_get(f"https://crt.sh/?q=%25.{domain}&output=json", timeout=CRT_TIMEOUT)
     if not r:
         return []
     try:
@@ -859,11 +860,14 @@ def analyze_domain(domain: str) -> dict:
         f_rip    = executor.submit(get_reverse_ip, ip)     if ip else None
         f_scrape = executor.submit(scrape_page,    domain)
 
+        # Per-call timeouts — crt.sh needs more time than ASN lookup
+        TIMEOUTS = {'asn': 10, 'whois': 10, 'ssl_sans': 20, 'reverse_ip': 10, 'scrape': 10}
+
         def _get(f, default, label):
             if f is None:
                 return default
             try:
-                return f.result(timeout=15)
+                return f.result(timeout=TIMEOUTS.get(label, 15))
             except Exception as ex:
                 logger.warning(f"analyze_domain({domain}) — {label} failed: {ex}")
                 return default
