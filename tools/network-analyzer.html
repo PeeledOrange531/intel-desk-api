@@ -134,7 +134,7 @@ h1 em{font-style:italic;color:var(--gold);}
   color:var(--dim);font-family:var(--mono);font-size:9px;text-transform:uppercase;
   letter-spacing:.10em;cursor:pointer;transition:all .15s;}
 .gc-btn:hover{color:var(--gold);background:rgba(200,169,110,.05);}
-#cy{flex:1;min-height:420px;background:
+#cy{flex:1;height:420px;min-height:420px;background:
   radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.04) 0%,transparent 70%),var(--bg);
   cursor:grab;}
 #cy:active{cursor:grabbing;}
@@ -258,6 +258,26 @@ h1 em{font-style:italic;color:var(--gold);}
 ::-webkit-scrollbar-thumb{background:rgba(200,169,110,.18);border-radius:2px;}
 
 /* ── RESPONSIVE ── */
+
+/* ── CATEGORIES ── */
+.cat-bar{display:none;gap:0;border:1px solid var(--border);
+  background:var(--bg2);margin-bottom:10px;flex-wrap:wrap;}
+.cat-bar.visible{display:flex;}
+.cat-pill{display:flex;align-items:center;gap:6px;padding:8px 14px;
+  background:transparent;border:none;border-right:1px solid var(--border);
+  cursor:pointer;transition:background .15s;font-family:var(--mono);
+  font-size:10px;color:var(--muted);white-space:nowrap;}
+.cat-pill:last-child{border-right:none;}
+.cat-pill:hover{background:rgba(255,255,255,.03);}
+.cat-pill.active{background:rgba(255,255,255,.05);}
+.cat-pill .cat-dot{width:8px;height:8px;border-radius:2px;flex-shrink:0;}
+.cat-pill .cat-count{font-weight:600;margin-left:2px;}
+.cat-pill.active .cat-count{color:var(--gold2);}
+/* queue category badge */
+.qi-cat{font-family:var(--mono);font-size:8px;text-transform:uppercase;
+  letter-spacing:.08em;padding:1px 5px;border-radius:1px;flex-shrink:0;
+  opacity:.85;}
+
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -345,6 +365,38 @@ h1 em{font-style:italic;color:var(--gold);}
 </div>
 <div class="seed-hint" id="seedHint">Enter a domain to begin mapping its network.</div>
 
+<!-- CATEGORY SUMMARY BAR -->
+<div class="cat-bar" id="catBar">
+  <button class="cat-pill active" id="catAll" onclick="setCatFilter('all',this)">
+    <span class="cat-dot" style="background:var(--dim)"></span>
+    All <span class="cat-count" id="catCountAll">0</span>
+  </button>
+  <button class="cat-pill" id="catAnchor" onclick="setCatFilter('anchor',this)">
+    <span class="cat-dot" style="background:#c0392b"></span>
+    State Anchor <span class="cat-count" id="catCountAnchor">0</span>
+  </button>
+  <button class="cat-pill" id="catAffiliate" onclick="setCatFilter('affiliate',this)">
+    <span class="cat-dot" style="background:#e87b4a"></span>
+    Covert Affiliate <span class="cat-count" id="catCountAffiliate">0</span>
+  </button>
+  <button class="cat-pill" id="catLaunderer" onclick="setCatFilter('launderer',this)">
+    <span class="cat-dot" style="background:#c8a96e"></span>
+    Content Launderer <span class="cat-count" id="catCountLaunderer">0</span>
+  </button>
+  <button class="cat-pill" id="catForeign" onclick="setCatFilter('foreign',this)">
+    <span class="cat-dot" style="background:#7eb8e4"></span>
+    Foreign Target <span class="cat-count" id="catCountForeign">0</span>
+  </button>
+  <button class="cat-pill" id="catInfra" onclick="setCatFilter('infra',this)">
+    <span class="cat-dot" style="background:rgba(240,236,228,.3)"></span>
+    Infrastructure <span class="cat-count" id="catCountInfra">0</span>
+  </button>
+  <button class="cat-pill" id="catUnknown" onclick="setCatFilter('unknown',this)">
+    <span class="cat-dot" style="background:rgba(240,236,228,.15)"></span>
+    Unclassified <span class="cat-count" id="catCountUnknown">0</span>
+  </button>
+</div>
+
 <!-- GRAPH -->
 <div class="graph-panel">
   <div class="graph-header">
@@ -368,11 +420,12 @@ h1 em{font-style:italic;color:var(--gold);}
     <div class="ge-text">Enter a domain above to begin.<br>The network graph builds here as you analyze.</div>
   </div>
   <div class="graph-legend">
-    <div class="gl"><div class="gl-dot" style="background:var(--gold)"></div>Seed/State media</div>
-    <div class="gl"><div class="gl-dot" style="background:var(--red)"></div>High opacity</div>
-    <div class="gl"><div class="gl-dot" style="background:var(--orange)"></div>Moderate</div>
-    <div class="gl"><div class="gl-dot" style="background:var(--green)"></div>Transparent</div>
-    <div class="gl"><div class="gl-dot" style="background:rgba(240,236,228,.2)"></div>Unanalyzed</div>
+    <div class="gl"><div class="gl-dot" style="background:#c8a96e;border-radius:1px;transform:rotate(45deg)"></div>State Anchor</div>
+    <div class="gl"><div class="gl-dot" style="background:#c0392b"></div>Covert Affiliate</div>
+    <div class="gl"><div class="gl-dot" style="background:#e87b4a"></div>Content Launderer</div>
+    <div class="gl"><div class="gl-dot" style="background:#c8a96e"></div>Foreign Target / Unknown</div>
+    <div class="gl"><div class="gl-dot" style="background:rgba(240,236,228,.25)"></div>Infrastructure</div>
+    <div class="gl"><div class="gl-dot" style="background:rgba(240,236,228,.1)"></div>Unanalyzed</div>
     <div class="gl"><div class="gl-line" style="background:var(--blue);opacity:.7"></div>SSL SAN</div>
     <div class="gl"><div class="gl-line" style="background:var(--orange);opacity:.6"></div>Shared IP</div>
   </div>
@@ -579,12 +632,13 @@ async function analyzeDomain(domain, type) {
     }
 
     // Render — each step isolated so nothing blocks the finally
-    try { updateNode(domain); }   catch(e) { showErr('CRASH in updateNode: ' + e.message); }
-    try { updateCentrality(); }   catch(e) { showErr('CRASH in updateCentrality: ' + e.message); }
-    try { renderQueue(); }        catch(e) { showErr('CRASH in renderQueue: ' + e.message); }
-    try { renderTable(); }        catch(e) { showErr('CRASH in renderTable: ' + e.message); }
-    try { updateBadge(); }        catch(e) { showErr('CRASH in updateBadge: ' + e.message); }
-    try { openDetail(domain); }   catch(e) { showErr('CRASH in openDetail: ' + e.message); }
+    try { updateNode(domain); }   catch(e) { console.warn('updateNode:', e.message); }
+    try { updateCentrality(); }   catch(e) { console.warn('centrality:', e.message); }
+    try { renderQueue(); }        catch(e) { console.warn('renderQueue:', e.message); }
+    try { renderTable(); }        catch(e) { console.warn('renderTable:', e.message); }
+    try { updateBadge(); }        catch(e) { console.warn('updateBadge:', e.message); }
+    try { updateCatBar(); }       catch(e) { console.warn('catBar:', e.message); }
+    try { openDetail(domain); }   catch(e) { console.warn('openDetail:', e.message); }
     const q = Object.values(nodes).filter(n => n.status === 'queued').length;
     showHint(`${domain} done · ${Object.keys(nodes).length} in graph · ${q} queued`);
 
@@ -681,13 +735,21 @@ function renderQueue() {
     nextBtn.disabled = running || pending === 0;
   }
 
-  scroll.innerHTML = items.map(node => {
-    const dims = node.analysis?.dimensions || {};
-    const op   = dims.infrastructure_opacity?.score;
+  // Apply category filter
+  const visibleItems = catFilter === 'all'
+    ? items
+    : items.filter(n => classifyDomain(n.id, n) === catFilter);
+
+  scroll.innerHTML = visibleItems.map(node => {
+    const dims    = node.analysis?.dimensions || {};
+    const op      = dims.infrastructure_opacity?.score;
+    const cat     = classifyDomain(node.id, node);
+    const catHtml = getCategoryBadgeHtml(cat);
     const scoreHtml = op !== undefined
       ? `<span style="font-family:var(--mono);font-size:9px;color:${opColor(op)}">${op}/10</span>` : '';
     return `<div class="q-item">
       <span class="qi-domain" title="${esc(node.id)}">${esc(node.id)}</span>
+      ${catHtml}
       ${scoreHtml}
       <span class="qi-status ${node.status}">${node.status}</span>
       ${node.status === 'queued'
@@ -764,6 +826,7 @@ function initCy() {
       { selector:'node', style:{
         'background-color':'data(color)','border-width':'data(bw)','border-color':'data(bc)',
         'width':'data(size)','height':'data(size)','label':'data(lbl)',
+        'shape':'data(shape)',
         'font-family':'DM Mono,monospace','font-size':9,'color':'rgba(240,236,228,0.65)',
         'text-valign':'bottom','text-margin-y':5,'text-wrap':'none',
       }},
@@ -804,28 +867,39 @@ function nodeStyle(domain) {
   const n    = nodes[domain];
   const st   = n?.status;
   const dims = n?.analysis?.dimensions || {};
-  const op   = dims.infrastructure_opacity?.score ?? null;
   const db   = n?.analysis?.db_match || {};
-  const isSeed = n?.type === 'seed' || db.tier === 'tier1';
+  const isSeed = n?.type === 'seed';
 
-  let color, size, bw, bc;
-  if      (isSeed)         { color='#c8a96e'; size=36; bw=3; bc='#e8d5a3'; }
-  else if (st==='queued')  { color='rgba(240,236,228,.1)'; size=12; bw=1; bc='rgba(255,255,255,.08)'; }
-  else if (st==='running') { color='rgba(200,169,110,.3)'; size=20; bw=2; bc='#c8a96e'; }
-  else if (st==='error')   { color='rgba(192,57,43,.3)'; size=16; bw=1; bc='rgba(192,57,43,.5)'; }
-  else if (op !== null) {
-    if      (op>=7) { color='#c0392b'; size=24; bw=2; bc='#c0392b'; }
-    else if (op>=4) { color='#e87b4a'; size=20; bw=1; bc='#e87b4a'; }
-    else if (op>=2) { color='#c8a96e'; size=18; bw=1; bc='#c8a96e'; }
-    else            { color='#4ec994'; size=16; bw=1; bc='#4ec994'; }
-  } else            { color='rgba(240,236,228,.2)'; size=16; bw=1; bc='rgba(255,255,255,.12)'; }
+  let color, size, bw, bc, shape;
 
-  return {
-    color, size, bw, bc,
-    lbl:   truncate(domain, 16),
-    status: st || 'queued',
-    dims:   dims,
-  };
+  // Running / error states always override
+  if (st === 'running') {
+    return { color:'rgba(200,169,110,.3)', size:20, bw:2, bc:'#c8a96e',
+             shape:'ellipse', lbl:truncate(domain,16), status:'running', dims, cat:'unknown' };
+  }
+  if (st === 'error') {
+    return { color:'rgba(192,57,43,.3)', size:16, bw:1, bc:'rgba(192,57,43,.5)',
+             shape:'ellipse', lbl:truncate(domain,16), status:'error', dims, cat:'unknown' };
+  }
+  // Queued = unclassified small dot
+  if (st === 'queued' || st !== 'done') {
+    return { color:'rgba(240,236,228,.1)', size:12, bw:1, bc:'rgba(255,255,255,.08)',
+             shape:'ellipse', lbl:truncate(domain,16), status:st||'queued', dims, cat:'unknown' };
+  }
+
+  // Analyzed — use category
+  const cat = classifyDomain(domain, n);
+  const meta = CAT_META[cat] || CAT_META.unknown;
+
+  // Seed node gets special treatment regardless of category
+  if (isSeed) {
+    color = '#c8a96e'; size = 36; bw = 3; bc = '#e8d5a3'; shape = meta.shape;
+  } else {
+    color = meta.color; size = meta.size; bw = 2; bc = meta.dot; shape = meta.shape;
+  }
+
+  return { color, size, bw, bc, shape,
+           lbl: truncate(domain, 16), status: st, dims, cat };
 }
 
 function edgeStyle(type) {
@@ -836,6 +910,11 @@ function edgeStyle(type) {
 }
 
 function updateNode(domain) {
+  // Re-init if cy is missing or container has no size
+  const cyEl = document.getElementById('cy');
+  if (!cy || !cyEl || cyEl.offsetWidth === 0) {
+    try { initCy(); } catch(e) { console.warn('cy reinit failed:', e); return; }
+  }
   if (!cy) return;
   const ge = document.getElementById('graphEmpty');
   if (ge) ge.style.display = 'none';
@@ -970,6 +1049,107 @@ function dl(content,filename,mime) {
   const a=document.createElement('a');
   a.href=URL.createObjectURL(new Blob([content],{type:mime}));
   a.download=filename; a.click(); URL.revokeObjectURL(a.href);
+}
+
+
+// ══ CATEGORY ENGINE ══════════════════════════════════════════════════════════
+
+const CAT_META = {
+  anchor:     { label:'State Anchor',      color:'#c0392b', dot:'#c0392b',    shape:'diamond',  size:32 },
+  affiliate:  { label:'Covert Affiliate',  color:'#e87b4a', dot:'#e87b4a',    shape:'ellipse',  size:22 },
+  launderer:  { label:'Content Launderer', color:'#c8a96e', dot:'#c8a96e',    shape:'rectangle',size:22 },
+  foreign:    { label:'Foreign Target',    color:'#7eb8e4', dot:'#7eb8e4',    shape:'ellipse',  size:20 },
+  infra:      { label:'Infrastructure',    color:'rgba(240,236,228,.25)', dot:'rgba(240,236,228,.3)', shape:'triangle', size:14 },
+  unknown:    { label:'Unclassified',      color:'rgba(240,236,228,.12)', dot:'rgba(240,236,228,.15)', shape:'ellipse',  size:14 },
+};
+
+let catFilter = 'all';
+
+function classifyDomain(domain, node) {
+  // Only classify analyzed nodes — queued = unclassified
+  if (!node || node.status !== 'done') return 'unknown';
+  const analysis = node.analysis || {};
+  const db       = analysis.db_match || {};
+  const dims     = analysis.dimensions || {};
+  const scrape   = analysis.scrape || {};
+  const attr     = analysis.attribution || {};
+
+  // State Anchor — in registry as overt state media
+  if (db.tier === 'tier1' && db.overt !== false) return 'anchor';
+
+  // Covert Affiliate — in registry as covert, or tier2
+  if (db.tier === 'tier2' || (db.tier === 'tier1' && db.overt === false)) return 'affiliate';
+
+  // Content Launderer — wire service / aggregator signals
+  const d = domain.toLowerCase();
+  const laundering_keywords = ['newswire','wire','syndicate','pressrelease','prwire',
+    'release','dispatch','bulletin','feed','digest','roundup'];
+  const sourcing = (scrape.content_sourcing || []).map(s => s.type);
+  const hasLaunderSignals = laundering_keywords.some(k => d.includes(k))
+    || (scrape.state_media_links || []).length >= 3
+    || sourcing.includes('press_release_heavy')
+    || sourcing.includes('attributed_republication');
+  if (hasLaunderSignals && dims.state_media_proximity?.score >= 3) return 'launderer';
+
+  // Infrastructure — CDN, cloud, static asset, API nodes
+  const infra_keywords = ['cdn','static','assets','img','images','media','oss',
+    'api','upload','download','storage','cache','cloud','s3','bucket',
+    'aliyun','qcloud','huaweicloud','azure','aws','fastly','cloudfront',
+    'akamai','dcloud','files','file'];
+  if (infra_keywords.some(k => d.includes(k))) return 'infra';
+  // Also infra if no content signals at all and low state proximity
+  if (!scrape.reachable && (dims.state_media_proximity?.score || 0) === 0) return 'infra';
+
+  // Foreign Target — non-English language or country-targeted TLD
+  const foreignTLDs = ['.fr','.de','.es','.it','.jp','.kr','.ar','.pt','.nl',
+    '.pl','.se','.no','.fi','.tr','.id','.th','.vn','.in','.br','.mx'];
+  const lang = (scrape.language || '').toLowerCase();
+  const isForeignLang = lang && lang !== 'en' && !lang.startsWith('en');
+  const isForeignTLD  = foreignTLDs.some(t => d.endsWith(t));
+  if (isForeignLang || isForeignTLD) return 'foreign';
+
+  // Unknown — analyzed but doesn't fit a clear pattern
+  return 'unknown';
+}
+
+function getCategoryBadgeHtml(cat) {
+  if (cat === 'unknown') return '';
+  const m = CAT_META[cat];
+  if (!m) return '';
+  return `<span class="qi-cat" style="background:${m.color}20;color:${m.dot};border:1px solid ${m.dot}40">${m.label}</span>`;
+}
+
+function updateCatBar() {
+  const allNodes = Object.values(nodes);
+  if (!allNodes.length) {
+    const bar = document.getElementById('catBar');
+    if (bar) bar.classList.remove('visible');
+    return;
+  }
+  const counts = { anchor:0, affiliate:0, launderer:0, foreign:0, infra:0, unknown:0 };
+  for (const n of allNodes) {
+    const cat = classifyDomain(n.id, n);
+    counts[cat] = (counts[cat] || 0) + 1;
+  }
+  const total = allNodes.length;
+  const bar = document.getElementById('catBar');
+  if (bar) bar.classList.add('visible');
+
+  const el = id => document.getElementById(id);
+  if (el('catCountAll'))        el('catCountAll').textContent        = total;
+  if (el('catCountAnchor'))     el('catCountAnchor').textContent     = counts.anchor;
+  if (el('catCountAffiliate'))  el('catCountAffiliate').textContent  = counts.affiliate;
+  if (el('catCountLaunderer'))  el('catCountLaunderer').textContent  = counts.launderer;
+  if (el('catCountForeign'))    el('catCountForeign').textContent    = counts.foreign;
+  if (el('catCountInfra'))      el('catCountInfra').textContent      = counts.infra;
+  if (el('catCountUnknown'))    el('catCountUnknown').textContent    = counts.unknown;
+}
+
+function setCatFilter(cat, btn) {
+  catFilter = cat;
+  document.querySelectorAll('.cat-pill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderQueue();
 }
 
 // ══ STATE HELPERS ═════════════════════════════════════════════════════════════
