@@ -845,46 +845,55 @@ def analyze_domain(domain: str) -> dict:
     }
 
     try:
-        # Step 1: DB check (instant) + parallel network calls
+        # Step 1: instant lookups
         result["db_match"] = check_database(domain)
         ip_res             = resolve_ip(domain)
         result["ip_info"]  = ip_res
         ip                 = ip_res.get("ip")
 
-        # Step 2: Run slow external calls in parallel (max 20s total)
-        with ThreadPoolExecutor(max_workers=4) as ex:
-            f_asn   = ex.submit(get_asn_info,    ip)    if ip   else None
-            f_whois = ex.submit(get_rdap_whois,  domain)
-            f_sans  = ex.submit(get_ssl_sans,    domain)
-            f_rip   = ex.submit(get_reverse_ip,  ip)    if ip   else None
-            f_scrape= ex.submit(scrape_page,     domain)
+        # Step 2: fire all slow calls in parallel, collect independently
+        executor = ThreadPoolExecutor(max_workers=5)
+        f_asn    = executor.submit(get_asn_info,   ip)     if ip else None
+        f_whois  = executor.submit(get_rdap_whois, domain)
+        f_sans   = executor.submit(get_ssl_sans,   domain)
+        f_rip    = executor.submit(get_reverse_ip, ip)     if ip else None
+        f_scrape = executor.submit(scrape_page,    domain)
 
-            def safe_result(f, default):
-                if f is None: return default
-                try:   return f.result(timeout=18)
-                except Exception: return default
+        def _get(f, default, label):
+            if f is None:
+                return default
+            try:
+                return f.result(timeout=15)
+            except Exception as ex:
+                logger.warning(f"analyze_domain({domain}) — {label} failed: {ex}")
+                return default
 
-            result["asn_info"]   = safe_result(f_asn,    {})
-            result["whois"]      = safe_result(f_whois,  {})
-            sans                 = safe_result(f_sans,   [])
-            rip                  = safe_result(f_rip,    [])
-            result["scrape"]     = safe_result(f_scrape, {})
+        asn_info = _get(f_asn,    {}, "asn")
+        whois    = _get(f_whois,  {}, "whois")
+        sans     = _get(f_sans,   [], "ssl_sans")
+        rip      = _get(f_rip,    [], "reverse_ip")
+        scrape   = _get(f_scrape, {}, "scrape")
 
+        executor.shutdown(wait=False)  # don't block — futures already collected
+
+        result["asn_info"]           = asn_info
+        result["whois"]              = whois
         result["ssl_sans"]           = sans
         result["ssl_san_overlap"]    = find_san_overlap(sans)
         result["reverse_ip"]         = rip
         result["reverse_ip_overlap"] = find_rip_overlap(rip)
-        result["attribution"]        = derive_attribution(domain, result["whois"], result["asn_info"])
+        result["scrape"]             = scrape
+        result["attribution"]        = derive_attribution(domain, whois, asn_info)
 
         result["dimensions"] = compute_dimensions(
             domain             = domain,
             db_match           = result["db_match"],
-            asn_info           = result["asn_info"],
+            asn_info           = asn_info,
             attribution        = result["attribution"],
-            whois              = result["whois"],
+            whois              = whois,
             ssl_san_overlap    = result["ssl_san_overlap"],
             reverse_ip_overlap = result["reverse_ip_overlap"],
-            scrape             = result["scrape"],
+            scrape             = scrape,
         )
 
     except Exception as e:
