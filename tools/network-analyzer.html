@@ -354,6 +354,81 @@ h1 em{font-style:italic;color:var(--gold);}
   padding:5px 8px;cursor:pointer;transition:all .15s;}
 .bulk-deselect:hover{color:var(--red);}
 
+
+/* ── STAGING PANEL ── */
+.staging-panel{background:var(--bg2);border:1px solid var(--border);
+  border-top:2px solid rgba(176,136,249,.4);
+  margin-bottom:10px;display:none;flex-direction:column;}
+.staging-panel.has-items{display:flex;}
+.staging-header{display:flex;align-items:center;justify-content:space-between;
+  padding:9px 14px;border-bottom:1px solid var(--border);
+  background:var(--bg3);flex-shrink:0;gap:8px;flex-wrap:wrap;}
+.staging-title{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.20em;color:#b088f9;}
+.staging-count{font-family:var(--mono);font-size:10px;color:var(--muted);}
+.staging-count strong{color:#b088f9;}
+.staging-header-actions{display:flex;gap:6px;}
+.staging-hdr-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;background:transparent;border:1px solid var(--border);
+  color:var(--dim);padding:4px 10px;cursor:pointer;transition:all .15s;}
+.staging-hdr-btn:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
+.staging-hdr-btn.promote{background:rgba(176,136,249,.12);color:#b088f9;
+  border-color:rgba(176,136,249,.3);}
+.staging-hdr-btn.promote:hover{background:rgba(176,136,249,.25);}
+.staging-scroll{flex:1;overflow-y:auto;max-height:320px;
+  scrollbar-width:thin;scrollbar-color:rgba(176,136,249,.15) transparent;}
+
+/* staging groups */
+.stg-group{border-bottom:1px solid rgba(255,255,255,.04);}
+.stg-group:last-child{border-bottom:none;}
+.stg-group-hdr{display:flex;align-items:center;gap:8px;padding:8px 14px;
+  cursor:pointer;background:var(--bg3);transition:background .1s;
+  border-bottom:1px solid rgba(255,255,255,.04);}
+.stg-group-hdr:hover{background:rgba(255,255,255,.03);}
+.stg-tool-color{width:3px;height:14px;border-radius:1px;flex-shrink:0;}
+.stg-tool-name{font-family:var(--mono);font-size:10px;font-weight:500;
+  color:var(--muted);flex:1;text-transform:uppercase;letter-spacing:.08em;}
+.stg-tool-count{font-family:var(--mono);font-size:10px;color:var(--dim);}
+.stg-group-toggle{font-family:var(--mono);font-size:9px;color:var(--dim);
+  margin-left:4px;transition:transform .2s;}
+.stg-group.collapsed .stg-group-toggle{transform:rotate(-90deg);}
+.stg-group-body{display:flex;flex-direction:column;}
+.stg-group.collapsed .stg-group-body{display:none;}
+.stg-group-actions{display:flex;gap:6px;padding:6px 14px;
+  background:rgba(176,136,249,.04);border-bottom:1px solid rgba(255,255,255,.03);}
+.stg-grp-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;background:transparent;border:1px solid var(--border);
+  color:var(--dim);padding:3px 9px;cursor:pointer;transition:all .15s;}
+.stg-grp-btn:hover{color:#b088f9;border-color:rgba(176,136,249,.3);}
+.stg-item{display:flex;align-items:center;gap:7px;padding:7px 14px;
+  border-bottom:1px solid rgba(255,255,255,.03);}
+.stg-item:last-child{border-bottom:none;}
+.stg-check{width:13px;height:13px;accent-color:#b088f9;cursor:pointer;flex-shrink:0;}
+.stg-domain{font-family:var(--mono);font-size:11px;color:var(--muted);flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stg-note{font-family:var(--mono);font-size:9px;color:var(--dim);
+  max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.stg-remove{background:transparent;border:none;color:rgba(192,57,43,.3);
+  font-size:11px;cursor:pointer;padding:1px 4px;transition:color .1s;flex-shrink:0;}
+.stg-remove:hover{color:var(--red);}
+
+/* staging footer */
+.staging-footer{display:flex;align-items:center;gap:8px;padding:8px 14px;
+  border-top:1px solid var(--border);background:var(--bg3);
+  flex-shrink:0;flex-wrap:wrap;}
+.stg-sel-count{font-family:var(--mono);font-size:10px;color:var(--muted);flex:1;}
+.stg-sel-count strong{color:#b088f9;}
+.stg-promote-btn{background:#b088f9;color:var(--bg);border:none;
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.12em;
+  padding:7px 16px;cursor:pointer;transition:opacity .15s;}
+.stg-promote-btn:hover{opacity:.85;}
+.stg-promote-btn:disabled{opacity:.3;cursor:not-allowed;}
+.stg-clear-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;background:transparent;border:1px solid var(--border);
+  color:var(--dim);padding:6px 10px;cursor:pointer;transition:all .15s;}
+.stg-clear-btn:hover{color:var(--red);}
+
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -509,6 +584,36 @@ h1 em{font-style:italic;color:var(--gold);}
 </div>
 
 <!-- QUEUE + TABLE -->
+
+<!-- STAGING AREA -->
+<div class="staging-panel" id="stagingPanel">
+  <div class="staging-header">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="staging-title">⚗ Staging Area</span>
+      <span class="staging-count">
+        <strong id="stagingTotal">0</strong> domains pending review
+      </span>
+    </div>
+    <div class="staging-header-actions">
+      <button class="staging-hdr-btn" onclick="stagingSelectAll(true)">Select All</button>
+      <button class="staging-hdr-btn" onclick="stagingSelectAll(false)">Deselect All</button>
+      <button class="staging-hdr-btn" onclick="clearStaging()">Clear Staging</button>
+      <button class="staging-hdr-btn promote" onclick="promoteSelected()">
+        → Promote Selected to Queue
+      </button>
+    </div>
+  </div>
+  <div class="staging-scroll" id="stagingScroll"></div>
+  <div class="staging-footer">
+    <span class="stg-sel-count" id="stagingSelCount">0 selected</span>
+    <button class="stg-promote-btn" id="stagingPromoteBtn"
+      onclick="promoteSelected()" disabled>
+      → Add Selected to Queue
+    </button>
+    <button class="stg-clear-btn" onclick="clearStaging()">Clear All</button>
+  </div>
+</div>
+
 <div class="lower-grid">
   <div class="queue-panel">
     <div class="queue-header">
@@ -713,17 +818,24 @@ async function analyzeDomain(domain, type) {
 
     setNode(domain, type || 'queued', 'done', data);
 
-    // Queue neighbors
+    // SSL SANs + Reverse IP → staging in Investigate mode, queue in Expand mode
+    const goToQueue = (mode === 'top' || type === 'queued');
     for (const san of (data.ssl_sans || []).slice(0,25)) {
-      if (san !== domain && !nodes[san]) {
-        setNode(san, 'ssl_san', 'queued', null, 'ssl_cert');
-        addEdge(domain, san, 'ssl_san');
+      if (san === domain) continue;
+      if (goToQueue) {
+        if (!nodes[san]) { setNode(san,'ssl_san','queued',null,'ssl_cert'); addEdge(domain,san,'ssl_san'); }
+      } else {
+        addEdge(domain, san, 'ssl_san'); // always add edge to graph
+        if (!nodes[san]) addToStaging('ssl_cert', san, `SSL SAN of ${domain}`);
       }
     }
     for (const n of (data.reverse_ip || []).slice(0,15)) {
-      if (n !== domain && !nodes[n]) {
-        setNode(n, 'shared_ip', 'queued', null, 'reverse_ip');
+      if (n === domain) continue;
+      if (goToQueue) {
+        if (!nodes[n]) { setNode(n,'shared_ip','queued',null,'reverse_ip'); addEdge(domain,n,'shared_ip'); }
+      } else {
         addEdge(domain, n, 'shared_ip');
+        if (!nodes[n]) addToStaging('reverse_ip', n, `Shares IP with ${domain}`);
       }
     }
     for (const sl of (data.scrape?.state_media_links || [])) {
@@ -1262,37 +1374,22 @@ async function runIdSearch(domain) {
 }
 
 function addAffiliateFromId(domain, idValue, idType) {
-  if (!nodes[domain]) {
-    setNode(domain, 'id_affiliate', 'queued', null, 'tracking_id');
-    // Mark the edge as a shared-ID connection
-    addEdge(nodes[domain]?.analysis?._seed || Object.keys(nodes)[0], domain, 'shared_id');
-  }
-  try { updateNode(domain); } catch(e) {}
-  renderQueue();
-  updateBadge();
-  updateCatBar();
-  showHint(`${domain} added to queue via shared ${idType} (${idValue})`);
+  // Route to staging, not directly to queue
+  addToStaging('tracking_id', domain, `Shared ${idType}: ${idValue}`);
+  showHint(`${domain} → staging via shared ${idType}`);
 }
 
 function addAllAffiliates(sourceDomain) {
   const affiliates = nodes[sourceDomain]?.analysis?._id_affiliates || [];
-  let added = 0;
+  let staged = 0;
   for (const aff of affiliates) {
     if (!nodes[aff.domain]) {
-      setNode(aff.domain, 'id_affiliate', 'queued', null);
-      addEdge(sourceDomain, aff.domain, 'shared_id');
-      added++;
+      addToStaging('tracking_id', aff.domain, `Shared ${aff.id_type}: ${aff.id_value}`);
+      staged++;
     }
   }
-  try {
-    for (const aff of affiliates) {
-      if (nodes[aff.domain]?.status === 'queued') updateNode(aff.domain);
-    }
-  } catch(e) {}
-  renderQueue();
-  updateBadge();
-  updateCatBar();
-  showHint(`${added} sites added to queue from shared ID search on ${sourceDomain}`);
+  const total = Object.keys(staging).reduce((s,t)=>s+staging[t].items.length,0);
+  showHint(`${staged} sites sent to staging (${total} total in staging)`);
 }
 
 function closeDetail() {
@@ -1579,49 +1676,240 @@ async function runInvestigationTool(domain, tool) {
     }
 
     const results = data.results || [];
-    let added = 0;
+
+    // Route to STAGING — never directly to queue
+    // Already-known domains get method tag updated in-place
+    let staged  = 0;
     let updated = 0;
-
     for (const found of results) {
-      // Handle both {domain, method, note} objects and plain strings
       const rawDomain = (typeof found === 'string') ? found : (found.domain || '');
-      const d = cleanDomain(rawDomain);
+      const d    = cleanDomain(rawDomain);
+      const note = typeof found === 'object' ? (found.note || '') : '';
       if (!d || d === domain) continue;
-
-      if (!nodes[d]) {
-        setNode(d, tool, 'queued', null, tool);
-        addEdge(domain, d, tool);
-        added++;
-      } else {
-        // Already known — stack the discovery method
-        const existing = nodes[d];
-        if (!existing.discovery_methods) existing.discovery_methods = [];
-        if (!existing.discovery_methods.includes(tool)) {
-          existing.discovery_methods.push(tool);
+      if (nodes[d]) {
+        // Already in graph — just tag with the method
+        if (!nodes[d].discovery_methods) nodes[d].discovery_methods = [];
+        if (!nodes[d].discovery_methods.includes(tool)) {
+          nodes[d].discovery_methods.push(tool);
           updated++;
         }
+      } else {
+        addToStaging(tool, d, note);
+        staged++;
       }
     }
 
-    // Always render after adding — regardless of what called us
     try { renderQueue(); }  catch(e) {}
-    try { renderTable(); }  catch(e) {}
     try { updateBadge(); }  catch(e) {}
     try { updateCatBar(); } catch(e) {}
-    try { updateGraphStats(); } catch(e) {}
 
-    const msg = added > 0
-      ? `${toolName(tool)} → ${domain}: added ${added} new domains${updated > 0 ? `, updated ${updated} existing` : ''}`
-      : updated > 0
-      ? `${toolName(tool)} → ${domain}: ${updated} existing domains got this method added`
-      : `${toolName(tool)} → ${domain}: no new domains found (${results.length} results returned)`;
-
+    const total = Object.keys(staging).reduce((s,t)=>s+staging[t].items.length, 0);
+    const msg = staged > 0
+      ? `${toolName(tool)} → ${domain}: ${staged} domains sent to staging (${total} total in staging)`
+      : `${toolName(tool)} → ${domain}: no new domains found`;
     showHint(msg);
     clearErr();
 
   } catch(err) {
     showErr(`${toolName(tool)} failed for ${domain}: ${err.message}`);
   }
+}
+
+
+// ══ STAGING AREA ══════════════════════════════════════════════════════════════
+// staging = { toolKey: { label, color, items: [{domain, note, source}] } }
+let staging = {};
+let stagingSelected = new Set();
+
+const TOOL_META = {
+  ssl_cert:    { label:'🔍 SSL Certificate Tracer',  color:'#7eb8e4' },
+  nameserver:  { label:'🌐 Nameserver Tracker',       color:'#4ec994' },
+  reverse_ip:  { label:'📡 Reverse IP Mapper',        color:'#e87b4a' },
+  tracking_id: { label:'🏷 Tracking ID Hunter',       color:'#b088f9' },
+  whois_batch: { label:'📋 WHOIS Batch Detector',     color:'#c8a96e' },
+  shared_id:   { label:'🔗 Shared Tracking ID',       color:'#b088f9' },
+};
+
+function addToStaging(tool, domain, note) {
+  domain = cleanDomain(domain);
+  if (!domain) return;
+  // Skip if already in queue or already in staging
+  if (nodes[domain]) return;
+  if (!staging[tool]) staging[tool] = { ...TOOL_META[tool], items: [] };
+  // Skip duplicates within staging
+  if (staging[tool].items.find(i => i.domain === domain)) return;
+  staging[tool].items.push({ domain, note: note || '' });
+  renderStaging();
+}
+
+function addManyToStaging(tool, results) {
+  // results = [{domain, note}] or plain strings
+  let added = 0;
+  for (const r of results) {
+    const domain = cleanDomain(typeof r === 'string' ? r : (r.domain || r));
+    const note   = typeof r === 'object' ? (r.note || '') : '';
+    if (!domain) continue;
+    if (nodes[domain]) continue; // already in graph
+    if (!staging[tool]) staging[tool] = { ...TOOL_META[tool], items: [] };
+    if (staging[tool].items.find(i => i.domain === domain)) continue;
+    staging[tool].items.push({ domain, note });
+    added++;
+  }
+  if (added > 0) renderStaging();
+  return added;
+}
+
+function renderStaging() {
+  const panel = document.getElementById('stagingPanel');
+  const scroll = document.getElementById('stagingScroll');
+  if (!panel || !scroll) return;
+
+  const tools = Object.keys(staging).filter(t => staging[t].items.length > 0);
+  const total  = tools.reduce((s, t) => s + staging[t].items.length, 0);
+
+  panel.classList.toggle('has-items', total > 0);
+  const totalEl = document.getElementById('stagingTotal');
+  if (totalEl) totalEl.textContent = total;
+
+  if (!total) { scroll.innerHTML = ''; updateStagingFooter(); return; }
+
+  scroll.innerHTML = tools.map(tool => {
+    const group    = staging[tool];
+    const items    = group.items;
+    const allKey   = `stg-group-${tool}`;
+    const isCollapsed = document.getElementById(allKey)?.classList.contains('collapsed') || false;
+
+    const itemsHtml = items.map(item => {
+      const key     = `${tool}::${item.domain}`;
+      const checked = stagingSelected.has(key);
+      return `<div class="stg-item">
+        <input type="checkbox" class="stg-check" ${checked?'checked':''}
+          onchange="stagingToggle('${esc(tool)}','${esc(item.domain)}',this.checked)">
+        <span class="stg-domain" title="${esc(item.domain)}">${esc(item.domain)}</span>
+        ${item.note ? `<span class="stg-note" title="${esc(item.note)}">${esc(item.note)}</span>` : ''}
+        <button class="stg-remove" onclick="stagingRemove('${esc(tool)}','${esc(item.domain)}')">✕</button>
+      </div>`;
+    }).join('');
+
+    return `<div class="stg-group${isCollapsed?' collapsed':''}" id="${allKey}">
+      <div class="stg-group-hdr" onclick="stagingToggleGroup('${esc(tool)}')">
+        <div class="stg-tool-color" style="background:${esc(group.color||'#888')}"></div>
+        <span class="stg-tool-name">${esc(group.label||tool)}</span>
+        <span class="stg-tool-count">${items.length} domain${items.length!==1?'s':''}</span>
+        <span class="stg-group-toggle">▾</span>
+      </div>
+      <div class="stg-group-body">
+        <div class="stg-group-actions">
+          <button class="stg-grp-btn" onclick="stagingSelectGroup('${esc(tool)}',true)">Select All</button>
+          <button class="stg-grp-btn" onclick="stagingSelectGroup('${esc(tool)}',false)">Deselect</button>
+          <button class="stg-grp-btn" onclick="promoteGroup('${esc(tool)}')">→ Promote All</button>
+        </div>
+        ${itemsHtml}
+      </div>
+    </div>`;
+  }).join('');
+
+  updateStagingFooter();
+}
+
+function updateStagingFooter() {
+  const n    = stagingSelected.size;
+  const el   = document.getElementById('stagingSelCount');
+  const btn  = document.getElementById('stagingPromoteBtn');
+  if (el)  el.innerHTML = n > 0 ? `<strong>${n}</strong> selected` : '0 selected';
+  if (btn) btn.disabled = n === 0;
+}
+
+function stagingToggle(tool, domain, checked) {
+  const key = `${tool}::${domain}`;
+  if (checked) stagingSelected.add(key);
+  else stagingSelected.delete(key);
+  updateStagingFooter();
+}
+
+function stagingToggleGroup(tool) {
+  const el = document.getElementById(`stg-group-${tool}`);
+  if (el) el.classList.toggle('collapsed');
+}
+
+function stagingSelectGroup(tool, checked) {
+  const group = staging[tool];
+  if (!group) return;
+  for (const item of group.items) {
+    const key = `${tool}::${item.domain}`;
+    if (checked) stagingSelected.add(key);
+    else stagingSelected.delete(key);
+  }
+  renderStaging();
+}
+
+function stagingSelectAll(checked) {
+  for (const tool of Object.keys(staging)) {
+    for (const item of staging[tool].items) {
+      const key = `${tool}::${item.domain}`;
+      if (checked) stagingSelected.add(key);
+      else stagingSelected.delete(key);
+    }
+  }
+  renderStaging();
+}
+
+function stagingRemove(tool, domain) {
+  if (!staging[tool]) return;
+  staging[tool].items = staging[tool].items.filter(i => i.domain !== domain);
+  stagingSelected.delete(`${tool}::${domain}`);
+  if (!staging[tool].items.length) delete staging[tool];
+  renderStaging();
+}
+
+function clearStaging() {
+  staging = {};
+  stagingSelected.clear();
+  renderStaging();
+}
+
+function promoteGroup(tool) {
+  const group = staging[tool];
+  if (!group) return;
+  let added = 0;
+  for (const item of group.items) {
+    if (!nodes[item.domain]) {
+      setNode(item.domain, tool, 'queued', null, tool);
+      added++;
+    }
+    stagingSelected.delete(`${tool}::${item.domain}`);
+  }
+  delete staging[tool];
+  renderStaging();
+  renderQueue();
+  updateBadge();
+  updateCatBar();
+  showHint(`Promoted ${added} domains from ${TOOL_META[tool]?.label||tool} to queue`);
+}
+
+function promoteSelected() {
+  const toPromote = [...stagingSelected];
+  if (!toPromote.length) return;
+  let added = 0;
+  for (const key of toPromote) {
+    const [tool, domain] = key.split('::');
+    if (!domain) continue;
+    if (!nodes[domain]) {
+      setNode(domain, tool, 'queued', null, tool);
+      added++;
+    }
+    // Remove from staging
+    if (staging[tool]) {
+      staging[tool].items = staging[tool].items.filter(i => i.domain !== domain);
+      if (!staging[tool].items.length) delete staging[tool];
+    }
+    stagingSelected.delete(key);
+  }
+  renderStaging();
+  renderQueue();
+  updateBadge();
+  updateCatBar();
+  showHint(`${added} domains promoted to queue — ready to analyze`);
 }
 
 // ══ STATE HELPERS ═════════════════════════════════════════════════════════════
