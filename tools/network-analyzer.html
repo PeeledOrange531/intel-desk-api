@@ -1245,10 +1245,7 @@ function openDetail(domain) {
     })()}
     <div id="idSearchResults-${esc(domain)}"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
-      ${(data.scrape?.analytics_ids||[]).length > 0
-        ? '<button class="id-search-btn" id="idSearchBtn-' + esc(domain) + '" onclick="runIdSearch(\'' + esc(domain) + '\')">🔍 Find Sites Sharing These IDs</button>'
-        : ''
-      }
+      ${''}
       <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
       <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--gold);margin-bottom:8px;">Investigation Toolkit</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
@@ -1279,6 +1276,185 @@ function openDetail(domain) {
 
 
 // ══ ID SEARCH — Find sites sharing tracking/analytics IDs ════════════════
+async function runIdSearchBulk(domain) {
+  // Search ALL IDs from this domain in parallel
+  // Results go directly to staging — persistent across the session
+  const btn = document.getElementById(`idSearchBtn-${domain}`);
+  const resultsEl = document.getElementById(`idSearchResults-${domain}`);
+
+  const ids = nodes[domain]?.analysis?.scrape?.analytics_ids || [];
+  const SKIP = new Set(['WeChat Integration','VKontakte Integration']);
+  const searchable = ids.filter(id => !SKIP.has(id.type));
+
+  if (!searchable.length) {
+    if (resultsEl) resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:8px 0;">No searchable IDs found.</div>`;
+    return;
+  }
+
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="id-spinner"></span>Searching all IDs…'; }
+
+  // Map SpyOnWeb endpoint types
+  const SPY_TYPE = {
+    'Google Analytics':    'analytics',
+    'Google Tag Manager':  'tag_manager',
+    'Yandex Metrica':      'metrika',
+  };
+
+  let totalStaged = 0;
+  let allManualLinks = [];
+  const resultsLog = []; // for display in detail drawer
+
+  // Fire all ID searches in parallel
+  const searches = searchable.map(async idEntry => {
+    const { type, id: idValue } = idEntry;
+    const spyType = SPY_TYPE[type];
+    let found = [];
+    let source = 'manual';
+
+    // Try SpyOnWeb browser-side
+    if (spyType) {
+      try {
+        const r = await fetch(
+          `https://api.spyonweb.com/v1/${spyType}/${encodeURIComponent(idValue)}?access_token=default`,
+          { headers: { 'Accept': 'application/json' }, signal: AbortSignal.timeout(8000) }
+        );
+        if (r.ok) {
+          const data = await r.json();
+          const items = data?.result?.[spyType]?.[idValue]?.items || {};
+          found = Object.keys(items).filter(d => d && cleanDomain(d) !== domain);
+          source = 'SpyOnWeb';
+        }
+      } catch(e) {
+        // SpyOnWeb unreachable from this browser — fall through
+      }
+    }
+
+    // Always generate manual search links regardless of API result
+    allManualLinks.push({
+      type, idValue,
+      publicwww: `https://publicwww.com/websites/${encodeURIComponent('"'+idValue+'"')}/`,
+      spyonweb:  `https://spyonweb.com/${encodeURIComponent(idValue)}`,
+      nerdydata: `https://nerdydata.com/search?query=${encodeURIComponent(idValue)}`,
+    });
+
+    // Stage all found domains immediately — they persist in staging
+    for (const d of found) {
+      addToStaging('tracking_id', d, `Shared ${type}: ${idValue}`);
+      totalStaged++;
+    }
+
+    resultsLog.push({ type, idValue, found, source });
+  });
+
+  await Promise.all(searches);
+
+  // Build results display in detail drawer
+  let html = '<div class="id-results" style="margin-top:8px;">';
+
+  const apiResults = resultsLog.filter(r => r.found.length > 0);
+  if (apiResults.length) {
+    html += `<div class="id-results-hdr" style="color:#b088f9;">
+      ⚗ ${totalStaged} site${totalStaged!==1?'s':''} sent to staging</div>`;
+    for (const r of apiResults) {
+      html += `<div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin:4px 0;">
+        <span style="color:#b088f9">${esc(r.type)}: ${esc(r.idValue)}</span>
+        → ${r.found.length} site${r.found.length!==1?'s':''} (${r.source}) → staged</div>`;
+    }
+  } else {
+    html += `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);margin-bottom:8px;">
+      No API results — check staging area and use manual links below.</div>`;
+  }
+
+  // Manual search links — always shown, open in new tabs
+  html += `<div style="margin-top:10px;">
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.14em;color:var(--dim);margin-bottom:7px;">
+      Manual Search — opens in new tab, paste results into staging manually
+    </div>`;
+
+  for (const link of allManualLinks) {
+    html += `<div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;flex-wrap:wrap;">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--blue);
+        background:rgba(126,184,228,.08);border:1px solid rgba(126,184,228,.18);
+        padding:1px 6px;white-space:nowrap;">${esc(link.type)}: ${esc(link.idValue)}</span>
+      <a href="${link.publicwww}" target="_blank" rel="noopener"
+        style="font-family:var(--mono);font-size:9px;color:var(--gold);
+        text-decoration:none;border:1px solid rgba(200,169,110,.2);
+        padding:2px 7px;white-space:nowrap;">PublicWWW ↗</a>
+      <a href="${link.spyonweb}" target="_blank" rel="noopener"
+        style="font-family:var(--mono);font-size:9px;color:var(--gold);
+        text-decoration:none;border:1px solid rgba(200,169,110,.2);
+        padding:2px 7px;white-space:nowrap;">SpyOnWeb ↗</a>
+      <a href="${link.nerdydata}" target="_blank" rel="noopener"
+        style="font-family:var(--mono);font-size:9px;color:var(--gold);
+        text-decoration:none;border:1px solid rgba(200,169,110,.2);
+        padding:2px 7px;white-space:nowrap;">NerdyData ↗</a>
+    </div>`;
+  }
+  html += '</div>';
+
+  // Manual add input — paste domains found manually into staging
+  html += `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">
+      Paste domains found manually (one per line or comma-separated)
+    </div>
+    <div style="display:flex;gap:0;">
+      <textarea id="manualPasteInput-${esc(domain)}"
+        style="flex:1;background:var(--bg3);border:1px solid var(--border);
+          border-right:none;outline:none;font-family:var(--mono);font-size:11px;
+          color:var(--text);padding:8px 10px;resize:vertical;min-height:60px;
+          placeholder-color:var(--dim);"
+        placeholder="example1.com&#10;example2.com&#10;example3.com"></textarea>
+      <button onclick="stageManualPaste('${esc(domain)}')"
+        style="background:rgba(176,136,249,.12);border:1px solid rgba(176,136,249,.25);
+          color:#b088f9;font-family:var(--mono);font-size:10px;font-weight:500;
+          text-transform:uppercase;letter-spacing:.12em;padding:0 14px;
+          cursor:pointer;white-space:nowrap;">
+        → Stage
+      </button>
+    </div>
+  </div>`;
+
+  html += '</div>';
+
+  if (resultsEl) resultsEl.innerHTML = html;
+  if (btn) {
+    btn.textContent = totalStaged > 0
+      ? `✓ ${totalStaged} staged · Search links ready`
+      : '🔍 Search All IDs → Stage Results';
+    btn.disabled = false;
+  }
+
+  // Update staging panel
+  renderStaging();
+  const stagingTotal = Object.keys(staging).reduce((s,t)=>s+staging[t].items.length,0);
+  if (totalStaged > 0) {
+    showHint(`${totalStaged} domains staged from ID search on ${domain} · ${stagingTotal} total in staging`);
+  }
+}
+
+// Keep old runIdSearch as alias for backward compatibility
+async function runIdSearch(domain) { return runIdSearchBulk(domain); }
+
+function stageManualPaste(sourceDomain) {
+  const ta = document.getElementById(`manualPasteInput-${sourceDomain}`);
+  if (!ta) return;
+  const raw = ta.value.trim();
+  if (!raw) return;
+  const domains = raw.split(/[\n,;\s]+/).map(d => cleanDomain(d)).filter(Boolean);
+  let staged = 0;
+  for (const d of domains) {
+    if (d !== sourceDomain && !nodes[d]) {
+      addToStaging('tracking_id', d, `Manually staged from ${sourceDomain} ID search`);
+      staged++;
+    }
+  }
+  ta.value = '';
+  renderStaging();
+  showHint(`${staged} domains staged manually from ${sourceDomain}`);
+}
+
 async function runIdSearch(domain) {
   const btn = document.getElementById(`idSearchBtn-${domain}`);
   const resultsEl = document.getElementById(`idSearchResults-${domain}`);
