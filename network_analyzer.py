@@ -1040,6 +1040,257 @@ def analyze():
     return resp
 
 
+
+@network_bp.route("/id-search", methods=["POST","OPTIONS"])
+def id_search():
+    """
+    Given a domain, extract all analytics/ad IDs from its HTML,
+    then search PublicWWW for other domains using each ID.
+    Returns a list of affiliate domains with the ID that connected them.
+    """
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+
+    data   = request.get_json(force=True, silent=True) or {}
+    domain = (data.get("domain") or "").strip()
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+
+    result = {
+        "domain":     domain,
+        "ids_found":  [],
+        "affiliates": [],   # [{domain, id_type, id_value, source}]
+        "errors":     [],
+        "timestamp":  time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    }
+
+    # Step 1: scrape the domain and extract IDs
+    # Re-use existing scrape function
+    try:
+        scrape = scrape_page(domain)
+        analytics_ids = scrape.get("analytics_ids", [])
+        result["ids_found"] = analytics_ids
+    except Exception as e:
+        result["errors"].append(f"Scrape failed: {str(e)}")
+        resp = jsonify(result)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    if not analytics_ids:
+        result["errors"].append("No trackable IDs found in page source")
+        resp = jsonify(result)
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp
+
+    # Step 2: for each ID, search PublicWWW
+    # Only search IDs that are meaningful for cross-site attribution
+    # (skip generic WeChat/VK integrations, focus on specific numeric/alphanumeric IDs)
+    SKIP_TYPES = {"WeChat Integration", "VKontakte Integration"}
+    affiliates_seen = set()
+
+    for id_entry in analytics_ids:
+        id_type  = id_entry.get("type", "")
+        id_value = id_entry.get("id", "")
+
+        if id_type in SKIP_TYPES or not id_value:
+            continue
+
+        # Build the search query string for PublicWWW
+        # PublicWWW indexes raw HTML source — search for the exact ID string
+        search_domains = _publicwww_search(id_value, id_type)
+
+        for found_domain in search_domains:
+            found_domain = found_domain.strip().lower()
+            # Clean up — remove protocol and path
+            found_domain = re.sub(r'^https?://', '', found_domain)
+            found_domain = found_domain.split('/')[0].strip()
+            if not found_domain or found_domain == domain:
+                continue
+            key = f"{found_domain}:{id_value}"
+            if key in affiliates_seen:
+                continue
+            affiliates_seen.add(key)
+            result["affiliates"].append({
+                "domain":   found_domain,
+                "id_type":  id_type,
+                "id_value": id_value,
+                "source":   "PublicWWW",
+                "signal":   "shared_tracking_id",
+            })
+
+    resp = jsonify(result)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+def _publicwww_search(id_value: str, id_type: str) -> list:
+    """
+    Search PublicWWW for pages containing the given ID.
+    Free tier — no API key required for basic searches.
+    Returns list of domain strings.
+    """
+    domains = []
+    try:
+        # PublicWWW search URL — quoted string search in page source
+        query    = requests.utils.quote(f'"{id_value}"')
+        url      = f"https://publicwww.com/websites/{query}/"
+        headers  = {
+            "User-Agent": "Mozilla/5.0 (compatible; IntelDesk-Research/1.0; +https://inteldesk.io)",
+            "Accept":     "text/html,application/xhtml+xml,*/*;q=0.8",
+        }
+        r = requests.get(url, headers=headers, timeout=12, allow_redirects=True)
+        if not r or r.status_code != 200:
+            return []
+
+        # Parse the results page — PublicWWW lists domains in <a> tags with class "badge"
+        soup  = BeautifulSoup(r.text, "html.parser")
+
+        # Method 1: domain badges in search results
+        for a in soup.find_all("a", href=True):
+            href = a.get("href", "")
+            text = a.get_text(strip=True)
+            # PublicWWW result links look like /websites/domain.com/
+            if href.startswith("/websites/") and href.endswith("/"):
+                extracted = href.replace("/websites/", "").rstrip("/")
+                if "." in extracted and len(extracted) > 3:
+                    domains.append(extracted)
+            # Also catch domain text that looks like a domain
+            elif re.match(r'^[a-z0-9][a-z0-9.\-]+\.[a-z]{2,}$', text, re.I):
+                domains.append(text)
+
+        # Deduplicate, cap at 50
+        seen = set()
+        result = []
+        for d in domains:
+            if d not in seen:
+                seen.add(d)
+                result.append(d)
+        return result[:50]
+
+    except Exception as e:
+        logger.debug(f"PublicWWW search for {id_value}: {e}")
+        return []
+
+
+@network_bp.route("/tool-expand", methods=["POST","OPTIONS"])
+def tool_expand():
+    """
+    Run a single named investigation tool against a domain.
+    Returns a list of discovered domains with their method.
+
+    Tools:
+      ssl_cert   — SSL certificate SAN expansion
+      reverse_ip — Reverse IP lookup
+      nameserver — Shared nameserver lookup
+      whois_batch — WHOIS registrant/registrar cluster
+    """
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+
+    data   = request.get_json(force=True, silent=True) or {}
+    domain = clean_domain((data.get("domain") or "").strip())
+    tool   = (data.get("tool") or "").strip()
+
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    if not tool:
+        return jsonify({"error": "tool required"}), 400
+
+    results = []
+    error   = None
+
+    try:
+        if tool == "ssl_cert":
+            sans = get_ssl_sans(domain)
+            results = [{"domain": s, "method": "ssl_cert",
+                        "note": "Shares SSL certificate SAN"} for s in sans if s != domain]
+
+        elif tool == "reverse_ip":
+            ip_res = resolve_ip(domain)
+            ip = ip_res.get("ip")
+            if ip:
+                neighbors = get_reverse_ip(ip)
+                results = [{"domain": n, "method": "reverse_ip",
+                            "note": f"Co-hosted on {ip}"} for n in neighbors if n != domain]
+            else:
+                error = f"Could not resolve IP for {domain}"
+
+        elif tool == "nameserver":
+            whois = get_rdap_whois(domain)
+            nameservers = whois.get("nameservers", [])
+            if not nameservers:
+                # Try getting nameservers from a simple dig-style lookup
+                try:
+                    import dns.resolver
+                    ns_records = dns.resolver.resolve(domain, 'NS')
+                    nameservers = [str(r).rstrip('.').lower() for r in ns_records]
+                except Exception:
+                    pass
+
+            if not nameservers:
+                error = f"No nameservers found for {domain}"
+            else:
+                found_domains = set()
+                for ns in nameservers[:3]:  # check first 3 nameservers
+                    ns_results = _hackertarget_nameserver_lookup(ns)
+                    found_domains.update(ns_results)
+                found_domains.discard(domain)
+                results = [{"domain": d, "method": "nameserver",
+                            "note": f"Shares nameserver with {domain}"}
+                           for d in sorted(found_domains)]
+
+        elif tool == "whois_batch":
+            whois = get_rdap_whois(domain)
+            registrar = whois.get("registrar", "")
+            registrant_org = whois.get("registrant_org", "")
+            created = whois.get("created", "")
+
+            if not registrar and not registrant_org:
+                error = "No WHOIS registrar/registrant data available"
+            else:
+                # Use HackerTarget to find domains by same registrar
+                found_domains = _hackertarget_registrar_lookup(registrar, domain)
+                results = [{"domain": d, "method": "whois_batch",
+                            "note": f"Same registrar: {registrar}"}
+                           for d in found_domains if d != domain]
+
+        else:
+            error = f"Unknown tool: {tool}"
+
+    except Exception as e:
+        error = str(e)
+        logger.exception(f"tool_expand({domain}, {tool})")
+
+    resp = jsonify({
+        "domain":   domain,
+        "tool":     tool,
+        "results":  results[:50],  # cap at 50
+        "count":    len(results),
+        "error":    error,
+        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+    })
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+def _hackertarget_nameserver_lookup(nameserver: str) -> list:
+    """Find domains sharing a nameserver via HackerTarget."""
+    r = safe_get(f"https://api.hackertarget.com/findsharednameserver/?q={nameserver}")
+    if not r or "error" in r.text.lower() or "API count" in r.text:
+        return []
+    domains = [d.strip() for d in r.text.strip().split("\n") if "." in d and len(d) > 3]
+    return domains[:100]
+
+
+def _hackertarget_registrar_lookup(registrar: str, seed_domain: str) -> list:
+    """
+    HackerTarget doesn't have a registrar API — use a zone file approach.
+    Fall back to returning empty list with note to check manually.
+    For now, return empty — this is a placeholder for a future
+    integration with WhoisXML or DomainTools APIs.
+    """
+    return []
+
 @network_bp.route("/expand", methods=["POST","OPTIONS"])
 def expand():
     if request.method == "OPTIONS":
