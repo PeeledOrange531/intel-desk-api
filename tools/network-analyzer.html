@@ -1141,19 +1141,19 @@ function openDetail(domain) {
       <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--gold);margin-bottom:8px;">Investigation Toolkit</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="id-search-btn" style="background:rgba(126,184,228,.08);color:#7eb8e4;border-color:rgba(126,184,228,.2);"
-          onclick="runInvestigationTool('${esc(domain)}','ssl_cert').then(()=>{renderQueue();updateCatBar();})">
+          onclick="runInvestigationTool('${esc(domain)}','ssl_cert')">
           🔍 SSL Certificate Tracer
         </button>
         <button class="id-search-btn" style="background:rgba(78,201,148,.08);color:#4ec994;border-color:rgba(78,201,148,.2);"
-          onclick="runInvestigationTool('${esc(domain)}','nameserver').then(()=>{renderQueue();updateCatBar();})">
+          onclick="runInvestigationTool('${esc(domain)}','nameserver')">
           🌐 Nameserver Tracker
         </button>
         <button class="id-search-btn" style="background:rgba(232,123,74,.08);color:#e87b4a;border-color:rgba(232,123,74,.2);"
-          onclick="runInvestigationTool('${esc(domain)}','reverse_ip').then(()=>{renderQueue();updateCatBar();})">
+          onclick="runInvestigationTool('${esc(domain)}','reverse_ip')">
           📡 Reverse IP Mapper
         </button>
         <button class="id-search-btn" style="background:rgba(176,136,249,.08);color:#b088f9;border-color:rgba(176,136,249,.2);"
-          onclick="runInvestigationTool('${esc(domain)}','whois_batch').then(()=>{renderQueue();updateCatBar();})">
+          onclick="runInvestigationTool('${esc(domain)}','whois_batch')">
           📋 WHOIS Batch Detector
         </button>
       </div>
@@ -1558,7 +1558,8 @@ function toolName(tool) {
 async function runInvestigationTool(domain, tool) {
   domain = cleanDomain(domain);
   if (!domain) return;
-  showHint(`${toolName(tool)} → ${domain}…`);
+  showHint(`${toolName(tool)} running on ${domain}…`);
+
   try {
     const res = await fetch(`${API}/network/tool-expand`, {
       method:  'POST',
@@ -1566,28 +1567,58 @@ async function runInvestigationTool(domain, tool) {
       body:    JSON.stringify({domain, tool}),
     });
     if (!res.ok) throw new Error(`Server ${res.status}`);
-    const data = await res.json();
 
+    const rawText = await res.text();
+    let data;
+    try { data = JSON.parse(rawText); }
+    catch(e) { throw new Error(`Bad JSON: ${rawText.slice(0,100)}`); }
+
+    if (data.error) {
+      showHint(`${toolName(tool)}: ${data.error}`);
+      return;
+    }
+
+    const results = data.results || [];
     let added = 0;
-    for (const found of (data.results || [])) {
-      const d = cleanDomain(found.domain || found);
+    let updated = 0;
+
+    for (const found of results) {
+      // Handle both {domain, method, note} objects and plain strings
+      const rawDomain = (typeof found === 'string') ? found : (found.domain || '');
+      const d = cleanDomain(rawDomain);
       if (!d || d === domain) continue;
+
       if (!nodes[d]) {
         setNode(d, tool, 'queued', null, tool);
         addEdge(domain, d, tool);
-        try { updateNode(d); } catch(e) {}
         added++;
       } else {
-        // Domain already known — just add the discovery method
+        // Already known — stack the discovery method
         const existing = nodes[d];
-        const methods  = existing.discovery_methods || [];
-        if (!methods.includes(tool)) {
-          methods.push(tool);
-          existing.discovery_methods = methods;
+        if (!existing.discovery_methods) existing.discovery_methods = [];
+        if (!existing.discovery_methods.includes(tool)) {
+          existing.discovery_methods.push(tool);
+          updated++;
         }
       }
     }
-    showHint(`${toolName(tool)} found ${added} new domains from ${domain}`);
+
+    // Always render after adding — regardless of what called us
+    try { renderQueue(); }  catch(e) {}
+    try { renderTable(); }  catch(e) {}
+    try { updateBadge(); }  catch(e) {}
+    try { updateCatBar(); } catch(e) {}
+    try { updateGraphStats(); } catch(e) {}
+
+    const msg = added > 0
+      ? `${toolName(tool)} → ${domain}: added ${added} new domains${updated > 0 ? `, updated ${updated} existing` : ''}`
+      : updated > 0
+      ? `${toolName(tool)} → ${domain}: ${updated} existing domains got this method added`
+      : `${toolName(tool)} → ${domain}: no new domains found (${results.length} results returned)`;
+
+    showHint(msg);
+    clearErr();
+
   } catch(err) {
     showErr(`${toolName(tool)} failed for ${domain}: ${err.message}`);
   }
