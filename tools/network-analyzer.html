@@ -1284,93 +1284,136 @@ async function runIdSearch(domain) {
   const resultsEl = document.getElementById(`idSearchResults-${domain}`);
   if (!btn || !resultsEl) return;
 
+  const ids = nodes[domain]?.analysis?.scrape?.analytics_ids || [];
+  if (!ids.length) {
+    resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:8px 0;">No tracking IDs found for this domain.</div>`;
+    return;
+  }
+
   btn.disabled = true;
-  btn.innerHTML = '<span class="id-spinner"></span>Searching PublicWWW…';
-  resultsEl.innerHTML = '';
+  btn.innerHTML = '<span class="id-spinner"></span>Searching…';
 
-  try {
-    const res = await fetch(`${API}/network/id-search`, {
-      method:  'POST',
-      headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify({domain}),
-    });
-    if (!res.ok) throw new Error(`Server ${res.status}`);
-    const data = await res.json();
+  // Filter to IDs worth searching (skip generic integrations)
+  const SKIP = new Set(['WeChat Integration','VKontakte Integration']);
+  const searchable = ids.filter(id => !SKIP.has(id.type));
 
-    if (data.error) throw new Error(data.error);
+  if (!searchable.length) {
+    resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:8px 0;">No cross-referenceable IDs found (only social integrations detected).</div>`;
+    btn.textContent = '🔍 Find Sites Sharing These IDs';
+    btn.disabled = false;
+    return;
+  }
 
-    const affiliates = data.affiliates || [];
-    const errors     = data.errors || [];
+  // Try SpyOnWeb browser-side (allows CORS from browsers, blocks server IPs)
+  let found = {};  // idKey → [domains]
+  let spyWorked = false;
 
-    if (!affiliates.length && !errors.length) {
-      resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:8px 0;">
-        No matching sites found on PublicWWW for these IDs.</div>`;
-      btn.textContent = '🔍 Find Sites Sharing These IDs';
-      btn.disabled = false;
-      return;
+  for (const idEntry of searchable) {
+    const { type, id: idValue } = idEntry;
+    // SpyOnWeb supports GA, GTM, Yandex, Adsense IDs
+    const spyType = type === 'Google Analytics' ? 'analytics'
+                  : type === 'Google Tag Manager' ? 'tag_manager'
+                  : type === 'Yandex Metrica' ? 'metrika'
+                  : type === 'Baidu Tongji' ? null
+                  : null;
+    if (!spyType) continue;
+
+    try {
+      const r = await fetch(
+        `https://api.spyonweb.com/v1/${spyType}/${encodeURIComponent(idValue)}?access_token=default`,
+        { headers: { 'Accept': 'application/json' } }
+      );
+      if (r.ok) {
+        const data = await r.json();
+        // SpyOnWeb returns: {status:"found", result:{analytics/tag_manager: {VALUE: {items:{domain:1,...}}}}}
+        const resultObj = data?.result?.[spyType]?.[idValue]?.items || {};
+        const domains = Object.keys(resultObj).filter(d => d && d !== domain);
+        if (domains.length) {
+          found[`${type}:${idValue}`] = { type, value: idValue, domains };
+          spyWorked = true;
+        }
+      }
+    } catch(e) {
+      // SpyOnWeb failed from this browser — will fall through to manual links
     }
+  }
 
-    // Group by ID value
-    const byId = {};
-    for (const aff of affiliates) {
-      const key = `${aff.id_type}:${aff.id_value}`;
-      if (!byId[key]) byId[key] = { type: aff.id_type, value: aff.id_value, domains: [] };
-      byId[key].domains.push(aff.domain);
-    }
+  // Build results HTML
+  let html = '<div class="id-results">';
 
-    let html = `<div class="id-results">
-      <div class="id-results-hdr">
-        🔗 ${affiliates.length} site${affiliates.length!==1?'s':''} found sharing tracking IDs with ${esc(domain)}
-      </div>`;
+  if (spyWorked && Object.keys(found).length) {
+    const total = Object.values(found).reduce((s,g) => s + g.domains.length, 0);
+    html += `<div class="id-results-hdr">🔗 ${total} site${total!==1?'s':''} found sharing tracking IDs with ${esc(domain)}</div>`;
 
-    for (const [key, group] of Object.entries(byId)) {
+    for (const [key, group] of Object.entries(found)) {
       html += `<div class="id-group">
         <div class="id-group-label">
-          ${esc(group.type)}
-          <span class="id-group-value">${esc(group.value)}</span>
+          ${esc(group.type)} <span class="id-group-value">${esc(group.value)}</span>
           <span style="color:var(--dim);font-size:9px;">${group.domains.length} site${group.domains.length!==1?'s':''}</span>
         </div>`;
-      for (const d of group.domains) {
-        const alreadyInGraph = !!nodes[d];
+      for (const d of group.domains.slice(0,30)) {
         html += `<div class="id-affiliate">
           <span class="id-aff-domain" title="${esc(d)}">${esc(d)}</span>
-          ${alreadyInGraph
+          ${nodes[d]
             ? `<span style="font-family:var(--mono);font-size:9px;color:var(--green)">In graph</span>`
-            : `<button class="id-aff-add" onclick="addAffiliateFromId('${esc(d)}','${esc(group.value)}','${esc(group.type)}')">+ Add to queue</button>`
+            : `<button class="id-aff-add" onclick="addAffiliateFromId('${esc(d)}','${esc(group.value)}','${esc(group.type)}')">+ Stage</button>`
           }
         </div>`;
       }
-      html += `</div>`;
+      html += '</div>';
     }
 
-    if (errors.length) {
-      html += `<div style="font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:6px;">
-        Note: ${esc(errors.join(' · '))}</div>`;
+    // Store for bulk add
+    const allAffiliates = [];
+    for (const group of Object.values(found)) {
+      for (const d of group.domains) {
+        allAffiliates.push({ domain:d, id_type:group.type, id_value:group.value });
+      }
     }
+    if (nodes[domain]?.analysis) nodes[domain].analysis._id_affiliates = allAffiliates;
 
     html += `<button style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
       letter-spacing:.12em;color:var(--gold);background:rgba(200,169,110,.08);
-      border:1px solid rgba(200,169,110,.25);padding:6px 14px;cursor:pointer;
-      margin-top:8px;" onclick="addAllAffiliates('${esc(domain)}')">
-      + Add All to Queue
-    </button>`;
+      border:1px solid rgba(200,169,110,.25);padding:6px 14px;cursor:pointer;margin-top:8px;"
+      onclick="addAllAffiliates('${esc(domain)}')">+ Stage All</button>`;
 
-    html += `</div>`;
-    resultsEl.innerHTML = html;
-
-    // Store affiliates on the node for bulk-add
-    if (nodes[domain]?.analysis) {
-      nodes[domain].analysis._id_affiliates = affiliates;
-    }
-
-    btn.textContent = `✓ Found ${affiliates.length} sites`;
-
-  } catch(err) {
-    resultsEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--red);padding:8px 0;">
-      ID search failed: ${esc(err.message)}</div>`;
-    btn.textContent = '🔍 Find Sites Sharing These IDs';
-    btn.disabled = false;
+  } else {
+    // SpyOnWeb didn't return results — show manual search links
+    html += `<div style="font-family:var(--mono);font-size:11px;color:var(--muted);margin-bottom:10px;">
+      SpyOnWeb returned no results. Search manually in a new tab:</div>`;
   }
+
+  // Always show manual search links for every ID — lets analyst verify
+  html += `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:10px;">
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:7px;">Manual Search Links</div>
+    <div style="display:flex;flex-direction:column;gap:5px;">`;
+
+  for (const idEntry of searchable) {
+    const { type, id: idValue } = idEntry;
+    const publicwwwUrl  = `https://publicwww.com/websites/${encodeURIComponent('"'+idValue+'"')}/`;
+    const spyonwebUrl   = `https://spyonweb.com/${encodeURIComponent(idValue)}`;
+    const nerdyataUrl   = `https://nerdydata.com/search?query=${encodeURIComponent(idValue)}`;
+    html += `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span style="font-family:var(--mono);font-size:9px;color:var(--blue);
+        background:rgba(126,184,228,.08);border:1px solid rgba(126,184,228,.18);
+        padding:1px 6px;">${esc(type)}: ${esc(idValue)}</span>
+      <a href="${publicwwwUrl}" target="_blank" style="font-family:var(--mono);font-size:9px;
+        color:var(--gold);text-decoration:none;border:1px solid rgba(200,169,110,.2);
+        padding:2px 7px;">PublicWWW ↗</a>
+      <a href="${spyonwebUrl}" target="_blank" style="font-family:var(--mono);font-size:9px;
+        color:var(--gold);text-decoration:none;border:1px solid rgba(200,169,110,.2);
+        padding:2px 7px;">SpyOnWeb ↗</a>
+      <a href="${nerdyataUrl}" target="_blank" style="font-family:var(--mono);font-size:9px;
+        color:var(--gold);text-decoration:none;border:1px solid rgba(200,169,110,.2);
+        padding:2px 7px;">NerdyData ↗</a>
+    </div>`;
+  }
+
+  html += `</div></div></div>`;
+  resultsEl.innerHTML = html;
+
+  btn.textContent = spyWorked ? `✓ Found results` : '🔍 Find Sites Sharing These IDs';
+  btn.disabled = false;
 }
 
 function addAffiliateFromId(domain, idValue, idType) {
