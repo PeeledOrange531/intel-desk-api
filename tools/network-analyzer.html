@@ -1232,6 +1232,8 @@ function openDetail(domain) {
     <div class="dd-dims">${cards}</div>
     ${(() => {
       const ids = (data.scrape?.analytics_ids || []);
+      const SKIP = new Set(['WeChat Integration','VKontakte Integration']);
+      const searchable = ids.filter(id => !SKIP.has(id.type));
       if (!ids.length) return '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);margin-bottom:10px;">No trackable IDs found in page source.</div>';
       const idList = ids.map(id =>
         '<span style="font-family:var(--mono);font-size:10px;padding:2px 8px;' +
@@ -1239,11 +1241,20 @@ function openDetail(domain) {
         'color:var(--blue);margin-right:4px;margin-bottom:4px;display:inline-block;">' +
         esc(id.type) + ': <strong>' + esc(id.id) + '</strong></span>'
       ).join('');
+      const bulkBtn = searchable.length > 0
+        ? '<button class="id-search-btn" id="idSearchBtn-' + esc(domain) + '" ' +
+          'style="margin-top:8px;background:rgba(176,136,249,.10);color:#b088f9;border-color:rgba(176,136,249,.3);" ' +
+          'onclick="runIdSearchBulk(\'' + esc(domain) + '\')">' +
+          '🔍 Search All ' + searchable.length + ' ID' + (searchable.length!==1?'s':'') + ' → Stage Results' +
+          '</button>'
+        : '';
       return '<div style="margin-bottom:12px;">' +
         '<div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Tracking IDs Found</div>' +
-        '<div>' + idList + '</div></div>';
+        '<div style="margin-bottom:6px;">' + idList + '</div>' +
+        bulkBtn +
+        '<div id="idSearchResults-' + esc(domain) + '"></div>' +
+        '</div>';
     })()}
-    <div id="idSearchResults-${esc(domain)}"></div>
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
       ${''}
       <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
