@@ -964,12 +964,29 @@ def _corsify(r):
 @network_bp.route("/ping", methods=["GET"])
 def ping():
     registry = NET_DB.get("state_media_registry", {})
+
+    # Test external API reachability
+    api_tests = {}
+    test_domains = {
+        "crt.sh":         "https://crt.sh/?q=%25.example.com&output=json",
+        "hackertarget":   "https://api.hackertarget.com/reverseiplookup/?q=8.8.8.8",
+        "rdap.org":       "https://rdap.org/domain/example.com",
+        "ipinfo.io":      "https://ipinfo.io/8.8.8.8/json",
+    }
+    for name, url in test_domains.items():
+        try:
+            r = requests.get(url, timeout=5, headers=HEADERS)
+            api_tests[name] = {"status": r.status_code, "ok": r.status_code == 200}
+        except Exception as e:
+            api_tests[name] = {"status": 0, "ok": False, "error": str(e)[:80]}
+
     return jsonify({
-        "status":          "ok",
-        "db_loaded":       bool(NET_DB),
-        "state_media":     len(registry),
+        "status":           "ok",
+        "db_loaded":        bool(NET_DB),
+        "state_media":      len(registry),
         "covert_affiliates": len(NET_DB.get("covert_affiliates", [])),
         "countries_covered": len(set(v.get("country","") for v in registry.values())),
+        "api_reachability": api_tests,
     })
 
 
