@@ -126,20 +126,61 @@ def get_asn_info(ip: str) -> dict:
 
 
 def get_ssl_sans(domain: str) -> list:
-    r = safe_get(f"https://crt.sh/?q=%25.{domain}&output=json", timeout=CRT_TIMEOUT)
-    if not r:
-        return []
-    try:
-        certs = r.json()
-        sans  = set()
-        for cert in certs[:60]:
-            for name in cert.get("name_value", "").split("\n"):
-                name = name.strip().lstrip("*.")
-                if name and "." in name and name != domain:
-                    sans.add(name)
-        return sorted(sans)[:100]
-    except Exception:
-        return []
+    """
+    Fetch SSL certificate SANs. Tries crt.sh first, falls back to
+    certspotter if crt.sh fails or returns 502.
+    """
+    sans = set()
+
+    # Method 1: crt.sh — retry once on 502
+    for attempt in range(2):
+        r = safe_get(f"https://crt.sh/?q=%25.{domain}&output=json", timeout=CRT_TIMEOUT)
+        if r and r.status_code == 200:
+            try:
+                certs = r.json()
+                for cert in certs[:60]:
+                    for name in cert.get("name_value", "").split("\n"):
+                        name = name.strip().lstrip("*.")
+                        if name and "." in name and name != domain:
+                            sans.add(name)
+                if sans:
+                    return sorted(sans)[:100]
+            except Exception:
+                pass
+        elif r and r.status_code == 502:
+            time.sleep(1)  # brief pause before retry
+            continue
+        break
+
+    # Method 2: certspotter (100 req/hr free, no key)
+    if not sans:
+        try:
+            r2 = safe_get(
+                f"https://api.certspotter.com/v1/issuances?domain={domain}"
+                f"&include_subdomains=true&expand=dns_names",
+                timeout=10
+            )
+            if r2 and r2.status_code == 200:
+                for cert in r2.json():
+                    for name in cert.get("dns_names", []):
+                        name = name.strip().lstrip("*.")
+                        if name and "." in name and name != domain:
+                            sans.add(name)
+        except Exception:
+            pass
+
+    # Method 3: DNS brute-force common subdomains as last resort
+    if not sans:
+        common = ["www","mail","ftp","api","cdn","static","media","img","images",
+                  "news","en","es","fr","de","ru","ar","app","mobile","m"]
+        for sub in common:
+            try:
+                socket.gethostbyname(f"{sub}.{domain}")
+                sans.add(f"{sub}.{domain}")
+            except Exception:
+                pass
+
+    return sorted(sans)[:100]
 
 
 def get_rdap_whois(domain: str) -> dict:
@@ -968,7 +1009,9 @@ def ping():
     # Test external API reachability
     api_tests = {}
     test_domains = {
-        "crt.sh":         "https://crt.sh/?q=%25.example.com&output=json",
+        "crt.sh (example)":  "https://crt.sh/?q=%25.example.com&output=json",
+        "crt.sh (cgtn)":    "https://crt.sh/?q=%25.cgtn.com&output=json",
+        "certspotter":    "https://api.certspotter.com/v1/issuances?domain=example.com&include_subdomains=true&expand=dns_names",
         "hackertarget":   "https://api.hackertarget.com/reverseiplookup/?q=8.8.8.8",
         "rdap.org":       "https://rdap.org/domain/example.com",
         "ipinfo.io":      "https://ipinfo.io/8.8.8.8/json",
