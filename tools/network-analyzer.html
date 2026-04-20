@@ -790,7 +790,30 @@ async function runSeed() {
 async function analyzeDomain(domain, type) {
   domain = cleanDomain(domain);
   if (!domain) return;
-  if (nodes[domain]?.status === 'done') { openDetail(domain); return; }
+  // Smart cache — use existing result if it has good data
+  const existing = nodes[domain];
+  if (existing?.status === 'done' && existing?.analysis) {
+    const a = existing.analysis;
+    const hasGoodData = (a.ssl_sans?.length > 0)
+                     || (a.reverse_ip?.length > 0)
+                     || (a.dimensions && Object.keys(a.dimensions).length > 0);
+    if (hasGoodData) {
+      showHint(`${domain} — cached (${a.ssl_sans?.length||0} SANs · ${a.reverse_ip?.length||0} IP neighbors)`);
+      try { openDetail(domain); } catch(e) {}
+      // Re-populate staging from cache in case it was cleared
+      for (const san of (a.ssl_sans||[]).slice(0,25)) {
+        if (san !== domain && !nodes[san]) addToStaging('ssl_cert', san, `SSL SAN of ${domain}`);
+      }
+      for (const n of (a.reverse_ip||[]).slice(0,15)) {
+        if (n !== domain && !nodes[n]) addToStaging('reverse_ip', n, `Shares IP with ${domain}`);
+      }
+      try { renderStaging(); } catch(e) {}
+      return;
+    }
+    // Previous result was empty — delete it and re-fetch
+    showHint(`${domain} — previous result was empty, re-fetching…`);
+    delete nodes[domain];
+  }
 
   running = true;
   setRunning(true, domain);
