@@ -534,6 +534,90 @@ h1 em{font-style:italic;color:var(--gold);}
 .deep-run-btn.deep-done{color:var(--green);border-color:rgba(78,201,148,.3);
   background:rgba(78,201,148,.08);}
 
+
+/* ── BACKGROUND JOB PANEL ── */
+.job-panel{background:var(--bg2);border:1px solid var(--border);
+  border-top:2px solid rgba(78,201,148,.4);margin-bottom:10px;}
+.job-panel-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  background:var(--bg3);gap:10px;flex-wrap:wrap;}
+.job-panel-title{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.20em;color:var(--green);}
+.job-toggle-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;color:var(--dim);background:transparent;
+  border:1px solid var(--border);padding:4px 10px;cursor:pointer;transition:all .15s;}
+.job-toggle-btn:hover{color:var(--gold);}
+.job-panel-body{padding:14px 16px;display:none;}
+.job-panel-body.open{display:block;}
+
+/* submit form */
+.job-form{display:flex;flex-direction:column;gap:8px;margin-bottom:14px;}
+.job-form-row{display:flex;gap:8px;flex-wrap:wrap;}
+.job-textarea{width:100%;background:var(--bg3);border:1px solid var(--border);
+  outline:none;font-family:var(--mono);font-size:11px;color:var(--text);
+  padding:10px 12px;resize:vertical;min-height:80px;line-height:1.6;}
+.job-textarea:focus{border-color:rgba(78,201,148,.35);}
+.job-textarea::placeholder{color:var(--dim);}
+.job-type-select{background:var(--bg3);border:1px solid var(--border);
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  padding:7px 12px;outline:none;cursor:pointer;flex:1;}
+.job-type-select option{background:var(--bg2);}
+.job-submit-btn{background:var(--green);color:var(--bg);border:none;
+  font-family:var(--mono);font-size:10px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.14em;
+  padding:8px 18px;cursor:pointer;transition:opacity .15s;white-space:nowrap;}
+.job-submit-btn:hover{opacity:.85;}
+.job-submit-btn:disabled{opacity:.35;cursor:not-allowed;}
+
+/* resume by job ID */
+.job-resume-row{display:flex;gap:0;border:1px solid var(--border);margin-bottom:14px;}
+.job-id-input{flex:1;background:var(--bg3);border:none;outline:none;
+  font-family:var(--mono);font-size:11px;color:var(--text);padding:8px 12px;
+  letter-spacing:.06em;}
+.job-id-input::placeholder{color:var(--dim);}
+.job-resume-btn{background:rgba(78,201,148,.12);border:none;
+  border-left:1px solid rgba(78,201,148,.25);
+  color:var(--green);font-family:var(--mono);font-size:10px;font-weight:500;
+  text-transform:uppercase;letter-spacing:.12em;padding:0 16px;
+  cursor:pointer;transition:all .15s;white-space:nowrap;}
+.job-resume-btn:hover{background:rgba(78,201,148,.22);}
+
+/* active jobs list */
+.job-list{display:flex;flex-direction:column;gap:6px;}
+.job-card{background:var(--bg3);border:1px solid var(--border);padding:10px 14px;}
+.job-card-top{display:flex;align-items:center;gap:10px;margin-bottom:8px;}
+.job-card-id{font-family:var(--mono);font-size:10px;color:var(--gold2);
+  font-weight:500;flex-shrink:0;}
+.job-card-type{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;padding:1px 6px;border-radius:1px;flex-shrink:0;}
+.job-card-type.triage{background:rgba(78,201,148,.12);color:var(--green);
+  border:1px solid rgba(78,201,148,.25);}
+.job-card-type.analyze{background:rgba(200,169,110,.12);color:var(--gold);
+  border:1px solid rgba(200,169,110,.25);}
+.job-card-status{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;color:var(--dim);flex:1;}
+.job-card-status.running{color:var(--green);animation:statusPulse .8s ease-in-out infinite;}
+.job-card-status.complete{color:var(--green);}
+.job-card-status.cancelled{color:var(--red);}
+.job-card-actions{display:flex;gap:6px;}
+.job-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;background:transparent;border:1px solid var(--border);
+  color:var(--dim);padding:3px 8px;cursor:pointer;transition:all .15s;}
+.job-btn:hover{color:var(--gold);}
+.job-btn.cancel:hover{color:var(--red);}
+
+/* progress bar */
+.job-progress{height:4px;background:rgba(255,255,255,.06);
+  border-radius:2px;overflow:hidden;margin-bottom:6px;}
+.job-progress-fill{height:100%;
+  background:linear-gradient(90deg,var(--green),rgba(78,201,148,.5));
+  border-radius:2px;transition:width .5s ease;}
+.job-progress-fill.complete{background:var(--green);}
+.job-stats{font-family:var(--mono);font-size:10px;color:var(--dim);
+  display:flex;gap:12px;flex-wrap:wrap;}
+.job-stats strong{color:var(--muted);}
+.job-eta{color:rgba(78,201,148,.6);}
+
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -689,6 +773,61 @@ h1 em{font-style:italic;color:var(--gold);}
 </div>
 
 <!-- QUEUE + TABLE -->
+
+<!-- BACKGROUND JOB PANEL -->
+<div class="job-panel" id="jobPanel">
+  <div class="job-panel-hdr">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="job-panel-title">⚙ Background Jobs</span>
+      <span style="font-family:var(--mono);font-size:10px;color:var(--dim);">
+        Runs on server while laptop sleeps
+      </span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <span id="jobBadge" style="display:none;font-family:var(--mono);font-size:9px;
+        color:var(--green);border:1px solid rgba(78,201,148,.25);padding:2px 8px;"></span>
+      <button class="job-toggle-btn" onclick="toggleJobPanel()">▾ Open</button>
+    </div>
+  </div>
+  <div class="job-panel-body" id="jobPanelBody">
+
+    <!-- Submit new job -->
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Submit New Job</div>
+    <div class="job-form">
+      <textarea class="job-textarea" id="jobDomains"
+        placeholder="Paste domains here — one per line or comma-separated.&#10;Drag &amp; drop a .txt or .csv file, or paste up to 5,000 domains.&#10;&#10;example.com&#10;another-domain.net&#10;suspicious-news.org"></textarea>
+      <div class="job-form-row">
+        <select class="job-type-select" id="jobType">
+          <option value="triage">⚡ Triage — IP + ASN only (fast, bulk, runs in minutes)</option>
+          <option value="analyze">🔬 Full Analyze — complete pipeline (slow, targeted)</option>
+        </select>
+        <button class="job-submit-btn" id="jobSubmitBtn" onclick="submitJob()">
+          Submit Job →
+        </button>
+      </div>
+    </div>
+
+    <!-- Resume existing job -->
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Resume by Job ID</div>
+    <div class="job-resume-row">
+      <input class="job-id-input" id="jobIdInput"
+        placeholder="Paste job ID from a previous session…"
+        onkeydown="if(event.key==='Enter')resumeJob()">
+      <button class="job-resume-btn" onclick="resumeJob()">Resume →</button>
+    </div>
+
+    <!-- Active jobs -->
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Active Jobs</div>
+    <div class="job-list" id="jobList">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--dim);
+        padding:8px 0;">No active jobs. Submit a domain list above.</div>
+    </div>
+  </div>
+</div>
+
 
 <!-- STAGING AREA -->
 <div class="staging-panel" id="stagingPanel">
@@ -1226,8 +1365,8 @@ function initCy() {
       }},
       { selector:'node:selected', style:{'border-width':3,'border-color':'#e8d5a3'}},
       { selector:'node[?deep]', style:{
-        'border-width':4,'border-color':'#e8d5a3',
-        'box-shadow':'0 0 0 3px rgba(232,213,163,.3)',
+        'border-width':5,'border-color':'#e8d5a3',
+        'background-opacity':1,
       }},
       { selector:'edge', style:{
         'width':'data(w)','line-color':'data(ec)','opacity':0.5,
@@ -2031,8 +2170,8 @@ const cy = cytoscape({
     }},
     { selector:'node:selected', style:{'border-width':3,'border-color':'#e8d5a3'}},
       { selector:'node[?deep]', style:{
-        'border-width':4,'border-color':'#e8d5a3',
-        'box-shadow':'0 0 0 3px rgba(232,213,163,.3)',
+        'border-width':5,'border-color':'#e8d5a3',
+        'background-opacity':1,
       }},
     { selector:'edge', style:{
       'width':'data(w)','line-color':'data(ec)','opacity':.5,
