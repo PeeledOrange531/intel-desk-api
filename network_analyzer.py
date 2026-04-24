@@ -1376,3 +1376,451 @@ def expand():
     resp   = jsonify(result)
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
+
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DEEP ANALYSIS — Tier 2 investigation
+# Historical DNS, Wayback, full cert chain, BGP, registrar history
+# ══════════════════════════════════════════════════════════════════════════════
+
+def get_historical_dns(domain: str) -> dict:
+    """
+    Fetch historical DNS records via SecurityTrails-compatible free APIs.
+    Uses HackerTarget DNS history as primary source.
+    """
+    result = {"a_records": [], "ns_history": [], "mx_records": [], "error": None}
+    try:
+        # HackerTarget DNS lookup — current records
+        r = safe_get(f"https://api.hackertarget.com/dnslookup/?q={domain}")
+        if r and r.status_code == 200 and "error" not in r.text.lower():
+            for line in r.text.strip().splitlines():
+                parts = line.strip().split()
+                if len(parts) >= 3:
+                    record_type = parts[1].upper() if len(parts) > 2 else ""
+                    value = parts[-1]
+                    if "A" == record_type and value not in result["a_records"]:
+                        result["a_records"].append(value)
+                    elif "NS" == record_type and value not in result["ns_history"]:
+                        result["ns_history"].append(value)
+                    elif "MX" == record_type and value not in result["mx_records"]:
+                        result["mx_records"].append(value)
+
+        # HackerTarget reverse DNS history
+        r2 = safe_get(f"https://api.hackertarget.com/hostsearch/?q={domain}")
+        if r2 and r2.status_code == 200 and "error" not in r2.text.lower():
+            hosts = [l.split(",")[0] for l in r2.text.strip().split("\n") if "," in l]
+            result["subdomains_found"] = hosts[:30]
+
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
+
+def get_wayback_snapshots(domain: str) -> dict:
+    """
+    Check Wayback Machine for archived snapshots.
+    Returns count, first/last seen dates, and sample URLs.
+    """
+    result = {"available": False, "first_seen": None, "last_seen": None,
+              "snapshot_count": 0, "sample_urls": [], "error": None}
+    try:
+        # Wayback CDX API — fast, no auth needed
+        r = safe_get(
+            f"https://web.archive.org/cdx/search/cdx"
+            f"?url={domain}/*&output=json&limit=5&fl=timestamp,original,statuscode"
+            f"&filter=statuscode:200&collapse=timestamp:6",
+            timeout=10
+        )
+        if r and r.status_code == 200:
+            data = r.json()
+            if len(data) > 1:  # first row is header
+                result["available"] = True
+                result["snapshot_count"] = len(data) - 1
+                timestamps = [row[0] for row in data[1:] if row[0]]
+                if timestamps:
+                    result["first_seen"] = timestamps[0][:8]   # YYYYMMDD
+                    result["last_seen"]  = timestamps[-1][:8]
+                result["sample_urls"] = [
+                    f"https://web.archive.org/web/{row[0]}/{row[1]}"
+                    for row in data[1:4] if len(row) >= 2
+                ]
+
+        # Also check availability API for total count
+        r2 = safe_get(f"https://archive.org/wayback/available?url={domain}", timeout=8)
+        if r2 and r2.status_code == 200:
+            snap = r2.json().get("archived_snapshots", {}).get("closest", {})
+            if snap.get("available"):
+                result["available"] = True
+                result["closest_snapshot"] = snap.get("url", "")
+                result["closest_timestamp"] = snap.get("timestamp", "")
+
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
+
+def get_bgp_info(ip: str) -> dict:
+    """
+    Get BGP routing info — which ASNs route this IP, peering relationships.
+    Uses BGPView-compatible free APIs.
+    """
+    result = {"prefixes": [], "peers": [], "upstreams": [],
+              "rir": None, "country": None, "error": None}
+    try:
+        # Shodan internetdb — free, no key
+        r = safe_get(f"https://internetdb.shodan.io/{ip}", timeout=8)
+        if r and r.status_code == 200:
+            data = r.json()
+            result["open_ports"]  = data.get("ports", [])[:10]
+            result["cpes"]        = data.get("cpes", [])[:5]
+            result["hostnames"]   = data.get("hostnames", [])[:5]
+            result["tags"]        = data.get("tags", [])
+            result["vulns"]       = data.get("vulns", [])[:5]
+
+        # ipinfo for ASN details
+        r2 = safe_get(f"https://ipinfo.io/{ip}/json", timeout=5)
+        if r2 and r2.status_code == 200:
+            d = r2.json()
+            result["org"]     = d.get("org", "")
+            result["country"] = d.get("country", "")
+            result["region"]  = d.get("region", "")
+            result["city"]    = d.get("city", "")
+            result["loc"]     = d.get("loc", "")  # lat,lng
+            result["timezone"]= d.get("timezone", "")
+
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
+
+def get_full_cert_chain(domain: str) -> dict:
+    """
+    Get full SSL certificate details — issuer, validity, fingerprint, SANs.
+    """
+    result = {"issuer": None, "subject": None, "valid_from": None,
+              "valid_to": None, "fingerprint": None, "san_count": 0,
+              "ca_org": None, "error": None}
+    try:
+        import ssl as ssl_lib
+        ctx = ssl_lib.create_default_context()
+        conn = ctx.wrap_socket(
+            __import__('socket').socket(), server_hostname=domain
+        )
+        conn.settimeout(8)
+        conn.connect((domain, 443))
+        cert = conn.getpeercert()
+        conn.close()
+
+        result["subject"]    = dict(x[0] for x in cert.get("subject", []))
+        result["issuer"]     = dict(x[0] for x in cert.get("issuer", []))
+        result["valid_from"] = cert.get("notBefore", "")
+        result["valid_to"]   = cert.get("notAfter", "")
+        result["ca_org"]     = result["issuer"].get("organizationName", "")
+
+        sans = []
+        for t, v in cert.get("subjectAltName", []):
+            if t == "DNS":
+                sans.append(v)
+        result["san_count"] = len(sans)
+        result["sans_sample"] = sans[:10]
+
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
+
+def deep_analyze_domain(domain: str) -> dict:
+    """
+    Tier 2 deep analysis — runs after standard analysis.
+    Adds historical DNS, Wayback snapshots, BGP info, full cert chain.
+    """
+    domain = clean_domain(domain)
+    result = {
+        "domain":         domain,
+        "timestamp":      time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "historical_dns": {},
+        "wayback":        {},
+        "bgp":            {},
+        "cert_chain":     {},
+        "error":          None,
+    }
+
+    try:
+        ip_res = resolve_ip(domain)
+        ip     = ip_res.get("ip")
+
+        executor = ThreadPoolExecutor(max_workers=4)
+        f_dns  = executor.submit(get_historical_dns, domain)
+        f_wb   = executor.submit(get_wayback_snapshots, domain)
+        f_bgp  = executor.submit(get_bgp_info, ip) if ip else None
+        f_cert = executor.submit(get_full_cert_chain, domain)
+
+        def _get(f, default, label):
+            if f is None: return default
+            try: return f.result(timeout=15)
+            except Exception as ex:
+                logger.warning(f"deep_analyze({domain}) — {label}: {ex}")
+                return default
+
+        result["historical_dns"] = _get(f_dns,  {}, "dns")
+        result["wayback"]        = _get(f_wb,   {}, "wayback")
+        result["bgp"]            = _get(f_bgp,  {}, "bgp")
+        result["cert_chain"]     = _get(f_cert, {}, "cert")
+        executor.shutdown(wait=False)
+
+    except Exception as e:
+        result["error"] = str(e)
+        logger.exception(f"deep_analyze_domain({domain})")
+
+    return result
+
+
+@network_bp.route("/deep-analyze", methods=["POST", "OPTIONS"])
+def deep_analyze():
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+    data   = request.get_json(force=True, silent=True) or {}
+    domain = clean_domain((data.get("domain") or "").strip())
+    if not domain:
+        return jsonify({"error": "domain required"}), 400
+    result = deep_analyze_domain(domain)
+    resp   = jsonify(result)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ASYNC JOB QUEUE
+# ══════════════════════════════════════════════════════════════════════════════
+import threading
+import uuid
+from datetime import datetime
+
+# In-memory job store
+# Structure: {job_id: {status, type, domains, results, done, total, errors, created_at, updated_at}}
+_jobs = {}
+_jobs_lock = threading.Lock()
+
+# Worker thread pool for background processing
+_worker_pool = ThreadPoolExecutor(max_workers=8)
+
+
+def _triage_domain(domain: str) -> dict:
+    """
+    Fast triage — IP + ASN only. No WHOIS, no SSL, no scraping.
+    ~1-2 seconds per domain.
+    """
+    domain = clean_domain(domain)
+    result = {
+        "domain":  domain,
+        "ip":      None,
+        "asn":     None,
+        "org":     None,
+        "country": None,
+        "error":   None,
+    }
+    try:
+        ip_res = resolve_ip(domain)
+        ip = ip_res.get("ip")
+        result["ip"] = ip
+        if ip:
+            asn_info = get_asn_info(ip)
+            result["asn"]     = asn_info.get("asn", "")
+            result["org"]     = asn_info.get("org", "")
+            result["country"] = asn_info.get("country", "")
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
+
+def _run_job(job_id: str):
+    """Background worker — processes all domains in a job."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if not job:
+            return
+        job["status"] = "running"
+
+    domains   = job["domains"]
+    job_type  = job["type"]  # "triage" or "analyze"
+    batch_size = 20  # parallel workers per batch
+
+    for i in range(0, len(domains), batch_size):
+        # Check for cancellation
+        with _jobs_lock:
+            if _jobs.get(job_id, {}).get("status") == "cancelled":
+                return
+
+        batch = domains[i:i + batch_size]
+
+        # Process batch in parallel
+        futures = {}
+        with ThreadPoolExecutor(max_workers=batch_size) as ex:
+            for domain in batch:
+                if job_type == "triage":
+                    futures[domain] = ex.submit(_triage_domain, domain)
+                else:
+                    futures[domain] = ex.submit(analyze_domain, domain)
+
+            for domain, future in futures.items():
+                try:
+                    result = future.result(timeout=30)
+                except Exception as e:
+                    result = {"domain": domain, "error": str(e)[:80]}
+
+                with _jobs_lock:
+                    j = _jobs.get(job_id)
+                    if j:
+                        j["results"].append(result)
+                        j["done"] += 1
+                        j["updated_at"] = datetime.utcnow().isoformat()
+
+    # Mark complete
+    with _jobs_lock:
+        j = _jobs.get(job_id)
+        if j and j["status"] == "running":
+            j["status"] = "complete"
+            j["updated_at"] = datetime.utcnow().isoformat()
+
+
+# ── Job routes ─────────────────────────────────────────────────────────────────
+
+@network_bp.route("/job/submit", methods=["POST", "OPTIONS"])
+def job_submit():
+    """Submit a bulk job. Returns job_id immediately."""
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+
+    data     = request.get_json(force=True, silent=True) or {}
+    domains  = data.get("domains", [])
+    job_type = data.get("type", "triage")  # "triage" or "analyze"
+
+    if not domains:
+        return jsonify({"error": "domains list required"}), 400
+    if job_type not in ("triage", "analyze"):
+        return jsonify({"error": "type must be triage or analyze"}), 400
+
+    # Clean and deduplicate
+    cleaned = []
+    seen = set()
+    for d in domains:
+        d = clean_domain(str(d).strip())
+        if d and d not in seen:
+            seen.add(d)
+            cleaned.append(d)
+
+    if not cleaned:
+        return jsonify({"error": "no valid domains after cleaning"}), 400
+
+    # Cap job size
+    MAX_DOMAINS = 5000
+    if len(cleaned) > MAX_DOMAINS:
+        cleaned = cleaned[:MAX_DOMAINS]
+
+    job_id = str(uuid.uuid4())[:8]
+    job = {
+        "id":         job_id,
+        "type":       job_type,
+        "status":     "queued",
+        "domains":    cleaned,
+        "results":    [],
+        "done":       0,
+        "total":      len(cleaned),
+        "created_at": datetime.utcnow().isoformat(),
+        "updated_at": datetime.utcnow().isoformat(),
+        "errors":     [],
+    }
+
+    with _jobs_lock:
+        _jobs[job_id] = job
+
+    # Start background worker
+    _worker_pool.submit(_run_job, job_id)
+
+    resp = jsonify({
+        "job_id":  job_id,
+        "total":   len(cleaned),
+        "type":    job_type,
+        "status":  "queued",
+    })
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@network_bp.route("/job/<job_id>", methods=["GET"])
+def job_status(job_id):
+    """
+    Poll job status. Returns new results since last_seen index.
+    Pass ?since=N to get only results after index N.
+    """
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+
+    if not job:
+        resp = jsonify({"error": "job not found"})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 404
+
+    since = int(request.args.get("since", 0))
+    new_results = job["results"][since:]
+
+    pct = round((job["done"] / job["total"] * 100), 1) if job["total"] else 0
+
+    # Estimate time remaining
+    eta_seconds = None
+    if job["status"] == "running" and job["done"] > 0:
+        elapsed = (datetime.utcnow() - datetime.fromisoformat(job["created_at"])).total_seconds()
+        rate    = job["done"] / elapsed  # domains per second
+        remaining = job["total"] - job["done"]
+        eta_seconds = int(remaining / rate) if rate > 0 else None
+
+    resp = jsonify({
+        "job_id":      job_id,
+        "status":      job["status"],
+        "type":        job["type"],
+        "done":        job["done"],
+        "total":       job["total"],
+        "pct":         pct,
+        "eta_seconds": eta_seconds,
+        "results":     new_results,
+        "results_from": since,
+    })
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@network_bp.route("/job/<job_id>/cancel", methods=["POST", "OPTIONS"])
+def job_cancel(job_id):
+    """Cancel a running job."""
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+        if job:
+            job["status"] = "cancelled"
+
+    resp = jsonify({"job_id": job_id, "status": "cancelled"})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@network_bp.route("/jobs", methods=["GET"])
+def jobs_list():
+    """List all active jobs."""
+    with _jobs_lock:
+        summary = [{
+            "job_id": jid,
+            "type":   j["type"],
+            "status": j["status"],
+            "done":   j["done"],
+            "total":  j["total"],
+            "pct":    round(j["done"] / j["total"] * 100, 1) if j["total"] else 0,
+            "created_at": j["created_at"],
+        } for jid, j in _jobs.items()]
+
+    resp = jsonify({"jobs": summary})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
