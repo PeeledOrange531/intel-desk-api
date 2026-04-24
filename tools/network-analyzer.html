@@ -893,6 +893,7 @@ async function analyzeDomain(domain, type) {
     showHint(`✓ ${domain}: dims=[${dimKeys.join(',')}] sans=${sanCount} rip=${ripCount} err=${data.error||'none'}`);
 
     setNode(domain, type || 'queued', 'done', data);
+    recordHistory(domain, 'done');
 
     // ALL neighbors always go to staging first
     // In Expand mode they are then auto-promoted to queue
@@ -941,6 +942,9 @@ async function analyzeDomain(domain, type) {
     // finally is ALWAYS guaranteed — banner always clears
     running = false;
     setRunning(false);
+    if (popoutWindow && !popoutWindow.closed) {
+      try { pushToPopout(); } catch(e) {}
+    }
   }
 }
 
@@ -1821,16 +1825,14 @@ document.addEventListener('drop', e => {
 
 // ══ TIMELAPSE HISTORY ═════════════════════════════════════════════════════════
 // Record every state change with timestamp for timelapse replay
-let timelapseHistory = [];  // [{ts, domain, status, nodeData}]
-const origSetNode = setNode;
+let timelapseHistory = [];  // [{ts, domain, status, cat}]
 
-function setNode(domain, type, status, analysis, discoveryMethod) {
-  origSetNode(domain, type, status, analysis, discoveryMethod);
+function recordHistory(domain, status) {
   if (status === 'done' || status === 'running') {
     timelapseHistory.push({
-      ts:     Date.now(),
+      ts:  Date.now(),
       domain, status,
-      cat:    status === 'done' ? classifyDomain(domain, nodes[domain]) : null,
+      cat: status === 'done' ? classifyDomain(domain, nodes[domain]) : null,
     });
   }
 }
@@ -1865,14 +1867,7 @@ function pushToPopout() {
   } catch(e) {}
 }
 
-// Push updates to popout after each analysis
-const _origUpdateNode = updateNode;
-function updateNode(domain) {
-  _origUpdateNode(domain);
-  if (popoutWindow && !popoutWindow.closed) {
-    setTimeout(() => pushToPopout(), 300);
-  }
-}
+// Popout updates are handled in analyzeDomain's finally block
 
 function buildPopoutPage() {
   const nodesJSON   = JSON.stringify(Object.values(nodes));
