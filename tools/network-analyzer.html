@@ -868,20 +868,24 @@ async function analyzeDomain(domain, type) {
     delete nodes[domain];
   }
 
+  console.log('[ANALYZE] Starting:', domain);
   running = true;
   setRunning(true, domain);
   setNode(domain, type || 'queued', 'running', null);
   renderQueue();
   updateNode(domain);
 
+  console.log('[ANALYZE] Fetching from backend...');
   try {
     const res = await fetch(`${API}/network/analyze`, {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
       body:    JSON.stringify({domain}),
     });
+    console.log('[ANALYZE] Response status:', res.status);
     if (!res.ok) throw new Error(`Server ${res.status}`);
     const rawText = await res.text();
+    console.log('[ANALYZE] Response length:', rawText.length);
     let data;
     try { data = JSON.parse(rawText); }
     catch(pe) { throw new Error(`Bad JSON: ${rawText.slice(0,120)}`); }
@@ -892,6 +896,7 @@ async function analyzeDomain(domain, type) {
     const ripCount = (data.reverse_ip || []).length;
     showHint(`✓ ${domain}: dims=[${dimKeys.join(',')}] sans=${sanCount} rip=${ripCount} err=${data.error||'none'}`);
 
+    console.log('[ANALYZE] Setting done, rendering...');
     setNode(domain, type || 'queued', 'done', data);
     recordHistory(domain, 'done');
 
@@ -935,11 +940,12 @@ async function analyzeDomain(domain, type) {
     showHint(`${domain} done · ${Object.keys(nodes).length} in graph · ${q} queued`);
 
   } catch(err) {
+    console.error('[ANALYZE] CAUGHT ERROR:', err.message, err.stack);
     setNode(domain, type || 'queued', 'error', null);
     showErr(`Analysis failed for ${domain}: ${err.message}`);
     try { renderQueue(); } catch(e) {}
   } finally {
-    // finally is ALWAYS guaranteed — banner always clears
+    console.log('[ANALYZE] Finally block running');
     running = false;
     setRunning(false);
     if (popoutWindow && !popoutWindow.closed) {
@@ -1545,7 +1551,7 @@ async function runIdSearchBulk(domain) {
 }
 
 // Keep old runIdSearch as alias for backward compatibility
-async function runIdSearch(domain) { return runIdSearchBulk(domain); }
+
 
 function stageManualPaste(sourceDomain) {
   const ta = document.getElementById(`manualPasteInput-${sourceDomain}`);
