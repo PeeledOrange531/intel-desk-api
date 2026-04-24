@@ -478,6 +478,62 @@ h1 em{font-style:italic;color:var(--gold);}
 .rec-btn.timelapse:hover{background:rgba(200,169,110,.22);}
 @keyframes recPulse{0%,100%{opacity:1;}50%{opacity:.6;}}
 
+
+/* ── DEEP ANALYSIS GOLD RING ── */
+.cy-deep-ring{
+  border-color:#e8d5a3 !important;
+  border-width:4px !important;
+  box-shadow:0 0 0 3px rgba(232,213,163,.3);
+}
+/* ── RIGHT-CLICK CONTEXT MENU ── */
+.ctx-menu{
+  position:fixed;z-index:9999;
+  background:var(--bg3);border:1px solid var(--border);
+  border-top:2px solid var(--gold);
+  min-width:200px;box-shadow:0 8px 32px rgba(0,0,0,.7);
+  display:none;
+}
+.ctx-menu.on{display:block;}
+.ctx-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 16px;cursor:pointer;
+  font-family:var(--mono);font-size:11px;color:var(--muted);
+  transition:background .1s;border-bottom:1px solid rgba(255,255,255,.04);
+}
+.ctx-item:last-child{border-bottom:none;}
+.ctx-item:hover{background:rgba(255,255,255,.04);color:var(--gold2);}
+.ctx-item .ctx-icon{font-size:13px;width:16px;text-align:center;flex-shrink:0;}
+.ctx-item.danger:hover{color:var(--red);}
+.ctx-domain{font-family:var(--mono);font-size:9px;color:var(--dim);
+  padding:8px 16px;border-bottom:1px solid var(--border);
+  text-overflow:ellipsis;overflow:hidden;white-space:nowrap;}
+/* ── DEEP ANALYSIS PANEL ── */
+.deep-panel{margin-top:14px;border-top:1px solid rgba(200,169,110,.25);padding-top:14px;}
+.deep-hdr{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.18em;color:var(--gold);margin-bottom:10px;
+  display:flex;align-items:center;gap:8px;}
+.deep-hdr::after{content:'';flex:1;height:1px;background:rgba(200,169,110,.2);}
+.deep-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:10px;}
+.deep-card{background:var(--bg3);border:1px solid var(--border);padding:12px;}
+.deep-card-title{font-family:var(--mono);font-size:8px;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--dim);margin-bottom:6px;}
+.deep-card-content{font-family:var(--mono);font-size:10px;color:var(--muted);
+  line-height:1.8;}
+.deep-card-content a{color:var(--gold);text-decoration:none;}
+.deep-card-content a:hover{text-decoration:underline;}
+.deep-loading{display:flex;align-items:center;gap:8px;
+  font-family:var(--mono);font-size:11px;color:var(--muted);}
+.deep-spinner{width:12px;height:12px;border:1px solid rgba(200,169,110,.2);
+  border-top-color:var(--gold);border-radius:50%;
+  animation:spin .6s linear infinite;flex-shrink:0;}
+.deep-run-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.14em;background:rgba(200,169,110,.10);
+  color:var(--gold);border:1px solid rgba(200,169,110,.25);
+  padding:6px 14px;cursor:pointer;transition:all .2s;}
+.deep-run-btn:hover{background:rgba(200,169,110,.20);}
+.deep-run-btn.deep-done{color:var(--green);border-color:rgba(78,201,148,.3);
+  background:rgba(78,201,148,.08);}
+
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -737,6 +793,19 @@ h1 em{font-style:italic;color:var(--gold);}
 <!-- DETAIL DRAWER -->
 <div class="detail-drawer" id="detailDrawer">
   <div class="dd-inner" id="detailInner"></div>
+</div>
+
+<!-- RIGHT-CLICK CONTEXT MENU -->
+<div class="ctx-menu" id="ctxMenu">
+  <div class="ctx-domain" id="ctxDomain"></div>
+  <div class="ctx-item" onclick="ctxAnalyze()"><span class="ctx-icon">▶</span>Analyze Domain</div>
+  <div class="ctx-item" onclick="ctxDeepAnalyze()"><span class="ctx-icon">🔬</span>Deep Investigate</div>
+  <div class="ctx-item" onclick="ctxOpenDetail()"><span class="ctx-icon">⬡</span>View Details</div>
+  <div class="ctx-item" onclick="ctxRunTool('ssl_cert')"><span class="ctx-icon">🔍</span>SSL Certificate Tracer</div>
+  <div class="ctx-item" onclick="ctxRunTool('nameserver')"><span class="ctx-icon">🌐</span>Nameserver Tracker</div>
+  <div class="ctx-item" onclick="ctxRunTool('reverse_ip')"><span class="ctx-icon">📡</span>Reverse IP Mapper</div>
+  <div class="ctx-item" onclick="ctxRunTool('tracking_id')"><span class="ctx-icon">🏷</span>Tracking ID Hunter</div>
+  <div class="ctx-item danger" onclick="ctxRemove()"><span class="ctx-icon">✕</span>Remove from Graph</div>
 </div>
 
 </div><!-- /page -->
@@ -1156,6 +1225,10 @@ function initCy() {
         'text-valign':'bottom','text-margin-y':5,'text-wrap':'none',
       }},
       { selector:'node:selected', style:{'border-width':3,'border-color':'#e8d5a3'}},
+      { selector:'node[?deep]', style:{
+        'border-width':4,'border-color':'#e8d5a3',
+        'box-shadow':'0 0 0 3px rgba(232,213,163,.3)',
+      }},
       { selector:'edge', style:{
         'width':'data(w)','line-color':'data(ec)','opacity':0.5,
         'curve-style':'bezier','target-arrow-shape':'none',
@@ -1181,6 +1254,9 @@ function initCy() {
     tip.style.top  = (e.originalEvent.clientY+12)+'px';
   });
   cy.on('mouseout','node', () => tip.classList.remove('on'));
+  // Wire right-click context menu
+  wireCtxMenu();
+
   cy.on('tap','node', evt => {
     const d = evt.target.data('id');
     if (nodes[d]?.status === 'done') openDetail(d);
@@ -1223,8 +1299,12 @@ function nodeStyle(domain) {
     color = meta.color; size = meta.size; bw = 2; bc = meta.dot; shape = meta.shape;
   }
 
+  // Gold ring for deep-analyzed nodes
+  const isDeep = !!n?.deep_analysis;
+  if (isDeep) { bw = 4; bc = '#e8d5a3'; }
+
   return { color, size, bw, bc, shape,
-           lbl: truncate(domain, 16), status: st, dims, cat };
+           lbl: truncate(domain, 16), status: st, dims, cat, deep: isDeep };
 }
 
 function edgeStyle(type) {
@@ -1362,7 +1442,15 @@ function openDetail(domain) {
     })()}
     <div style="display:flex;align-items:center;gap:8px;margin-top:4px;flex-wrap:wrap;">
       ${''}
-      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
+      <div class="deep-panel" id="deepPanel-${esc(domain)}">
+      <div class="deep-hdr">🔬 Deep Investigation</div>
+      <div id="deepContent-${esc(domain)}">
+        <button class="deep-run-btn" onclick="runDeepAnalysis('${esc(domain)}')">
+          Run Deep Analysis on ${esc(domain)}
+        </button>
+      </div>
+    </div>
+    <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px;">
       <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--gold);margin-bottom:8px;">Investigation Toolkit</div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;">
         <button class="id-search-btn" style="background:rgba(126,184,228,.08);color:#7eb8e4;border-color:rgba(126,184,228,.2);"
@@ -1942,6 +2030,10 @@ const cy = cytoscape({
       'text-valign':'bottom','text-margin-y':6,'text-wrap':'none',
     }},
     { selector:'node:selected', style:{'border-width':3,'border-color':'#e8d5a3'}},
+      { selector:'node[?deep]', style:{
+        'border-width':4,'border-color':'#e8d5a3',
+        'box-shadow':'0 0 0 3px rgba(232,213,163,.3)',
+      }},
     { selector:'edge', style:{
       'width':'data(w)','line-color':'data(ec)','opacity':.5,
       'curve-style':'bezier','target-arrow-shape':'none',
@@ -2050,9 +2142,16 @@ function toggleRecord() {
 }
 
 function startRecord() {
-  const canvas = document.querySelector('#cy canvas');
-  if (!canvas) { alert('Canvas not found'); return; }
-  const stream = canvas.captureStream(30);
+  // Cytoscape renders to a canvas inside #cy — find it correctly
+  const cyEl = document.getElementById('cy');
+  const canvas = cyEl ? cyEl.querySelector('canvas') : null;
+  if (!canvas) { alert('Canvas not ready — try again after the graph loads'); return; }
+  let stream;
+  try {
+    stream = canvas.captureStream(30);
+  } catch(e) {
+    alert('Recording not supported in this browser: ' + e.message); return;
+  }
   recordedChunks = [];
   mediaRecorder = new MediaRecorder(stream, {mimeType: 'video/webm;codecs=vp9'});
   mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
@@ -2162,6 +2261,178 @@ async function playTimelapse() {
 </body>
 </html>`;
 }
+
+
+// ══ DEEP ANALYSIS ════════════════════════════════════════════════════════════
+async function runDeepAnalysis(domain) {
+  const contentEl = document.getElementById(`deepContent-${domain}`);
+  if (!contentEl) return;
+
+  contentEl.innerHTML = `<div class="deep-loading">
+    <div class="deep-spinner"></div>
+    Running deep investigation on ${esc(domain)}…
+  </div>`;
+
+  try {
+    const res = await fetch(`${API}/network/deep-analyze`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({domain}),
+    });
+    if (!res.ok) throw new Error(`Server ${res.status}`);
+    const data = await res.json();
+
+    // Store deep analysis on the node
+    if (nodes[domain]) {
+      nodes[domain].deep_analysis = data;
+      // Update graph node to show gold ring
+      try { updateNode(domain); } catch(e) {}
+    }
+
+    renderDeepResults(domain, data, contentEl);
+  } catch(err) {
+    contentEl.innerHTML = `<div style="font-family:var(--mono);font-size:11px;color:var(--red);">
+      Deep analysis failed: ${esc(err.message)}</div>`;
+  }
+}
+
+function renderDeepResults(domain, data, el) {
+  const dns  = data.historical_dns || {};
+  const wb   = data.wayback || {};
+  const bgp  = data.bgp || {};
+  const cert = data.cert_chain || {};
+
+  // DNS card
+  const dnsHtml = `<div class="deep-card">
+    <div class="deep-card-title">🌐 Historical DNS</div>
+    <div class="deep-card-content">
+      ${dns.a_records?.length
+        ? `<div><strong>A Records:</strong> ${dns.a_records.slice(0,5).join(', ')}</div>` : ''}
+      ${dns.ns_history?.length
+        ? `<div><strong>Nameservers:</strong> ${dns.ns_history.slice(0,4).join(', ')}</div>` : ''}
+      ${dns.mx_records?.length
+        ? `<div><strong>MX:</strong> ${dns.mx_records.slice(0,3).join(', ')}</div>` : ''}
+      ${dns.subdomains_found?.length
+        ? `<div><strong>Subdomains:</strong> ${dns.subdomains_found.slice(0,5).join(', ')}</div>` : ''}
+      ${!dns.a_records?.length && !dns.ns_history?.length ? '<div style="color:var(--dim)">No records found</div>' : ''}
+    </div>
+  </div>`;
+
+  // Wayback card
+  const wbHtml = `<div class="deep-card">
+    <div class="deep-card-title">📼 Wayback Machine</div>
+    <div class="deep-card-content">
+      ${wb.available ? `
+        <div><strong>First seen:</strong> ${wb.first_seen || '?'}</div>
+        <div><strong>Last seen:</strong> ${wb.last_seen || '?'}</div>
+        <div><strong>Snapshots:</strong> ${wb.snapshot_count || '?'}</div>
+        ${wb.sample_urls?.length
+          ? `<div style="margin-top:4px;">${wb.sample_urls.slice(0,2).map(u =>
+              `<a href="${esc(u)}" target="_blank" rel="noopener">View snapshot ↗</a>`).join('<br>')}</div>`
+          : ''}
+        ${wb.closest_snapshot
+          ? `<div><a href="${esc(wb.closest_snapshot)}" target="_blank" rel="noopener">Latest snapshot ↗</a></div>`
+          : ''}
+      ` : '<div style="color:var(--dim)">No Wayback snapshots found</div>'}
+    </div>
+  </div>`;
+
+  // BGP/Shodan card
+  const bgpHtml = `<div class="deep-card">
+    <div class="deep-card-title">🔌 Infrastructure</div>
+    <div class="deep-card-content">
+      ${bgp.org ? `<div><strong>ASN:</strong> ${esc(bgp.org)}</div>` : ''}
+      ${bgp.city ? `<div><strong>Location:</strong> ${esc(bgp.city)}, ${esc(bgp.region||'')} ${esc(bgp.country||'')}</div>` : ''}
+      ${bgp.timezone ? `<div><strong>Timezone:</strong> ${esc(bgp.timezone)}</div>` : ''}
+      ${bgp.open_ports?.length ? `<div><strong>Open ports:</strong> ${bgp.open_ports.join(', ')}</div>` : ''}
+      ${bgp.tags?.length ? `<div><strong>Tags:</strong> ${bgp.tags.join(', ')}</div>` : ''}
+      ${bgp.vulns?.length ? `<div style="color:var(--red)"><strong>Vulns:</strong> ${bgp.vulns.slice(0,3).join(', ')}</div>` : ''}
+    </div>
+  </div>`;
+
+  // Cert card
+  const certHtml = `<div class="deep-card">
+    <div class="deep-card-title">🔒 SSL Certificate</div>
+    <div class="deep-card-content">
+      ${cert.ca_org ? `<div><strong>Issued by:</strong> ${esc(cert.ca_org)}</div>` : ''}
+      ${cert.valid_from ? `<div><strong>Valid from:</strong> ${esc(cert.valid_from)}</div>` : ''}
+      ${cert.valid_to ? `<div><strong>Expires:</strong> ${esc(cert.valid_to)}</div>` : ''}
+      ${cert.san_count ? `<div><strong>SANs:</strong> ${cert.san_count}</div>` : ''}
+      ${cert.error ? `<div style="color:var(--dim)">SSL: ${esc(cert.error)}</div>` : ''}
+    </div>
+  </div>`;
+
+  el.innerHTML = `
+    <div class="deep-grid">${dnsHtml}${wbHtml}${bgpHtml}${certHtml}</div>
+    <button class="deep-run-btn deep-done" onclick="runDeepAnalysis('${esc(domain)}')">
+      ↻ Re-run Deep Analysis
+    </button>
+  `;
+}
+
+// ══ CONTEXT MENU ══════════════════════════════════════════════════════════════
+let ctxDomain = null;
+
+function showCtxMenu(domain, x, y) {
+  ctxDomain = domain;
+  const menu = document.getElementById('ctxMenu');
+  const lbl  = document.getElementById('ctxDomain');
+  if (!menu) return;
+  lbl.textContent = domain;
+  menu.style.left = x + 'px';
+  menu.style.top  = y + 'px';
+  menu.classList.add('on');
+  // Adjust if off screen
+  const rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth)  menu.style.left = (x - rect.width)  + 'px';
+  if (rect.bottom > window.innerHeight) menu.style.top  = (y - rect.height) + 'px';
+}
+
+function hideCtxMenu() {
+  document.getElementById('ctxMenu')?.classList.remove('on');
+  ctxDomain = null;
+}
+
+document.addEventListener('click', hideCtxMenu);
+document.addEventListener('keydown', e => { if (e.key === 'Escape') hideCtxMenu(); });
+
+function ctxAnalyze()      { if (ctxDomain) analyzeDomain(ctxDomain); hideCtxMenu(); }
+function ctxDeepAnalyze()  {
+  if (!ctxDomain) return;
+  // Open detail drawer first, then trigger deep analysis
+  if (nodes[ctxDomain]?.status === 'done') {
+    openDetail(ctxDomain);
+    setTimeout(() => runDeepAnalysis(ctxDomain), 300);
+  } else {
+    analyzeDomain(ctxDomain).then(() => {
+      openDetail(ctxDomain);
+      setTimeout(() => runDeepAnalysis(ctxDomain), 300);
+    });
+  }
+  hideCtxMenu();
+}
+function ctxOpenDetail()   { if (ctxDomain) openDetail(ctxDomain); hideCtxMenu(); }
+function ctxRunTool(tool)  { if (ctxDomain) runInvestigationTool(ctxDomain, tool); hideCtxMenu(); }
+function ctxRemove()       { if (ctxDomain) removeNode(ctxDomain); hideCtxMenu(); }
+
+// Wire context menu to Cytoscape nodes
+function wireCtxMenu() {
+  if (!cy) return;
+  cy.on('cxttap', 'node', evt => {
+    evt.preventDefault?.();
+    const domain = evt.target.data('id');
+    const pos    = evt.originalEvent;
+    showCtxMenu(domain, pos.clientX, pos.clientY);
+  });
+  // Also long-press on mobile
+  cy.on('taphold', 'node', evt => {
+    const domain = evt.target.data('id');
+    const pos    = evt.originalEvent;
+    showCtxMenu(domain, pos.clientX || pos.touches?.[0]?.clientX || 0,
+                        pos.clientY || pos.touches?.[0]?.clientY || 0);
+  });
+}
+
 
 function closeDetail() {
   document.getElementById('detailDrawer').classList.remove('open');
