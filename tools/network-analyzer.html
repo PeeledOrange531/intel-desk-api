@@ -2074,332 +2074,153 @@ function recordHistory(domain, status) {
 let popoutWindow = null;
 
 function openPopout() {
-  // Build a self-contained HTML page for the graph
-  const popoutHtml = buildPopoutPage();
-  const blob = new Blob([popoutHtml], {type: 'text/html'});
+  const nodesJSON = JSON.stringify(Object.values(nodes));
+  const edgesJSON = JSON.stringify(edges);
+  const histJSON  = JSON.stringify(timelapseHistory);
+  const html = buildPopoutHead() + buildPopoutBody(nodesJSON, edgesJSON, histJSON);
+  const blob = new Blob([html], {type:'text/html'});
   const url  = URL.createObjectURL(blob);
   popoutWindow = window.open(url, 'IntelDesk_Graph',
-    'width=1400,height=900,menubar=no,toolbar=no,location=no,status=no');
-
-  // Push current state to popout after it loads
+    'width=1400,height=900,menubar=no,toolbar=no,location=no');
   setTimeout(() => pushToPopout(), 1200);
-
-  // Update popout when new nodes are analyzed
-  showHint('Graph opened in new window — it will update as you analyze more domains');
+  showHint('Graph opened in new window — updates live as you analyze');
 }
 
-function pushToPopout() {
-  if (!popoutWindow || popoutWindow.closed) return;
-  try {
-    popoutWindow.postMessage({
-      type:    'UPDATE_GRAPH',
-      nodes:   Object.values(nodes),
-      edges:   edges,
-      history: timelapseHistory,
-    }, '*');
-  } catch(e) {}
+function buildPopoutHead() {
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Intel Desk — Network Graph</title>'
+    + '<scr' + 'ipt src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></scr' + 'ipt>'
+    + '<style>'
+    + '*{box-sizing:border-box;margin:0;padding:0;}'
+    + 'body{background:#050505;color:#f5f2ec;font-family:"DM Mono",monospace;overflow:hidden;height:100vh;display:flex;flex-direction:column;}'
+    + '.tb{display:flex;align-items:center;gap:6px;padding:8px 12px;background:#0d0d0d;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;flex-wrap:wrap;}'
+    + '.tbl{font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(200,169,110,.7);}'
+    + '.tbstat{font-size:10px;color:rgba(240,236,228,.5);margin-right:6px;}'
+    + '.tbstat strong{color:#c8a96e;}'
+    + '.tbbtn{font-size:9px;text-transform:uppercase;letter-spacing:.10em;padding:5px 10px;background:transparent;border:1px solid rgba(255,255,255,.1);color:rgba(240,236,228,.5);cursor:pointer;}'
+    + '.tbbtn:hover{color:#c8a96e;}'
+    + '.recbtn{background:rgba(192,57,43,.15);color:#c0392b;border:1px solid rgba(192,57,43,.3);}'
+    + '.recbtn.on{background:#c0392b;color:#fff;}'
+    + '.tlbtn{background:rgba(200,169,110,.12);color:#c8a96e;border:1px solid rgba(200,169,110,.25);}'
+    + '.recdot{width:8px;height:8px;border-radius:50%;background:#c0392b;display:none;margin-left:2px;}'
+    + '.recdot.on{display:inline-block;animation:rp 1s ease-in-out infinite;}'
+    + '@keyframes rp{0%,100%{opacity:1;}50%{opacity:.2;}}'
+    + '#cy{flex:1;background:#050505;}'
+    + 'select{background:#141414;border:1px solid rgba(255,255,255,.1);color:rgba(240,236,228,.6);font-size:10px;padding:4px 8px;outline:none;}'
+    + '</style></head>';
 }
 
-// Popout updates are handled in analyzeDomain's finally block
+function buildPopoutBody(nodesJSON, edgesJSON, histJSON) {
+  const scriptOpen  = '<scr' + 'ipt>';
+  const scriptClose = '</scr' + 'ipt>';
+  const bodyHTML = '<body>'
+    + '<div class="tb">'
+    + '<span class="tbl">Intel Desk</span>'
+    + '<span style="color:rgba(255,255,255,.1);margin:0 4px">|</span>'
+    + '<span class="tbl">Network Graph</span>'
+    + '<span style="flex:1"></span>'
+    + '<span class="tbstat">Nodes: <strong id="nc">0</strong></span>'
+    + '<span class="tbstat">Edges: <strong id="ec">0</strong></span>'
+    + '<span class="tbstat">Analyzed: <strong id="ac">0</strong></span>'
+    + '<button class="tbbtn" onclick="pFit()">Fit</button>'
+    + '<button class="tbbtn" onclick="pLayout()">Cluster</button>'
+    + '<span style="color:rgba(255,255,255,.1);margin:0 2px">|</span>'
+    + '<button class="tbbtn recbtn" id="recBtn" onclick="toggleRec()">\u23fa Record</button>'
+    + '<span class="recdot" id="recdot"></span>'
+    + '<span style="color:rgba(255,255,255,.1);margin:0 2px">|</span>'
+    + '<select id="spd"><option value="5">5x</option><option value="10" selected>10x</option><option value="20">20x</option><option value="50">50x</option></select>'
+    + '<button class="tbbtn tlbtn" onclick="playTL()">\u25b6 Timelapse</button>'
+    + '<button class="tbbtn" id="dlBtn" style="display:none" onclick="dlRec()">&darr; Download</button>'
+    + '</div>'
+    + '<div id="cy"></div>';
 
-function buildPopoutPage() {
-  const nodesJSON   = JSON.stringify(Object.values(nodes));
-  const edgesJSON   = JSON.stringify(edges);
-  const histJSON    = JSON.stringify(timelapseHistory);
+  const scriptContent = `
+var cy=cytoscape({container:document.getElementById('cy'),elements:[],style:[
+  {selector:'node',style:{'background-color':'data(color)','border-width':'data(bw)','border-color':'data(bc)','width':'data(sz)','height':'data(sz)','label':'data(lbl)','shape':'data(sh)','font-family':'DM Mono,monospace','font-size':9,'color':'rgba(240,236,228,.65)','text-valign':'bottom','text-margin-y':5}},
+  {selector:'node:selected',style:{'border-width':3,'border-color':'#e8d5a3'}},
+  {selector:'edge',style:{'width':'data(w)','line-color':'data(ec)','opacity':.5,'curve-style':'bezier','target-arrow-shape':'none'}},
+],layout:{name:'null'},userZoomingEnabled:true,userPanningEnabled:true,minZoom:.02,maxZoom:5});
 
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>Intel Desk — Network Graph</title>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"><\/script>
-<style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:#050505;color:#f5f2ec;font-family:'DM Mono',monospace;overflow:hidden;height:100vh;display:flex;flex-direction:column;}
-.toolbar{display:flex;align-items:center;gap:8px;padding:8px 14px;background:#0d0d0d;border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0;flex-wrap:wrap;}
-.tb-label{font-size:9px;text-transform:uppercase;letter-spacing:.16em;color:rgba(200,169,110,.7);}
-.tb-stat{font-size:10px;color:rgba(240,236,228,.5);margin-right:8px;}
-.tb-stat strong{color:#c8a96e;}
-.tb-btn{font-size:9px;text-transform:uppercase;letter-spacing:.10em;padding:5px 12px;
-  background:transparent;border:1px solid rgba(255,255,255,.1);color:rgba(240,236,228,.5);cursor:pointer;transition:all .15s;}
-.tb-btn:hover{color:#c8a96e;border-color:rgba(200,169,110,.35);}
-.rec-indicator{width:8px;height:8px;border-radius:50%;background:#c0392b;display:none;animation:rp 1s ease-in-out infinite;}
-.rec-indicator.on{display:inline-block;}
-@keyframes rp{0%,100%{opacity:1;}50%{opacity:.3;}}
-#cy{flex:1;background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.04) 0%,transparent 70%),#050505;}
-.speed-select{background:#141414;border:1px solid rgba(255,255,255,.1);color:rgba(240,236,228,.6);font-size:10px;padding:4px 8px;outline:none;}
-</style>
-</head>
-<body>
-<div class="toolbar">
-  <span class="tb-label">Intel Desk</span>
-  <span style="color:rgba(255,255,255,.15);margin:0 4px;">|</span>
-  <span class="tb-label">Network Graph</span>
-  <span style="flex:1"></span>
-  <span class="tb-stat">Nodes: <strong id="pNodeCount">0</strong></span>
-  <span class="tb-stat">Edges: <strong id="pEdgeCount">0</strong></span>
-  <span class="tb-stat">Analyzed: <strong id="pAnalyzed">0</strong></span>
-  <button class="tb-btn" onclick="pFit()">Fit</button>
-  <button class="tb-btn" onclick="pLayout()">Cluster</button>
-  <span style="color:rgba(255,255,255,.15);margin:0 2px;">|</span>
-  <button class="tb-btn rec-btn record" id="recBtn" onclick="toggleRecord()">⏺ Record</button>
-  <span class="rec-indicator" id="recIndicator"></span>
-  <span style="color:rgba(255,255,255,.15);margin:0 2px;">|</span>
-  <select class="speed-select" id="tlSpeed">
-    <option value="5">5× speed</option>
-    <option value="10" selected>10× speed</option>
-    <option value="20">20× speed</option>
-    <option value="50">50× speed</option>
-    <option value="100">100× speed</option>
-  </select>
-  <button class="tb-btn rec-btn timelapse" onclick="playTimelapse()">▶ Timelapse</button>
-  <button class="tb-btn" id="dlBtn" style="display:none" onclick="downloadRecording()">↓ Download MP4</button>
-</div>
-<div id="cy"></div>
-<script>
-// ── CYTOSCAPE INIT ────────────────────────────────────────────────────────────
-const cy = cytoscape({
-  container: document.getElementById('cy'),
-  elements:  [],
-  style: [
-    { selector:'node', style:{
-      'background-color':'data(color)','border-width':'data(bw)','border-color':'data(bc)',
-      'width':'data(size)','height':'data(size)','label':'data(lbl)','shape':'data(shape)',
-      'font-family':'DM Mono,monospace','font-size':9,'color':'rgba(240,236,228,.65)',
-      'text-valign':'bottom','text-margin-y':6,'text-wrap':'none',
-    }},
-    { selector:'node:selected', style:{'border-width':3,'border-color':'#e8d5a3'}},
-      { selector:'node[?deep]', style:{
-        'border-width':5,'border-color':'#e8d5a3',
-        'background-opacity':1,
-      }},
-    { selector:'edge', style:{
-      'width':'data(w)','line-color':'data(ec)','opacity':.5,
-      'curve-style':'bezier','target-arrow-shape':'none',
-    }},
-  ],
-  layout:{name:'null'},
-  userZoomingEnabled:true, userPanningEnabled:true, minZoom:.02, maxZoom:5,
+var iN=${nodesJSON},iE=${edgesJSON},tlH=${histJSON},mr=null,ch=[],isR=false;
+
+function nv(n){var s=n.status,c=n.cat||'unknown';
+  if(s==='queued') return{color:'rgba(240,236,228,.1)',sz:10,bw:1,bc:'rgba(255,255,255,.08)',sh:'ellipse'};
+  if(s==='running')return{color:'rgba(200,169,110,.3)',sz:18,bw:2,bc:'#c8a96e',sh:'ellipse'};
+  if(c==='anchor')   return{color:'#c8a96e',sz:32,bw:3,bc:'#e8d5a3',sh:'diamond'};
+  if(c==='affiliate')return{color:'#c0392b',sz:22,bw:2,bc:'#c0392b',sh:'ellipse'};
+  if(c==='launderer')return{color:'#e87b4a',sz:20,bw:2,bc:'#e87b4a',sh:'rectangle'};
+  if(c==='foreign')  return{color:'#7eb8e4',sz:18,bw:1,bc:'#7eb8e4',sh:'ellipse'};
+  if(c==='infra')    return{color:'rgba(240,236,228,.2)',sz:12,bw:1,bc:'rgba(255,255,255,.2)',sh:'triangle'};
+  return{color:'rgba(240,236,228,.25)',sz:16,bw:1,bc:'rgba(255,255,255,.15)',sh:'ellipse'};
+}
+function ev(t){
+  if(t==='ssl_san')  return{w:1.5,ec:'rgba(126,184,228,.45)'};
+  if(t==='shared_ip')return{w:1.0,ec:'rgba(232,123,74,.35)'};
+  if(t==='shared_id')return{w:2.0,ec:'rgba(126,184,228,.7)'};
+  return{w:.8,ec:'rgba(255,255,255,.10)'};
+}
+function lb(id){return id.length>18?id.slice(0,17)+'\u2026':id;}
+function loadG(ns,es){cy.elements().remove();var els=[];
+  ns.forEach(function(n){var v=nv(n);els.push({data:{id:n.id,lbl:lb(n.id),color:v.color,sz:v.sz,bw:v.bw,bc:v.bc,sh:v.sh,status:n.status}});});
+  es.forEach(function(e){var v=ev(e.type);els.push({data:{id:e.source+'--'+e.type+'--'+e.target,source:e.source,target:e.target,w:v.w,ec:v.ec}});});
+  cy.add(els);pLayout();st();
+}
+function st(){document.getElementById('nc').textContent=cy.nodes().length;document.getElementById('ec').textContent=cy.edges().length;document.getElementById('ac').textContent=cy.nodes().filter(function(n){return n.data('status')==='done';}).length;}
+function pFit(){cy.fit(40);}
+function pLayout(){if(!cy.nodes().length)return;cy.layout({name:'cose',idealEdgeLength:100,nodeRepulsion:function(){return 500000;},gravity:60,numIter:500,animate:false,fit:true,padding:40}).run();}
+loadG(iN,iE);
+
+window.addEventListener('message',function(e){
+  if(!e.data||e.data.type!=='UPDATE_GRAPH')return;
+  if(e.data.history)tlH=e.data.history;
+  (e.data.nodes||[]).forEach(function(n){var ex=cy.$id(n.id),v=nv(n);
+    if(ex.length)ex.data({color:v.color,sz:v.sz,bw:v.bw,bc:v.bc,sh:v.sh,status:n.status});
+    else cy.add({data:{id:n.id,lbl:lb(n.id),color:v.color,sz:v.sz,bw:v.bw,bc:v.bc,sh:v.sh,status:n.status}});
+  });
+  (e.data.edges||[]).forEach(function(e2){var eid=e2.source+'--'+e2.type+'--'+e2.target;
+    if(!cy.$id(eid).length){try{var v=ev(e2.type);cy.add({data:{id:eid,source:e2.source,target:e2.target,w:v.w,ec:v.ec}});}catch(x){}}
+  });st();
 });
 
-// ── INITIAL DATA ─────────────────────────────────────────────────────────────
-const initialNodes   = ${nodesJSON};
-const initialEdges   = ${edgesJSON};
-let   tlHistory      = ${histJSON};
-
-function nodeColor(node) {
-  const cat = node.cat || 'unknown';
-  const st  = node.status;
-  if (st==='queued')  return {color:'rgba(240,236,228,.1)', size:10, bw:1, bc:'rgba(255,255,255,.08)', shape:'ellipse'};
-  if (st==='running') return {color:'rgba(200,169,110,.3)', size:18, bw:2, bc:'#c8a96e', shape:'ellipse'};
-  if (cat==='anchor')     return {color:'#c8a96e', size:32, bw:3, bc:'#e8d5a3', shape:'diamond'};
-  if (cat==='affiliate')  return {color:'#c0392b', size:22, bw:2, bc:'#c0392b', shape:'ellipse'};
-  if (cat==='launderer')  return {color:'#e87b4a', size:20, bw:2, bc:'#e87b4a', shape:'rectangle'};
-  if (cat==='foreign')    return {color:'#7eb8e4', size:18, bw:1, bc:'#7eb8e4', shape:'ellipse'};
-  if (cat==='infra')      return {color:'rgba(240,236,228,.2)', size:12, bw:1, bc:'rgba(255,255,255,.2)', shape:'triangle'};
-  return {color:'rgba(240,236,228,.25)', size:16, bw:1, bc:'rgba(255,255,255,.15)', shape:'ellipse'};
+function toggleRec(){if(isR)stopR();else startR();}
+function startR(){
+  var cel=document.getElementById('cy'),can=cel?cel.querySelector('canvas'):null;
+  if(!can){alert('Canvas not ready');return;}
+  var stream;try{stream=can.captureStream(30);}catch(e){alert('Not supported: '+e.message);return;}
+  ch=[];var mime=MediaRecorder.isTypeSupported('video/webm;codecs=vp9')?'video/webm;codecs=vp9':'video/webm';
+  mr=new MediaRecorder(stream,{mimeType:mime});
+  mr.ondataavailable=function(e){if(e.data.size>0)ch.push(e.data);};
+  mr.onstop=function(){document.getElementById('dlBtn').style.display='';};
+  mr.start(100);isR=true;
+  document.getElementById('recBtn').textContent='\u23f9 Stop';document.getElementById('recBtn').classList.add('on');
+  document.getElementById('recdot').classList.add('on');
 }
-
-function edgeColor(type) {
-  if (type==='ssl_san')   return {w:1.5, ec:'rgba(126,184,228,.45)'};
-  if (type==='shared_ip') return {w:1.0, ec:'rgba(232,123,74,.35)'};
-  if (type==='shared_id') return {w:2.0, ec:'rgba(126,184,228,.7)'};
-  return {w:0.8, ec:'rgba(255,255,255,.10)'};
+function stopR(){
+  if(mr)mr.stop();isR=false;
+  document.getElementById('recBtn').textContent='\u23fa Record';document.getElementById('recBtn').classList.remove('on');
+  document.getElementById('recdot').classList.remove('on');
 }
-
-function loadGraph(nodeArr, edgeArr) {
-  cy.elements().remove();
-  const els = [];
-  for (const n of nodeArr) {
-    const v = nodeColor(n);
-    const lbl = n.id.length > 18 ? n.id.slice(0,17)+'…' : n.id;
-    els.push({data:{id:n.id, lbl, ...v, status:n.status}});
+function dlRec(){var blob=new Blob(ch,{type:'video/webm'});var url=URL.createObjectURL(blob);var a=document.createElement('a');a.href=url;a.download='inteldesk-'+new Date().toISOString().slice(0,10)+'.webm';a.click();URL.revokeObjectURL(url);}
+async function playTL(){
+  if(!tlH.length){alert('No history yet');return;}
+  var spd=parseInt(document.getElementById('spd').value)||10;
+  document.querySelector('.tlbtn').textContent='\u23f8 Playing';
+  startR();cy.elements().remove();st();
+  var evts=tlH.slice().sort(function(a,b){return a.ts-b.ts;});
+  for(var i=0;i<evts.length;i++){
+    var e=evts[i],v=nv({status:e.status,cat:e.cat||'unknown'});
+    var ex=cy.$id(e.domain);
+    if(ex.length)ex.data({color:v.color,sz:v.sz,bw:v.bw,bc:v.bc,sh:v.sh,status:e.status});
+    else cy.add({data:{id:e.domain,lbl:lb(e.domain),color:v.color,sz:v.sz,bw:v.bw,bc:v.bc,sh:v.sh,status:e.status}});
+    if(i%5===0&&cy.nodes().length>1)cy.layout({name:'cose',idealEdgeLength:80,nodeRepulsion:function(){return 300000;},gravity:80,numIter:200,animate:false,fit:true,padding:30}).run();
+    st();await new Promise(function(r){setTimeout(r,Math.max(40,200/spd));});
   }
-  for (const e of edgeArr) {
-    const v = edgeColor(e.type);
-    els.push({data:{id:e.source+'--'+e.type+'--'+e.target, source:e.source, target:e.target, ...v}});
-  }
-  cy.add(els);
-  pLayout();
-  updateStats();
+  stopR();document.querySelector('.tlbtn').textContent='\u25b6 Timelapse';pLayout();
+}
+`;
+  return bodyHTML + scriptOpen + scriptContent + scriptClose + '</body></html>';
 }
 
-function updateStats() {
-  document.getElementById('pNodeCount').textContent  = cy.nodes().length;
-  document.getElementById('pEdgeCount').textContent  = cy.edges().length;
-  document.getElementById('pAnalyzed').textContent   =
-    cy.nodes().filter(n=>n.data('status')==='done').length;
-}
 
-function pFit()    { cy.fit(40); }
-function pLayout() {
-  if (!cy.nodes().length) return;
-  cy.layout({name:'cose',idealEdgeLength:100,nodeRepulsion:()=>500000,
-    gravity:60,numIter:500,animate:false,fit:true,padding:40}).run();
-}
-
-// Load initial data
-loadGraph(initialNodes, initialEdges);
-
-// ── LIVE UPDATES via postMessage ──────────────────────────────────────────────
-window.addEventListener('message', e => {
-  if (e.data?.type !== 'UPDATE_GRAPH') return;
-  const { nodes: newNodes, edges: newEdges, history } = e.data;
-  if (history) tlHistory = history;
-  // Incremental update — add new nodes/edges without full reload
-  for (const n of newNodes) {
-    const existing = cy.$id(n.id);
-    const v = nodeColor(n);
-    const lbl = n.id.length > 18 ? n.id.slice(0,17)+'…' : n.id;
-    if (existing.length) {
-      existing.data({...v, lbl, status:n.status});
-    } else {
-      cy.add({data:{id:n.id, lbl, ...v, status:n.status}});
-    }
-  }
-  for (const e of newEdges) {
-    const eid = e.source+'--'+e.type+'--'+e.target;
-    if (!cy.$id(eid).length) {
-      try {
-        const v = edgeColor(e.type);
-        cy.add({data:{id:eid, source:e.source, target:e.target, ...v}});
-      } catch(ex) {}
-    }
-  }
-  if (newNodes.length > cy.nodes().length * 0.1) pLayout();
-  updateStats();
-});
-
-// ── RECORDING ─────────────────────────────────────────────────────────────────
-let mediaRecorder = null;
-let recordedChunks = [];
-let isRecording = false;
-
-function toggleRecord() {
-  if (isRecording) stopRecord();
-  else startRecord();
-}
-
-function startRecord() {
-  // Cytoscape renders to a canvas inside #cy — find it correctly
-  const cyEl = document.getElementById('cy');
-  const canvas = cyEl ? cyEl.querySelector('canvas') : null;
-  if (!canvas) { alert('Canvas not ready — try again after the graph loads'); return; }
-  let stream;
-  try {
-    stream = canvas.captureStream(30);
-  } catch(e) {
-    alert('Recording not supported in this browser: ' + e.message); return;
-  }
-  recordedChunks = [];
-  mediaRecorder = new MediaRecorder(stream, {mimeType: 'video/webm;codecs=vp9'});
-  mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
-  mediaRecorder.onstop = () => {
-    document.getElementById('dlBtn').style.display = '';
-  };
-  mediaRecorder.start(100);
-  isRecording = true;
-  const btn = document.getElementById('recBtn');
-  btn.textContent = '⏹ Stop';
-  btn.classList.add('active');
-  document.getElementById('recIndicator').classList.add('on');
-}
-
-function stopRecord() {
-  if (mediaRecorder) mediaRecorder.stop();
-  isRecording = false;
-  const btn = document.getElementById('recBtn');
-  btn.textContent = '⏺ Record';
-  btn.classList.remove('active');
-  document.getElementById('recIndicator').classList.remove('on');
-}
-
-function downloadRecording() {
-  const blob = new Blob(recordedChunks, {type:'video/webm'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url; a.download = 'inteldesk-network-' + new Date().toISOString().slice(0,10) + '.webm';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── TIMELAPSE REPLAY ─────────────────────────────────────────────────────────
-async function playTimelapse() {
-  if (!tlHistory.length) {
-    alert('No analysis history yet. Analyze some domains first, then play timelapse.');
-    return;
-  }
-
-  const speed   = parseInt(document.getElementById('tlSpeed').value) || 10;
-  const btn     = document.querySelector('.rec-btn.timelapse');
-  btn.textContent = '⏸ Playing…';
-
-  // Start recording automatically during timelapse
-  startRecord();
-
-  // Rebuild graph from scratch
-  cy.elements().remove();
-  updateStats();
-
-  // Replay each event
-  const events  = [...tlHistory].sort((a,b) => a.ts - b.ts);
-  const t0      = events[0].ts;
-  const tEnd    = events[events.length-1].ts;
-  const duration = tEnd - t0;
-
-  // Build a map of all nodes/edges at each point
-  const allNodes = Object.fromEntries(
-    (window.opener ? Object.values(window.opener.nodes || {}) : initialNodes)
-      .map(n => [n.id, n])
-  );
-  const allEdges = window.opener ? (window.opener.edges || initialEdges) : initialEdges;
-
-  for (let i = 0; i < events.length; i++) {
-    const ev = events[i];
-    const nodeData = allNodes[ev.domain];
-    if (!nodeData) continue;
-
-    const v = nodeColor({...nodeData, status: ev.status, cat: ev.cat});
-    const lbl = ev.domain.length > 18 ? ev.domain.slice(0,17)+'…' : ev.domain;
-
-    const existing = cy.$id(ev.domain);
-    if (existing.length) {
-      existing.data({...v, lbl, status:ev.status});
-    } else {
-      cy.add({data:{id:ev.domain, lbl, ...v, status:ev.status}});
-      // Add edges for this domain
-      for (const e of allEdges) {
-        if (e.source !== ev.domain && e.target !== ev.domain) continue;
-        const eid = e.source+'--'+e.type+'--'+e.target;
-        if (cy.$id(eid).length) continue;
-        if (cy.$id(e.source).length && cy.$id(e.target).length) {
-          const ev2 = edgeColor(e.type);
-          try { cy.add({data:{id:eid, source:e.source, target:e.target, ...ev2}}); } catch(ex) {}
-        }
-      }
-    }
-
-    updateStats();
-
-    // Re-layout periodically
-    if (i % 5 === 0 && cy.nodes().length > 1) {
-      cy.layout({name:'cose',idealEdgeLength:80,nodeRepulsion:()=>300000,
-        gravity:80,numIter:200,animate:false,fit:true,padding:30}).run();
-    }
-
-    // Calculate delay based on speed
-    const frameDelay = Math.max(50, 200 / speed);
-    await new Promise(r => setTimeout(r, frameDelay));
-  }
-
-  stopRecord();
-  btn.textContent = '▶ Timelapse';
-  pLayout();
-}
-<\/script>
-</body>
-</html>`;
-}
 
 
 // ══ DEEP ANALYSIS ════════════════════════════════════════════════════════════
@@ -2894,6 +2715,260 @@ async function runInvestigationTool(domain, tool) {
   } catch(err) {
     showErr(`${toolName(tool)} failed for ${domain}: ${err.message}`);
   }
+}
+
+
+
+// ══ BACKGROUND JOB QUEUE ══════════════════════════════════════════════════════
+let activeJobs = {};
+const JOB_POLL_INTERVAL = 8000;
+const JOB_STORAGE_KEY   = 'inteldesk_jobs_v1';
+
+function toggleJobPanel() {
+  const body = document.getElementById('jobPanelBody');
+  const btn  = document.querySelector('.job-toggle-btn');
+  if (!body) return;
+  const open = body.classList.toggle('open');
+  if (btn) btn.textContent = open ? '▲ Close' : '▾ Open';
+  if (open) renderJobList();
+}
+
+async function submitJob() {
+  const raw     = (document.getElementById('jobDomains')?.value || '').trim();
+  const jobType = document.getElementById('jobType')?.value || 'triage';
+  const btn     = document.getElementById('jobSubmitBtn');
+  if (!raw) { showErr('Paste some domains first.'); return; }
+
+  const domains = raw.split(/[\n,;\t]+/)
+    .map(d => cleanDomain(d.trim())).filter(Boolean);
+  if (!domains.length) { showErr('No valid domains found.'); return; }
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+  clearErr();
+
+  try {
+    const res = await fetch(`${API}/network/job/submit`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({ domains, type: jobType }),
+    });
+    if (!res.ok) throw new Error(`Server ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    registerJob(data.job_id, data.type, data.total);
+    document.getElementById('jobDomains').value = '';
+    showHint(`Job ${data.job_id} submitted — ${data.total} domains queued. Close your laptop, Render is working.`);
+    // Open panel to show progress
+    const body = document.getElementById('jobPanelBody');
+    if (body && !body.classList.contains('open')) toggleJobPanel();
+  } catch(err) {
+    showErr(`Job submission failed: ${err.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit Job →'; }
+  }
+}
+
+async function resumeJob() {
+  const jobId = (document.getElementById('jobIdInput')?.value || '').trim();
+  if (!jobId) { showErr('Enter a job ID first.'); return; }
+  if (activeJobs[jobId]) { showHint(`Already tracking job ${jobId}`); return; }
+  document.getElementById('jobIdInput').value = '';
+  try {
+    const res = await fetch(`${API}/network/job/${jobId}`);
+    if (!res.ok) throw new Error('Job not found');
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+    registerJob(jobId, data.type, data.total, data.done);
+    showHint(`Resumed job ${jobId} — ${data.done}/${data.total} done`);
+  } catch(err) {
+    showErr(`Could not resume: ${err.message}`);
+  }
+}
+
+function registerJob(jobId, type, total, doneAlready = 0) {
+  activeJobs[jobId] = {
+    id: jobId, type, total,
+    done: doneAlready, status: 'running',
+    lastSeen: doneAlready,
+  };
+  saveActiveJobs();
+  startPolling(jobId);
+  renderJobList();
+  updateJobBadge();
+}
+
+function startPolling(jobId) {
+  const job = activeJobs[jobId];
+  if (!job) return;
+  pollJob(jobId); // immediate
+  job.pollTimer = setInterval(() => pollJob(jobId), JOB_POLL_INTERVAL);
+}
+
+async function pollJob(jobId) {
+  const job = activeJobs[jobId];
+  if (!job) return;
+  try {
+    const res = await fetch(`${API}/network/job/${jobId}?since=${job.lastSeen}`);
+    if (!res.ok) return;
+    const data = await res.json();
+    if (data.error) return;
+
+    const newResults = data.results || [];
+    if (newResults.length) {
+      ingestJobResults(jobId, data.type, newResults);
+      job.lastSeen = (data.results_from || 0) + newResults.length;
+    }
+
+    job.done   = data.done;
+    job.total  = data.total;
+    job.status = data.status;
+    job.pct    = data.pct;
+    job.eta    = data.eta_seconds;
+
+    renderJobList();
+    updateJobBadge();
+    saveActiveJobs();
+
+    if (data.status === 'complete' || data.status === 'cancelled') {
+      clearInterval(job.pollTimer);
+      if (data.status === 'complete')
+        showHint(`Job ${jobId} complete — ${data.done} domains processed`);
+    }
+  } catch(err) {
+    console.warn(`Poll failed for ${jobId}:`, err.message);
+  }
+}
+
+function ingestJobResults(jobId, jobType, results) {
+  // Background jobs BYPASS staging — go directly to queue or graph
+  // This enables overnight exponential growth
+  let added = 0;
+  for (const r of results) {
+    const domain = cleanDomain(r.domain || '');
+    if (!domain || nodes[domain]) continue;
+
+    if (jobType === 'triage') {
+      // Triage → queue directly with ASN metadata stored
+      const note = [r.asn, r.org, r.country].filter(Boolean).join(' · ');
+      setNode(domain, 'job_triage', 'queued', {
+        _triage: true, domain,
+        asn_info: { asn: r.asn, org: r.org, country: r.country },
+        ip_info:  { ip: r.ip },
+        dimensions: {}, whois: {}, scrape: {}, ssl_sans: [], reverse_ip: [],
+        db_match: {}, attribution: { primary: r.country || '?' },
+        _note: note,
+      }, 'job_triage');
+    } else {
+      // Full analysis → directly done
+      setNode(domain, 'job_analyze', 'done', r, 'job_analyze');
+      try { updateNode(domain); } catch(e) {}
+    }
+    added++;
+  }
+
+  if (added > 0) {
+    try { renderQueue(); }  catch(e) {}
+    try { renderTable(); }  catch(e) {}
+    try { updateBadge(); }  catch(e) {}
+    try { updateCatBar(); } catch(e) {}
+    try { updateGraphStats(); } catch(e) {}
+  }
+}
+
+async function cancelJob(jobId) {
+  try {
+    await fetch(`${API}/network/job/${jobId}/cancel`, { method: 'POST' });
+    const job = activeJobs[jobId];
+    if (job) { clearInterval(job.pollTimer); job.status = 'cancelled'; }
+    renderJobList(); updateJobBadge();
+    showHint(`Job ${jobId} cancelled`);
+  } catch(err) { showErr(`Cancel failed: ${err.message}`); }
+}
+
+function removeJobFromUI(jobId) {
+  const job = activeJobs[jobId];
+  if (job) clearInterval(job.pollTimer);
+  delete activeJobs[jobId];
+  saveActiveJobs(); renderJobList(); updateJobBadge();
+}
+
+function renderJobList() {
+  const list = document.getElementById('jobList');
+  if (!list) return;
+  const jobs = Object.values(activeJobs);
+  if (!jobs.length) {
+    list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);padding:8px 0;">No active jobs.</div>';
+    return;
+  }
+  list.innerHTML = jobs.map(job => {
+    const pct = job.pct ?? (job.total ? Math.round(job.done/job.total*100) : 0);
+    const eta = job.eta ? formatETA(job.eta) : '';
+    return `<div class="job-card">
+      <div class="job-card-top">
+        <span class="job-card-id">${esc(job.id)}</span>
+        <span class="job-card-type ${job.type}">${job.type==='triage'?'⚡ Triage':'🔬 Analyze'}</span>
+        <span class="job-card-status ${job.status}">${job.status.toUpperCase()}</span>
+        <div class="job-card-actions">
+          ${job.status==='running'?`<button class="job-btn cancel" onclick="cancelJob('${esc(job.id)}')">✕ Cancel</button>`:''}
+          <button class="job-btn" onclick="navigator.clipboard?.writeText('${esc(job.id)}').then(()=>showHint('Job ID copied'))">📋 Copy ID</button>
+          ${job.status!=='running'?`<button class="job-btn" onclick="removeJobFromUI('${esc(job.id)}')">Remove</button>`:''}
+        </div>
+      </div>
+      <div class="job-progress">
+        <div class="job-progress-fill ${job.status==='complete'?'complete':''}" style="width:${pct}%"></div>
+      </div>
+      <div class="job-stats">
+        <span><strong>${job.done.toLocaleString()}</strong> / ${(job.total||0).toLocaleString()}</span>
+        <span><strong>${pct}%</strong></span>
+        ${eta?`<span class="job-eta">~${eta} remaining</span>`:''}
+        ${job.status==='complete'?'<span style="color:var(--green)">✓ Done</span>':''}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateJobBadge() {
+  const badge = document.getElementById('jobBadge');
+  if (!badge) return;
+  const running = Object.values(activeJobs).filter(j => j.status === 'running');
+  badge.style.display = running.length ? '' : 'none';
+  badge.textContent   = `${running.length} job${running.length!==1?'s':''} running`;
+}
+
+function formatETA(s) {
+  if (s < 60)   return s + 's';
+  if (s < 3600) return Math.round(s/60) + 'm';
+  return Math.round(s/3600) + 'h ' + Math.round((s%3600)/60) + 'm';
+}
+
+function saveActiveJobs() {
+  try {
+    const toSave = {};
+    for (const [id, j] of Object.entries(activeJobs)) {
+      toSave[id] = { id:j.id, type:j.type, total:j.total,
+                     done:j.done, status:j.status, lastSeen:j.lastSeen };
+    }
+    localStorage.setItem(JOB_STORAGE_KEY, JSON.stringify(toSave));
+  } catch(e) {}
+}
+
+function restoreActiveJobs() {
+  try {
+    const raw = localStorage.getItem(JOB_STORAGE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    for (const [id, job] of Object.entries(saved)) {
+      if (job.status === 'running' || job.status === 'queued') {
+        activeJobs[id] = { ...job, pollTimer: null };
+        startPolling(id);
+      }
+    }
+    if (Object.keys(activeJobs).length) {
+      renderJobList(); updateJobBadge();
+      showHint(`Resumed ${Object.keys(activeJobs).length} background job(s)`);
+    }
+  } catch(e) {}
 }
 
 
