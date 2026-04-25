@@ -9,6 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.1/graphology.umd.min.js"></script>
 <style>
 :root{
   --bg:#050505;--bg2:#0d0d0d;--bg3:#141414;
@@ -618,6 +620,50 @@ h1 em{font-style:italic;color:var(--gold);}
 .job-stats strong{color:var(--muted);}
 .job-eta{color:rgba(78,201,148,.6);}
 
+
+/* ── ASN CLUSTER VIEW ── */
+.cluster-panel{background:var(--bg2);border:1px solid var(--border);
+  border-top:2px solid rgba(200,169,110,.35);margin-bottom:10px;display:none;}
+.cluster-panel.visible{display:block;}
+.cluster-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:10px 16px;border-bottom:1px solid var(--border);
+  background:var(--bg3);flex-wrap:wrap;gap:8px;}
+.cluster-title{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.20em;color:var(--gold);}
+.cluster-actions{display:flex;gap:6px;}
+.cluster-btn{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.10em;padding:5px 12px;background:transparent;
+  border:1px solid var(--border);color:var(--dim);cursor:pointer;transition:all .15s;}
+.cluster-btn:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
+.cluster-btn.primary{background:rgba(200,169,110,.12);color:var(--gold2);
+  border-color:rgba(200,169,110,.3);}
+.cluster-btn.primary:hover{background:rgba(200,169,110,.22);}
+.cluster-scroll{max-height:380px;overflow-y:auto;
+  scrollbar-width:thin;scrollbar-color:rgba(200,169,110,.15) transparent;}
+.cluster-row{display:grid;grid-template-columns:16px 1fr 80px 60px 100px 160px;
+  align-items:center;gap:8px;padding:8px 16px;
+  border-bottom:1px solid rgba(255,255,255,.03);transition:background .1s;}
+.cluster-row:hover{background:rgba(255,255,255,.02);}
+.cluster-row.hdr{background:var(--bg3);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:1;}
+.cr-check{width:13px;height:13px;accent-color:var(--gold);cursor:pointer;}
+.cr-org{font-family:var(--mono);font-size:11px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.cr-org strong{color:var(--gold2);}
+.cr-count{font-family:var(--mono);font-size:11px;color:var(--gold2);
+  font-weight:600;text-align:right;}
+.cr-cc{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;}
+.cr-bar{height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;}
+.cr-fill{height:100%;border-radius:2px;background:var(--gold);transition:width .5s;}
+.cr-export{font-family:var(--mono);font-size:9px;text-transform:uppercase;
+  letter-spacing:.08em;background:transparent;border:1px solid var(--border);
+  color:var(--dim);padding:3px 8px;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.cr-export:hover{color:var(--gold);border-color:rgba(200,169,110,.35);}
+.cluster-footer{padding:8px 16px;border-top:1px solid var(--border);
+  background:var(--bg3);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.cluster-sel-count{font-family:var(--mono);font-size:10px;color:var(--muted);flex:1;}
+.cluster-sel-count strong{color:var(--gold2);}
+
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
   .dd-dims{grid-template-columns:repeat(2,1fr);}
@@ -774,57 +820,52 @@ h1 em{font-style:italic;color:var(--gold);}
 
 <!-- QUEUE + TABLE -->
 
-<!-- BACKGROUND JOB PANEL -->
-<div class="job-panel" id="jobPanel">
-  <div class="job-panel-hdr">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <span class="job-panel-title">⚙ Background Jobs</span>
-      <span style="font-family:var(--mono);font-size:10px;color:var(--dim);">
-        Runs on server while laptop sleeps
-      </span>
+<!-- BULK MODE ENTRY -->
+<div style="margin-bottom:10px;display:flex;align-items:center;gap:14px;
+  padding:12px 16px;background:var(--bg2);border:1px solid var(--border);">
+  <div style="flex:1;">
+    <div style="font-family:var(--mono);font-size:10px;color:var(--muted);margin-bottom:3px;">
+      Need to map a full network at scale?
     </div>
-    <div style="display:flex;align-items:center;gap:8px;">
-      <span id="jobBadge" style="display:none;font-family:var(--mono);font-size:9px;
-        color:var(--green);border:1px solid rgba(78,201,148,.25);padding:2px 8px;"></span>
-      <button class="job-toggle-btn" onclick="toggleJobPanel()">▾ Open</button>
+    <div style="font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.7;">
+      Initiate background jobs for larger tasks — up to 500,000 domains — that run on the 
+      server while your laptop sleeps. Results render in a full-screen WebGL graph built 
+      for network-scale visualization.
     </div>
   </div>
-  <div class="job-panel-body" id="jobPanelBody">
+  <button onclick="enterBulkMode()"
+    style="background:rgba(78,201,148,.12);border:1px solid rgba(78,201,148,.3);
+    color:var(--green);font-family:var(--mono);font-size:10px;font-weight:600;
+    text-transform:uppercase;letter-spacing:.14em;padding:10px 20px;
+    cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;">
+    ⚙ Bulk Analysis Mode →
+  </button>
+</div>
 
-    <!-- Submit new job -->
-    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-      letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Submit New Job</div>
-    <div class="job-form">
-      <textarea class="job-textarea" id="jobDomains"
-        placeholder="Paste domains here — one per line or comma-separated.&#10;Drag &amp; drop a .txt or .csv file, or paste up to 5,000 domains.&#10;&#10;example.com&#10;another-domain.net&#10;suspicious-news.org"></textarea>
-      <div class="job-form-row">
-        <select class="job-type-select" id="jobType">
-          <option value="triage">⚡ Triage — IP + ASN only (fast, bulk, runs in minutes)</option>
-          <option value="analyze">🔬 Full Analyze — complete pipeline (slow, targeted)</option>
-        </select>
-        <button class="job-submit-btn" id="jobSubmitBtn" onclick="submitJob()">
-          Submit Job →
-        </button>
-      </div>
-    </div>
 
-    <!-- Resume existing job -->
-    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-      letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Resume by Job ID</div>
-    <div class="job-resume-row">
-      <input class="job-id-input" id="jobIdInput"
-        placeholder="Paste job ID from a previous session…"
-        onkeydown="if(event.key==='Enter')resumeJob()">
-      <button class="job-resume-btn" onclick="resumeJob()">Resume →</button>
+<!-- ASN CLUSTER VIEW -->
+<div class="cluster-panel" id="clusterPanel">
+  <div class="cluster-hdr">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <span class="cluster-title">📊 ASN Clusters</span>
+      <span id="clusterMeta" style="font-family:var(--mono);font-size:10px;color:var(--dim);"></span>
     </div>
-
-    <!-- Active jobs -->
-    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-      letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Active Jobs</div>
-    <div class="job-list" id="jobList">
-      <div style="font-family:var(--mono);font-size:11px;color:var(--dim);
-        padding:8px 0;">No active jobs. Submit a domain list above.</div>
+    <div class="cluster-actions">
+      <button class="cluster-btn" onclick="clusterSelectAll(true)">Select All</button>
+      <button class="cluster-btn" onclick="clusterSelectAll(false)">Deselect</button>
+      <button class="cluster-btn" onclick="clusterPanel.classList.remove('visible')">Close</button>
+      <button class="cluster-btn primary" id="clusterExportBtn"
+        onclick="exportClustersToGraph()" disabled>
+        → Export Selected to Graph
+      </button>
     </div>
+  </div>
+  <div class="cluster-scroll" id="clusterScroll"></div>
+  <div class="cluster-footer">
+    <span class="cluster-sel-count" id="clusterSelCount">0 clusters selected</span>
+    <button class="cluster-btn primary" onclick="exportClustersToGraph()"
+      id="clusterExportBtn2">→ Export Selected to Graph</button>
+    <button class="cluster-btn" onclick="exportClustersToQueue()">→ Add to Queue</button>
   </div>
 </div>
 
@@ -2746,11 +2787,14 @@ async function submitJob() {
   if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
   clearErr();
 
+  const isDnsOnly  = jobType === 'triage_dns';
+  const actualType = isDnsOnly ? 'triage' : jobType;
+
   try {
     const res = await fetch(`${API}/network/job/submit`, {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify({ domains, type: jobType }),
+      body:    JSON.stringify({ domains, type: actualType, dns_only: isDnsOnly }),
     });
     if (!res.ok) throw new Error(`Server ${res.status}`);
     const data = await res.json();
@@ -2867,12 +2911,11 @@ function ingestJobResults(jobId, jobType, results) {
     added++;
   }
 
-  if (added > 0) {
+  // Batch render every 200 results — NO graph update (deferred for perf)
+  // User exports clusters to graph manually via "View Clusters" → "Export to Graph"
+  if (added > 0 && added % 200 === 0) {
     try { renderQueue(); }  catch(e) {}
-    try { renderTable(); }  catch(e) {}
     try { updateBadge(); }  catch(e) {}
-    try { updateCatBar(); } catch(e) {}
-    try { updateGraphStats(); } catch(e) {}
   }
 }
 
@@ -2911,6 +2954,7 @@ function renderJobList() {
         <span class="job-card-status ${job.status}">${job.status.toUpperCase()}</span>
         <div class="job-card-actions">
           ${job.status==='running'?`<button class="job-btn cancel" onclick="cancelJob('${esc(job.id)}')">✕ Cancel</button>`:''}
+          ${job.done>0?`<button class="job-btn" style="color:var(--gold)" onclick="loadJobClusters('${esc(job.id)}')">📊 View Clusters</button>`:''}
           <button class="job-btn" onclick="navigator.clipboard?.writeText('${esc(job.id)}').then(()=>showHint('Job ID copied'))">📋 Copy ID</button>
           ${job.status!=='running'?`<button class="job-btn" onclick="removeJobFromUI('${esc(job.id)}')">Remove</button>`:''}
         </div>
@@ -3270,6 +3314,757 @@ document.addEventListener('DOMContentLoaded', () => {
     })
     .catch(()=>showHint('Backend offline — deploy network_analyzer.py to Render first.'));
 });
+
+
+// ══ BULK MODE ════════════════════════════════════════════════════════════════
+let bulkSigma       = null;
+let bulkGraph       = null;
+let bulkActivePoll  = null;
+let bulkActiveJobId = null;
+let bulkNodeData    = {};  // domain → {asn, org, country, ip}
+let bulkRecorder    = null;
+let bulkRecChunks   = [];
+let bulkIsRecording = false;
+let bulkColorMode   = 'asn';
+const ASN_COLORS    = {};  // asn → color string
+
+// Color palette for ASNs — generate deterministically
+function asnColor(asn) {
+  if (!ASN_COLORS[asn]) {
+    // Hash the ASN string to a hue
+    let hash = 0;
+    for (let i = 0; i < asn.length; i++) {
+      hash = asn.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    // Suspicious ASNs get red spectrum
+    const SUSPICIOUS = new Set(['AS37963','AS45090','AS55967','AS4134','AS4837',
+      'AS197695','AS8334','AS58461']);
+    const sat = SUSPICIOUS.has(asn) ? '80%' : '60%';
+    const lit = SUSPICIOUS.has(asn) ? '55%' : '65%';
+    ASN_COLORS[asn] = `hsl(${SUSPICIOUS.has(asn) ? Math.abs(hash)%40 : hue},${sat},${lit})`;
+  }
+  return ASN_COLORS[asn];
+}
+
+const CC_COLORS = {
+  CN:'#c0392b', RU:'#e87b4a', IR:'#e8d5a3', KP:'#c0392b',
+  BY:'#e87b4a', US:'#7eb8e4', GB:'#7eb8e4', FR:'#7eb8e4',
+  DE:'#7eb8e4', QA:'#c8a96e',
+};
+function countryColor(cc) {
+  return CC_COLORS[cc] || '#4ec994';
+}
+
+function nodeColor(n) {
+  if (bulkColorMode === 'country') return countryColor(n.country || '?');
+  if (bulkColorMode === 'asn')     return asnColor(n.asn || 'UNKNOWN');
+  // category
+  const cat = n.category || 'unknown';
+  if (cat === 'anchor')    return '#c8a96e';
+  if (cat === 'affiliate') return '#c0392b';
+  return '#4ec994';
+}
+
+function enterBulkMode() {
+  document.getElementById('bulkMode').style.display = 'flex';
+  document.body.style.overflow = 'hidden';
+  initBulkSigma();
+  syncBulkJobList();
+}
+
+function exitBulkMode() {
+  document.getElementById('bulkMode').style.display = 'none';
+  document.body.style.overflow = '';
+}
+
+function initBulkSigma() {
+  if (bulkSigma) return;  // already initialized
+  const container = document.getElementById('bulkSigmaContainer');
+  if (!container) return;
+
+  // Use Graphology for the graph data structure
+  if (typeof graphology === 'undefined' && typeof Graph !== 'undefined') {
+    bulkGraph = new Graph();
+  } else if (typeof graphology !== 'undefined') {
+    bulkGraph = new graphology.Graph();
+  } else {
+    // Fallback — simple adjacency structure, render with canvas2d
+    initCanvasFallback(container);
+    return;
+  }
+
+  try {
+    bulkSigma = new Sigma(bulkGraph, container, {
+      renderEdgeLabels: false,
+      defaultEdgeColor: 'rgba(255,255,255,0.08)',
+      defaultNodeColor: '#4ec994',
+      labelColor:       { color: 'rgba(240,236,228,0.5)' },
+      labelSize:        9,
+      labelWeight:      'normal',
+      minCameraRatio:   0.001,
+      maxCameraRatio:   100,
+    });
+
+    // Click handler — send node to investigation tool
+    bulkSigma.on('clickNode', ({ node }) => {
+      const domain = node;
+      showBulkTooltip(null);
+      // Switch back to investigation mode with this domain
+      exitBulkMode();
+      document.getElementById('seedInput').value = domain;
+      showHint(`${domain} loaded — click Analyze to investigate`);
+    });
+
+    // Hover tooltip
+    bulkSigma.on('enterNode', ({ node, event }) => {
+      const d = bulkNodeData[node] || {};
+      showBulkTooltip(event, node, d);
+    });
+    bulkSigma.on('leaveNode', () => showBulkTooltip(null));
+
+  } catch(e) {
+    console.warn('Sigma init failed, using canvas fallback:', e.message);
+    initCanvasFallback(container);
+  }
+}
+
+// Canvas fallback for browsers where Sigma doesn't load
+let fallbackCanvas = null, fallbackCtx = null, fallbackNodes = [];
+function initCanvasFallback(container) {
+  fallbackCanvas = document.createElement('canvas');
+  fallbackCanvas.style.cssText = 'width:100%;height:100%;';
+  container.appendChild(fallbackCanvas);
+  fallbackCtx = fallbackCanvas.getContext('2d');
+  function resize() {
+    fallbackCanvas.width  = container.offsetWidth;
+    fallbackCanvas.height = container.offsetHeight;
+    renderFallback();
+  }
+  new ResizeObserver(resize).observe(container);
+  resize();
+}
+
+function renderFallback() {
+  if (!fallbackCtx || !fallbackCanvas) return;
+  const W = fallbackCanvas.width, H = fallbackCanvas.height;
+  fallbackCtx.fillStyle = '#050505';
+  fallbackCtx.fillRect(0, 0, W, H);
+  const nodes = fallbackNodes;
+  if (!nodes.length) return;
+  nodes.forEach(n => {
+    fallbackCtx.beginPath();
+    fallbackCtx.arc(n.x * W, n.y * H, 2, 0, Math.PI * 2);
+    fallbackCtx.fillStyle = nodeColor(n);
+    fallbackCtx.fill();
+  });
+}
+
+function showBulkTooltip(event, domain, data) {
+  const tip = document.getElementById('bulkTooltip');
+  if (!tip) return;
+  if (!event) { tip.style.display = 'none'; return; }
+  tip.style.display = 'block';
+  tip.style.left    = (event.x + 14) + 'px';
+  tip.style.top     = (event.y + 14) + 'px';
+  tip.innerHTML     = `<strong style="color:var(--gold2)">${esc(domain)}</strong><br>
+    ${data.asn ? `ASN: ${esc(data.asn)}<br>` : ''}
+    ${data.org ? `${esc(data.org.slice(0,40))}<br>` : ''}
+    ${data.country ? `Country: ${esc(data.country)}<br>` : ''}
+    ${data.ip ? `IP: ${esc(data.ip)}` : ''}
+    <br><span style="color:var(--dim);font-size:9px">Click to investigate →</span>`;
+}
+
+function addNodeToSigma(domain, data) {
+  if (!domain) return;
+  bulkNodeData[domain] = data;
+
+  // Position by layout mode
+  const layout = document.getElementById('bulkLayoutSelect')?.value || 'asn';
+  let x, y;
+
+  if (layout === 'asn') {
+    // Cluster around ASN position with jitter
+    const asn = data.asn || 'UNKNOWN';
+    if (!ASN_COLORS[asn]) asnColor(asn); // init color
+    // Hash ASN to a position
+    let hash = 0;
+    for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash << 5) - hash);
+    const angle = (Math.abs(hash) % 360) * Math.PI / 180;
+    const r = 500 + (Math.abs(hash >> 8) % 200);
+    x = r * Math.cos(angle) + (Math.random() - 0.5) * 80;
+    y = r * Math.sin(angle) + (Math.random() - 0.5) * 80;
+  } else if (layout === 'country') {
+    const CC_POS = {
+      CN: {x:-600,y:-200}, RU:{x:-300,y:-400}, US:{x:400,y:0},
+      GB:{x:100,y:-400},   DE:{x:150,y:-350},  FR:{x:100,y:-300},
+      IR:{x:-100,y:-200},  KP:{x:-500,y:-100},
+    };
+    const pos = CC_POS[data.country] || {x:0,y:0};
+    x = pos.x + (Math.random()-0.5)*200;
+    y = pos.y + (Math.random()-0.5)*200;
+  } else {
+    x = (Math.random()-0.5) * 2000;
+    y = (Math.random()-0.5) * 2000;
+  }
+
+  const color = nodeColor(data);
+  const size  = isSuspiciousASN(data.asn||'', data.org||'', data.country||'') ? 4 : 2;
+
+  try {
+    if (bulkGraph && !bulkGraph.hasNode(domain)) {
+      bulkGraph.addNode(domain, { x, y, size, color, label: domain });
+    }
+  } catch(e) {}
+
+  // Fallback canvas
+  if (fallbackNodes && !fallbackNodes.find(n => n.id === domain)) {
+    fallbackNodes.push({
+      id: domain, x: (x + 1200) / 2400, y: (y + 1200) / 2400,
+      asn: data.asn, country: data.country,
+    });
+    if (fallbackNodes.length % 500 === 0) renderFallback();
+  }
+}
+
+function updateBulkGraphStats() {
+  const nodeCount = bulkGraph ? bulkGraph.order : (fallbackNodes?.length || 0);
+  const edgeCount = bulkGraph ? bulkGraph.size  : 0;
+  const nc = document.getElementById('sigmaNodeCount');
+  const ec = document.getElementById('sigmaEdgeCount');
+  if (nc) nc.textContent = nodeCount.toLocaleString();
+  if (ec) ec.textContent = edgeCount.toLocaleString();
+  // Hide empty state
+  if (nodeCount > 0) {
+    const empty = document.getElementById('bulkGraphEmpty');
+    if (empty) empty.style.display = 'none';
+  }
+}
+
+function changeBulkLayout(mode) {
+  // Re-position all existing nodes
+  if (!bulkGraph) return;
+  bulkGraph.forEachNode((node, attrs) => {
+    const data = bulkNodeData[node] || {};
+    let x, y;
+    if (mode === 'asn') {
+      const asn = data.asn || 'UNKNOWN';
+      let hash = 0;
+      for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash << 5) - hash);
+      const angle = (Math.abs(hash) % 360) * Math.PI / 180;
+      const r = 500 + (Math.abs(hash >> 8) % 200);
+      x = r * Math.cos(angle) + (Math.random()-0.5)*80;
+      y = r * Math.sin(angle) + (Math.random()-0.5)*80;
+    } else if (mode === 'country') {
+      const CC_POS = {CN:{x:-600,y:-200},RU:{x:-300,y:-400},US:{x:400,y:0},GB:{x:100,y:-400}};
+      const pos = CC_POS[data.country] || {x:0,y:0};
+      x = pos.x + (Math.random()-0.5)*200;
+      y = pos.y + (Math.random()-0.5)*200;
+    } else {
+      x = (Math.random()-0.5)*2000;
+      y = (Math.random()-0.5)*2000;
+    }
+    bulkGraph.setNodeAttribute(node, 'x', x);
+    bulkGraph.setNodeAttribute(node, 'y', y);
+  });
+  if (bulkSigma) bulkSigma.refresh();
+}
+
+function colorBulkGraph(mode) {
+  bulkColorMode = mode;
+  if (!bulkGraph) return;
+  bulkGraph.forEachNode((node, attrs) => {
+    const data  = bulkNodeData[node] || {};
+    const color = nodeColor(data);
+    bulkGraph.setNodeAttribute(node, 'color', color);
+  });
+  if (bulkSigma) bulkSigma.refresh();
+  if (fallbackNodes) renderFallback();
+}
+
+function clearBulkGraph() {
+  if (bulkGraph) {
+    bulkGraph.clear();
+    if (bulkSigma) bulkSigma.refresh();
+  }
+  bulkNodeData = {};
+  fallbackNodes = [];
+  if (fallbackCtx && fallbackCanvas) renderFallback();
+  updateBulkGraphStats();
+  const empty = document.getElementById('bulkGraphEmpty');
+  if (empty) empty.style.display = '';
+}
+
+// ── BULK JOB SUBMISSION ───────────────────────────────────────────────────────
+async function submitBulkJob() {
+  const raw     = (document.getElementById('bulkDomains')?.value || '').trim();
+  const jobType = document.getElementById('bulkJobType')?.value || 'triage_dns';
+  const btn     = document.getElementById('bulkSubmitBtn');
+  if (!raw) return;
+
+  const domains = raw.split(/[\n,;\t]+/).map(d => cleanDomain(d.trim())).filter(Boolean);
+  if (!domains.length) return;
+
+  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
+
+  const isDnsOnly  = jobType === 'triage_dns';
+  const actualType = isDnsOnly ? 'triage' : jobType;
+
+  try {
+    const res = await fetch(`${API}/network/job/submit`, {
+      method:  'POST',
+      headers: {'Content-Type':'application/json'},
+      body:    JSON.stringify({ domains, type: actualType, dns_only: isDnsOnly }),
+    });
+    if (!res.ok) throw new Error(`Server ${res.status}`);
+    const data = await res.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('bulkDomains').value = '';
+    startBulkPolling(data.job_id, data.total);
+    showHint(`Job ${data.job_id} submitted — ${data.total.toLocaleString()} domains`);
+
+    // Also register in main tool's activeJobs
+    registerJob(data.job_id, actualType, data.total);
+
+  } catch(err) {
+    showHint(`Submission failed: ${err.message}`);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit →'; }
+  }
+}
+
+async function resumeBulkJob() {
+  const jobId = (document.getElementById('bulkResumeId')?.value || '').trim();
+  if (!jobId) return;
+  document.getElementById('bulkResumeId').value = '';
+  try {
+    const res = await fetch(`${API}/network/job/${jobId}`);
+    if (!res.ok) throw new Error('Not found');
+    const data = await res.json();
+    startBulkPolling(jobId, data.total, data.done);
+    registerJob(jobId, data.type, data.total, data.done);
+  } catch(err) {
+    showHint(`Resume failed: ${err.message}`);
+  }
+}
+
+function startBulkPolling(jobId, total, doneAlready = 0) {
+  if (bulkActivePoll) clearInterval(bulkActivePoll);
+  bulkActiveJobId = jobId;
+  let lastSeen = doneAlready;
+
+  // Show badge
+  const badge = document.getElementById('bulkJobBadge');
+  const idEl  = document.getElementById('bulkJobId');
+  if (badge) badge.style.display = 'flex';
+  if (idEl)  idEl.textContent = jobId;
+
+  async function poll() {
+    try {
+      const res = await fetch(`${API}/network/job/${jobId}?since=${lastSeen}&limit=1000`);
+      if (!res.ok) return;
+      const data = await res.json();
+
+      // Add new results to Sigma graph
+      const results = data.results || [];
+      for (const r of results) {
+        if (r.domain && r.ip) {
+          addNodeToSigma(r.domain, r);
+        }
+      }
+      if (results.length) {
+        lastSeen += results.length;
+        updateBulkGraphStats();
+        if (bulkSigma) bulkSigma.refresh();
+      }
+
+      // Update progress
+      const pct = data.pct || 0;
+      const fill = document.getElementById('bulkProgressFill');
+      const pctEl = document.getElementById('bulkJobPct');
+      const etaEl = document.getElementById('bulkJobEta');
+      if (fill)  fill.style.width = pct + '%';
+      if (pctEl) pctEl.textContent = pct + '%';
+      if (etaEl) etaEl.textContent = data.eta_seconds ? '~' + formatETA(data.eta_seconds) : '';
+
+      // Update job list
+      syncBulkJobList();
+
+      // Load clusters when job completes
+      if (data.status === 'complete' || data.status === 'cancelled') {
+        clearInterval(bulkActivePoll);
+        bulkActivePoll = null;
+        if (data.status === 'complete') {
+          loadBulkClusters(jobId);
+          showHint(`Job complete — ${data.done.toLocaleString()} domains processed`);
+        }
+      }
+    } catch(e) {
+      console.warn('Bulk poll error:', e.message);
+    }
+  }
+
+  poll(); // immediate
+  bulkActivePoll = setInterval(poll, 8000);
+}
+
+async function loadBulkClusters(jobId) {
+  try {
+    const res = await fetch(`${API}/network/job/${jobId}/clusters`);
+    if (!res.ok) return;
+    const data = await res.json();
+    renderBulkClusters(data.clusters || [], data.total_processed || 0);
+  } catch(e) {}
+}
+
+function renderBulkClusters(clusters, total) {
+  const list = document.getElementById('bulkClusterList');
+  const meta = document.getElementById('bulkClusterMeta');
+  if (meta) meta.textContent = `${total.toLocaleString()} processed · ${clusters.length} ASNs`;
+  if (!list) return;
+
+  const maxCount = clusters[0]?.count || 1;
+  list.innerHTML = clusters.slice(0,30).map(cl => {
+    const pct     = Math.round((cl.count / maxCount) * 100);
+    const sus     = isSuspiciousASN(cl.asn, cl.org, cl.country);
+    const barColor = sus ? 'var(--red)' : 'var(--gold)';
+    return `<div style="margin-bottom:6px;cursor:pointer;"
+      onclick="highlightCluster('${esc(cl.asn)}')"
+      title="Click to highlight in graph">
+      <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
+        <span style="font-family:var(--mono);font-size:9px;color:${sus?'var(--red)':'var(--muted)'};
+          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;"
+          title="${esc(cl.org)}">
+          ${sus?'⚠ ':''}${esc((cl.asn||'').replace(/^AS[0-9]+ ?/,'').slice(0,25)||cl.asn)}
+        </span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--gold2);
+          flex-shrink:0;margin-left:6px;">${cl.count.toLocaleString()}</span>
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;">
+        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;"></div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function highlightCluster(asn) {
+  if (!bulkGraph || !bulkSigma) return;
+  bulkGraph.forEachNode((node, attrs) => {
+    const data = bulkNodeData[node] || {};
+    const isMatch = (data.asn === asn);
+    bulkGraph.setNodeAttribute(node, 'color',
+      isMatch ? '#ffffff' : 'rgba(240,236,228,0.15)');
+    bulkGraph.setNodeAttribute(node, 'size',
+      isMatch ? 5 : 1.5);
+  });
+  bulkSigma.refresh();
+  // Reset after 3 seconds
+  setTimeout(() => colorBulkGraph(bulkColorMode), 3000);
+}
+
+function syncBulkJobList() {
+  const list = document.getElementById('bulkJobList');
+  if (!list) return;
+  const jobs = Object.values(activeJobs);
+  if (!jobs.length) {
+    list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);">No jobs yet.</div>';
+    return;
+  }
+  list.innerHTML = jobs.map(job => {
+    const pct = job.pct ?? (job.total ? Math.round(job.done/job.total*100) : 0);
+    return `<div style="background:var(--bg3);border:1px solid var(--border);
+      padding:8px 10px;margin-bottom:6px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+        <span style="font-family:var(--mono);font-size:10px;color:var(--gold2);">${esc(job.id)}</span>
+        <span style="font-family:var(--mono);font-size:9px;color:${job.status==='running'?'var(--green)':'var(--dim)'};">${job.status}</span>
+        <span style="flex:1"></span>
+        ${job.done>0?`<button onclick="loadBulkClusters('${esc(job.id)}')" style="font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;background:rgba(200,169,110,.10);color:var(--gold);border:1px solid rgba(200,169,110,.2);padding:2px 6px;cursor:pointer;">Clusters</button>`:''}
+        ${job.status==='running'?`<button onclick="cancelJob('${esc(job.id)}')" style="font-family:var(--mono);font-size:8px;background:transparent;color:var(--red);border:1px solid rgba(192,57,43,.2);padding:2px 6px;cursor:pointer;">✕</button>`:''}
+      </div>
+      <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:4px;">
+        <div style="height:100%;width:${pct}%;background:var(--green);border-radius:2px;transition:width .5s;"></div>
+      </div>
+      <div style="font-family:var(--mono);font-size:9px;color:var(--dim);">
+        ${job.done.toLocaleString()} / ${(job.total||0).toLocaleString()} · ${pct}%
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── BULK RECORDING ────────────────────────────────────────────────────────────
+function toggleBulkRecord() {
+  if (bulkIsRecording) stopBulkRecord();
+  else startBulkRecord();
+}
+
+function startBulkRecord() {
+  const container = document.getElementById('bulkSigmaContainer');
+  const canvas    = container?.querySelector('canvas');
+  if (!canvas) { showHint('Canvas not ready — add some nodes first'); return; }
+  try {
+    const stream = canvas.captureStream(30);
+    const mime   = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
+                   ? 'video/webm;codecs=vp9' : 'video/webm';
+    bulkRecChunks = [];
+    bulkRecorder  = new MediaRecorder(stream, {mimeType: mime});
+    bulkRecorder.ondataavailable = e => { if (e.data.size > 0) bulkRecChunks.push(e.data); };
+    bulkRecorder.onstop = downloadBulkRecording;
+    bulkRecorder.start(100);
+    bulkIsRecording = true;
+    const btn = document.getElementById('bulkRecBtn');
+    if (btn) { btn.textContent = '⏹ Stop'; btn.style.background = 'var(--red)'; btn.style.color = '#fff'; }
+  } catch(e) { showHint('Recording not supported: ' + e.message); }
+}
+
+function stopBulkRecord() {
+  if (bulkRecorder) bulkRecorder.stop();
+  bulkIsRecording = false;
+  const btn = document.getElementById('bulkRecBtn');
+  if (btn) { btn.textContent = '⏺ Record'; btn.style.background = 'rgba(192,57,43,.12)'; btn.style.color = 'var(--red)'; }
+}
+
+function downloadBulkRecording() {
+  if (!bulkRecChunks.length) return;
+  const blob = new Blob(bulkRecChunks, {type:'video/webm'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'inteldesk-bulk-' + new Date().toISOString().slice(0,10) + '.webm';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ── BULK GEXF EXPORT ──────────────────────────────────────────────────────────
+function exportBulkGEXF() {
+  if (!bulkGraph || bulkGraph.order === 0) {
+    showHint('No nodes to export. Run a job first.');
+    return;
+  }
+  let ns = '', es = '';
+  bulkGraph.forEachNode((node, attrs) => {
+    const d = bulkNodeData[node] || {};
+    ns += `<node id="${esc(node)}" label="${esc(node)}">
+      <attvalues>
+        <attvalue for="0" value="${esc(d.asn||'')}"/>
+        <attvalue for="1" value="${esc(d.org||'')}"/>
+        <attvalue for="2" value="${esc(d.country||'')}"/>
+        <attvalue for="3" value="${esc(d.ip||'')}"/>
+      </attvalues>
+    </node>\n`;
+  });
+  bulkGraph.forEachEdge((edge, attrs, source, target) => {
+    es += `<edge source="${esc(source)}" target="${esc(target)}"/>\n`;
+  });
+  const gexf = `<?xml version="1.0" encoding="UTF-8"?>
+<gexf xmlns="http://gexf.net/1.3" version="1.3">
+  <meta><creator>Intel Desk Bulk Analysis</creator></meta>
+  <graph defaultedgetype="undirected">
+    <attributes class="node">
+      <attribute id="0" title="asn" type="string"/>
+      <attribute id="1" title="org" type="string"/>
+      <attribute id="2" title="country" type="string"/>
+      <attribute id="3" title="ip" type="string"/>
+    </attributes>
+    <nodes>\n${ns}    </nodes>
+    <edges>\n${es}    </edges>
+  </graph>
+</gexf>`;
+  const blob = new Blob([gexf], {type:'application/xml'});
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url;
+  a.download = 'inteldesk-bulk-' + new Date().toISOString().slice(0,10) + '.gexf';
+  a.click();
+  URL.revokeObjectURL(url);
+  showHint(`Exported ${bulkGraph.order.toLocaleString()} nodes to GEXF`);
+}
+
+// Keyboard shortcut to exit bulk mode
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && document.getElementById('bulkMode')?.style.display !== 'none') {
+    exitBulkMode();
+  }
+});
+
+
 </script>
+
+<!-- BULK MODE OVERLAY — full screen, separate interface -->
+<div id="bulkMode" style="display:none;position:fixed;inset:0;z-index:9000;
+  background:var(--bg);flex-direction:column;overflow:hidden;">
+
+  <!-- BULK HEADER -->
+  <div style="display:flex;align-items:center;gap:12px;padding:10px 18px;
+    background:var(--bg3);border-bottom:2px solid rgba(78,201,148,.3);
+    flex-shrink:0;flex-wrap:wrap;">
+    <button onclick="exitBulkMode()"
+      style="font-family:var(--mono);font-size:10px;text-transform:uppercase;
+      letter-spacing:.12em;background:transparent;border:1px solid var(--border);
+      color:var(--muted);padding:6px 12px;cursor:pointer;">
+      ← Back to Investigation
+    </button>
+    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.20em;color:var(--green);">Bulk Analysis Mode</div>
+    <div style="flex:1;"></div>
+    <!-- Active job badge -->
+    <div id="bulkJobBadge" style="display:none;font-family:var(--mono);font-size:10px;
+      color:var(--green);display:flex;align-items:center;gap:8px;">
+      <span id="bulkJobId" style="border:1px solid rgba(78,201,148,.25);padding:2px 8px;"></span>
+      <span id="bulkJobPct" style="color:var(--gold2);">0%</span>
+      <div style="width:120px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;">
+        <div id="bulkProgressFill" style="height:100%;background:var(--green);width:0%;transition:width .5s;border-radius:2px;"></div>
+      </div>
+      <span id="bulkJobEta" style="color:var(--dim);"></span>
+    </div>
+  </div>
+
+  <!-- BULK BODY — two columns -->
+  <div style="display:flex;flex:1;overflow:hidden;">
+
+    <!-- LEFT PANEL — controls -->
+    <div style="width:320px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
+      display:flex;flex-direction:column;overflow-y:auto;">
+
+      <!-- Submit -->
+      <div style="padding:14px;border-bottom:1px solid var(--border);">
+        <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Submit Job</div>
+        <textarea id="bulkDomains" style="width:100%;background:var(--bg3);
+          border:1px solid var(--border);outline:none;font-family:var(--mono);
+          font-size:11px;color:var(--text);padding:10px;resize:vertical;
+          min-height:100px;line-height:1.6;" 
+          placeholder="Paste domains — one per line or comma-separated&#10;&#10;Or drag &amp; drop a .txt / .csv file"></textarea>
+        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+          <select id="bulkJobType" style="flex:1;background:var(--bg3);border:1px solid var(--border);
+            font-family:var(--mono);font-size:10px;color:var(--muted);padding:6px;outline:none;">
+            <option value="triage_dns">🚀 DNS-Only — fastest, no rate limits</option>
+            <option value="triage">⚡ Triage — IP + ASN data</option>
+            <option value="analyze">🔬 Full Analysis — targeted use</option>
+          </select>
+          <button onclick="submitBulkJob()" id="bulkSubmitBtn"
+            style="background:var(--green);color:var(--bg);border:none;
+            font-family:var(--mono);font-size:10px;font-weight:600;
+            text-transform:uppercase;letter-spacing:.12em;
+            padding:6px 14px;cursor:pointer;white-space:nowrap;">
+            Submit →
+          </button>
+        </div>
+        <!-- Resume -->
+        <div style="display:flex;gap:0;margin-top:8px;border:1px solid var(--border);">
+          <input id="bulkResumeId" placeholder="Resume job ID…"
+            style="flex:1;background:var(--bg3);border:none;outline:none;
+            font-family:var(--mono);font-size:11px;color:var(--text);padding:7px 10px;"
+            onkeydown="if(event.key==='Enter')resumeBulkJob()">
+          <button onclick="resumeBulkJob()"
+            style="background:rgba(78,201,148,.10);border:none;border-left:1px solid rgba(78,201,148,.2);
+            color:var(--green);font-family:var(--mono);font-size:10px;
+            text-transform:uppercase;letter-spacing:.10em;padding:7px 12px;cursor:pointer;">
+            Resume
+          </button>
+        </div>
+      </div>
+
+      <!-- Active jobs list -->
+      <div style="padding:14px;border-bottom:1px solid var(--border);">
+        <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Active Jobs</div>
+        <div id="bulkJobList" style="display:flex;flex-direction:column;gap:6px;">
+          <div style="font-family:var(--mono);font-size:11px;color:var(--dim);">No jobs yet.</div>
+        </div>
+      </div>
+
+      <!-- ASN Clusters -->
+      <div style="padding:14px;flex:1;">
+        <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">
+          ASN Clusters
+          <span id="bulkClusterMeta" style="text-transform:none;letter-spacing:0;
+            color:rgba(200,169,110,.5);margin-left:8px;font-size:9px;"></span>
+        </div>
+        <div id="bulkClusterList" style="font-family:var(--mono);font-size:10px;
+          color:var(--dim);">Run a job to see clusters.</div>
+      </div>
+
+      <!-- Graph controls -->
+      <div style="padding:14px;border-top:1px solid var(--border);flex-shrink:0;">
+        <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Graph Controls</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;">
+          <select id="bulkLayoutSelect" onchange="changeBulkLayout(this.value)"
+            style="background:var(--bg3);border:1px solid var(--border);
+            font-family:var(--mono);font-size:10px;color:var(--muted);
+            padding:5px 8px;outline:none;flex:1;">
+            <option value="asn">ASN Clusters</option>
+            <option value="country">By Country</option>
+            <option value="force">Force-Directed</option>
+          </select>
+          <select id="bulkColorSelect" onchange="colorBulkGraph(this.value)"
+            style="background:var(--bg3);border:1px solid var(--border);
+            font-family:var(--mono);font-size:10px;color:var(--muted);
+            padding:5px 8px;outline:none;flex:1;">
+            <option value="asn">Color by ASN</option>
+            <option value="country">Color by Country</option>
+            <option value="category">Color by Category</option>
+          </select>
+        </div>
+        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
+          <button onclick="toggleBulkRecord()" id="bulkRecBtn"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;padding:5px 10px;background:rgba(192,57,43,.12);
+            color:var(--red);border:1px solid rgba(192,57,43,.25);cursor:pointer;flex:1;">
+            ⏺ Record
+          </button>
+          <button onclick="exportBulkGEXF()"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;padding:5px 10px;background:transparent;
+            color:var(--dim);border:1px solid var(--border);cursor:pointer;flex:1;">
+            ↓ GEXF
+          </button>
+          <button onclick="clearBulkGraph()"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;padding:5px 10px;background:transparent;
+            color:var(--dim);border:1px solid var(--border);cursor:pointer;flex:1;">
+            Clear
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- RIGHT — SIGMA GRAPH CANVAS -->
+    <div style="flex:1;position:relative;overflow:hidden;background:
+      radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.03) 0%,transparent 70%),
+      var(--bg);">
+      <div id="bulkSigmaContainer" style="width:100%;height:100%;"></div>
+      <!-- Graph empty state -->
+      <div id="bulkGraphEmpty" style="position:absolute;inset:0;display:flex;
+        flex-direction:column;align-items:center;justify-content:center;gap:10px;
+        pointer-events:none;">
+        <div style="font-size:40px;opacity:.1;">◎</div>
+        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);
+          text-align:center;line-height:1.9;max-width:320px;">
+          Submit a job to begin.<br>
+          Nodes render here as results arrive.<br>
+          Handles up to 500,000 nodes via WebGL.
+        </div>
+      </div>
+      <!-- Node count overlay -->
+      <div style="position:absolute;top:10px;right:10px;
+        font-family:var(--mono);font-size:10px;color:var(--dim);
+        background:rgba(5,5,5,.8);padding:4px 10px;border:1px solid var(--border);">
+        <span id="sigmaNodeCount">0</span> nodes ·
+        <span id="sigmaEdgeCount">0</span> edges
+      </div>
+      <!-- Tooltip -->
+      <div id="bulkTooltip" style="display:none;position:absolute;
+        background:var(--bg3);border:1px solid var(--border);
+        padding:8px 12px;font-family:var(--mono);font-size:10px;
+        color:var(--muted);pointer-events:none;z-index:100;
+        box-shadow:0 8px 32px rgba(0,0,0,.7);max-width:220px;"></div>
+    </div>
+  </div>
+</div>
+
+
 </body>
 </html>
