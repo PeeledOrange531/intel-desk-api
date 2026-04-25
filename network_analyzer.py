@@ -1598,19 +1598,64 @@ import threading
 import uuid
 from datetime import datetime
 
-# In-memory job store
-# Structure: {job_id: {status, type, domains, results, done, total, errors, created_at, updated_at}}
+# In-memory job store — metadata only (no results in RAM at scale)
+# Results streamed to disk file: /tmp/job_{id}.jsonl
 _jobs = {}
 _jobs_lock = threading.Lock()
+_worker_pool = ThreadPoolExecutor(max_workers=16)
 
-# Worker thread pool for background processing
-_worker_pool = ThreadPoolExecutor(max_workers=8)
+RESULTS_DIR = '/tmp'  # Render ephemeral disk — survives job lifetime
+
+def _results_path(job_id: str) -> str:
+    return os.path.join(RESULTS_DIR, f'job_{job_id}.jsonl')
+
+def _append_result(job_id: str, result: dict):
+    """Append one result line to the job's JSONL file."""
+    try:
+        with open(_results_path(job_id), 'a') as f:
+            f.write(json.dumps(result) + '\n')
+    except Exception as e:
+        logger.warning(f"Failed to write result for job {job_id}: {e}")
+
+def _read_results(job_id: str, offset: int = 0, limit: int = 1000) -> list:
+    """Read results from JSONL file starting at line offset."""
+    path = _results_path(job_id)
+    if not os.path.exists(path):
+        return []
+    results = []
+    try:
+        with open(path, 'r') as f:
+            for i, line in enumerate(f):
+                if i < offset:
+                    continue
+                if len(results) >= limit:
+                    break
+                line = line.strip()
+                if line:
+                    try:
+                        results.append(json.loads(line))
+                    except Exception:
+                        pass
+    except Exception as e:
+        logger.warning(f"Failed to read results for job {job_id}: {e}")
+    return results
+
+def _count_results(job_id: str) -> int:
+    path = _results_path(job_id)
+    if not os.path.exists(path):
+        return 0
+    try:
+        with open(path, 'r') as f:
+            return sum(1 for line in f if line.strip())
+    except Exception:
+        return 0
 
 
-def _triage_domain(domain: str) -> dict:
+def _triage_domain(domain: str, dns_only: bool = False) -> dict:
     """
     Fast triage — IP + ASN only. No WHOIS, no SSL, no scraping.
-    ~1-2 seconds per domain.
+    dns_only=True: just DNS resolution, no ipinfo call (faster, no rate limits)
+    dns_only=False: IP + full ASN lookup via ipinfo (~2s, 50k/month free)
     """
     domain = clean_domain(domain)
     result = {
@@ -1625,7 +1670,7 @@ def _triage_domain(domain: str) -> dict:
         ip_res = resolve_ip(domain)
         ip = ip_res.get("ip")
         result["ip"] = ip
-        if ip:
+        if ip and not dns_only:
             asn_info = get_asn_info(ip)
             result["asn"]     = asn_info.get("asn", "")
             result["org"]     = asn_info.get("org", "")
@@ -1660,7 +1705,7 @@ def _run_job(job_id: str):
         with ThreadPoolExecutor(max_workers=batch_size) as ex:
             for domain in batch:
                 if job_type == "triage":
-                    futures[domain] = ex.submit(_triage_domain, domain)
+                    futures[domain] = ex.submit(_triage_domain, domain, job.get("dns_only", False))
                 else:
                     futures[domain] = ex.submit(analyze_domain, domain)
 
@@ -1673,9 +1718,10 @@ def _run_job(job_id: str):
                 with _jobs_lock:
                     j = _jobs.get(job_id)
                     if j:
-                        j["results"].append(result)
                         j["done"] += 1
                         j["updated_at"] = datetime.utcnow().isoformat()
+                # Write result to disk — not memory
+                _append_result(job_id, result)
 
     # Mark complete
     with _jobs_lock:
@@ -1715,19 +1761,20 @@ def job_submit():
         return jsonify({"error": "no valid domains after cleaning"}), 400
 
     # Cap job size
-    MAX_DOMAINS = 5000
+    MAX_DOMAINS = 500000
     if len(cleaned) > MAX_DOMAINS:
         cleaned = cleaned[:MAX_DOMAINS]
 
     job_id = str(uuid.uuid4())[:8]
+    dns_only = bool(data.get("dns_only", False))
     job = {
         "id":         job_id,
         "type":       job_type,
         "status":     "queued",
         "domains":    cleaned,
-        "results":    [],
         "done":       0,
         "total":      len(cleaned),
+        "dns_only":   dns_only,
         "created_at": datetime.utcnow().isoformat(),
         "updated_at": datetime.utcnow().isoformat(),
         "errors":     [],
@@ -1764,7 +1811,8 @@ def job_status(job_id):
         return resp, 404
 
     since = int(request.args.get("since", 0))
-    new_results = job["results"][since:]
+    limit = int(request.args.get("limit", 500))
+    new_results = _read_results(job["id"], offset=since, limit=limit)
 
     pct = round((job["done"] / job["total"] * 100), 1) if job["total"] else 0
 
@@ -1806,6 +1854,64 @@ def job_cancel(job_id):
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
+
+
+
+@network_bp.route("/job/<job_id>/clusters", methods=["GET"])
+def job_clusters(job_id):
+    """
+    Aggregate triage results by ASN — returns cluster heatmap data.
+    Used for the ASN cluster view before deciding what to graph.
+    """
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if not job:
+        resp = jsonify({"error": "job not found"})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 404
+
+    # Read ALL results from disk and cluster by ASN
+    all_results = _read_results(job_id, offset=0, limit=500000)
+
+    clusters = {}  # asn → {asn, org, country, domains: [], count}
+    errors   = 0
+    no_ip    = 0
+
+    for r in all_results:
+        if r.get("error"):
+            errors += 1
+            continue
+        if not r.get("ip"):
+            no_ip += 1
+            continue
+        asn = r.get("asn") or "UNKNOWN"
+        org = r.get("org") or asn
+        cc  = r.get("country") or "?"
+        if asn not in clusters:
+            clusters[asn] = {"asn": asn, "org": org, "country": cc,
+                             "domains": [], "count": 0}
+        clusters[asn]["domains"].append(r["domain"])
+        clusters[asn]["count"] += 1
+
+    # Sort by count descending
+    sorted_clusters = sorted(clusters.values(), key=lambda x: x["count"], reverse=True)
+
+    # For display, truncate domain list to first 100 per cluster
+    for cl in sorted_clusters:
+        cl["sample_domains"] = cl["domains"][:100]
+        del cl["domains"]
+
+    resp = jsonify({
+        "job_id":          job_id,
+        "total_processed": job["done"],
+        "total_domains":   job["total"],
+        "clusters":        sorted_clusters[:200],  # top 200 ASNs
+        "errors":          errors,
+        "no_ip":           no_ip,
+        "timestamp":       datetime.utcnow().isoformat(),
+    })
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
 
 @network_bp.route("/jobs", methods=["GET"])
 def jobs_list():
