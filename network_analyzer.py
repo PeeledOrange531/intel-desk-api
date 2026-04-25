@@ -1688,40 +1688,60 @@ def _run_job(job_id: str):
             return
         job["status"] = "running"
 
-    domains   = job["domains"]
-    job_type  = job["type"]  # "triage" or "analyze"
-    batch_size = 20  # parallel workers per batch
+    domains  = job.get("domains", [])
+    job_type = job.get("type", "triage")
+    dns_only = job.get("dns_only", False)
 
-    for i in range(0, len(domains), batch_size):
-        # Check for cancellation
-        with _jobs_lock:
-            if _jobs.get(job_id, {}).get("status") == "cancelled":
-                return
+    # Use a dedicated thread pool per job — avoids nesting in _worker_pool
+    # 20 workers for triage, 4 for full analysis
+    n_workers  = 20 if job_type == "triage" else 4
+    batch_size = n_workers * 2  # submit ahead of completion
 
-        batch = domains[i:i + batch_size]
-
-        # Process batch in parallel
+    with ThreadPoolExecutor(max_workers=n_workers) as ex:
         futures = {}
-        with ThreadPoolExecutor(max_workers=batch_size) as ex:
-            for domain in batch:
-                if job_type == "triage":
-                    futures[domain] = ex.submit(_triage_domain, domain, job.get("dns_only", False))
-                else:
-                    futures[domain] = ex.submit(analyze_domain, domain)
 
-            for domain, future in futures.items():
-                try:
-                    result = future.result(timeout=30)
-                except Exception as e:
-                    result = {"domain": domain, "error": str(e)[:80]}
-
+        for i, domain in enumerate(domains):
+            # Check cancellation every batch
+            if i % batch_size == 0:
                 with _jobs_lock:
-                    j = _jobs.get(job_id)
-                    if j:
-                        j["done"] += 1
-                        j["updated_at"] = datetime.utcnow().isoformat()
-                # Write result to disk — not memory
-                _append_result(job_id, result)
+                    if _jobs.get(job_id, {}).get("status") == "cancelled":
+                        ex.shutdown(wait=False)
+                        return
+
+            # Submit work
+            if job_type == "triage":
+                futures[ex.submit(_triage_domain, domain, dns_only)] = domain
+            else:
+                futures[ex.submit(analyze_domain, domain)] = domain
+
+            # Collect completed futures when we have a full batch
+            if len(futures) >= batch_size:
+                done_futures = [f for f in futures if f.done()]
+                for future in done_futures:
+                    domain_done = futures.pop(future)
+                    try:
+                        result = future.result(timeout=1)
+                    except Exception as e:
+                        result = {"domain": domain_done, "error": str(e)[:80]}
+                    _append_result(job_id, result)
+                    with _jobs_lock:
+                        j = _jobs.get(job_id)
+                        if j:
+                            j["done"] += 1
+                            j["updated_at"] = datetime.utcnow().isoformat()
+
+        # Collect remaining futures
+        for future, domain_done in futures.items():
+            try:
+                result = future.result(timeout=30)
+            except Exception as e:
+                result = {"domain": domain_done, "error": str(e)[:80]}
+            _append_result(job_id, result)
+            with _jobs_lock:
+                j = _jobs.get(job_id)
+                if j:
+                    j["done"] += 1
+                    j["updated_at"] = datetime.utcnow().isoformat()
 
     # Mark complete
     with _jobs_lock:
@@ -1856,6 +1876,34 @@ def job_cancel(job_id):
 
 
 
+
+
+@network_bp.route("/job/<job_id>/debug", methods=["GET"])
+def job_debug(job_id):
+    """Debug endpoint — shows raw job state."""
+    with _jobs_lock:
+        job = _jobs.get(job_id)
+    if not job:
+        resp = jsonify({"error": "not found", "all_jobs": list(_jobs.keys())})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 404
+    # Count lines in result file
+    result_count = _count_results(job_id)
+    resp = jsonify({
+        "job_id":       job_id,
+        "status":       job.get("status"),
+        "done":         job.get("done"),
+        "total":        job.get("total"),
+        "dns_only":     job.get("dns_only"),
+        "type":         job.get("type"),
+        "result_file":  _results_path(job_id),
+        "result_count": result_count,
+        "domains_in_job": len(job.get("domains", [])),
+        "created_at":   job.get("created_at"),
+        "updated_at":   job.get("updated_at"),
+    })
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
 
 @network_bp.route("/job/<job_id>/clusters", methods=["GET"])
 def job_clusters(job_id):
