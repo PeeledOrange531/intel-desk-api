@@ -1004,6 +1004,10 @@ def _corsify(r):
 
 @network_bp.route("/ping", methods=["GET"])
 def ping():
+    # Load persisted jobs on first ping (startup)
+    if not hasattr(ping, '_initialized'):
+        ping._initialized = True
+        _load_jobs_meta()
     registry = NET_DB.get("state_media_registry", {})
 
     # Test external API reachability
@@ -1598,13 +1602,67 @@ import threading
 import uuid
 from datetime import datetime
 
-# In-memory job store — metadata only (no results in RAM at scale)
-# Results streamed to disk file: /tmp/job_{id}.jsonl
+# Job store — metadata persisted to disk, results streamed to JSONL files
 _jobs = {}
 _jobs_lock = threading.Lock()
 _worker_pool = ThreadPoolExecutor(max_workers=16)
 
-RESULTS_DIR = '/tmp'  # Render ephemeral disk — survives job lifetime
+RESULTS_DIR  = '/tmp'
+JOBS_META_FILE = '/tmp/inteldesk_jobs.json'  # persists job metadata across restarts
+
+def _save_jobs_meta():
+    """Persist job metadata to disk so restarts can resume jobs."""
+    try:
+        with _jobs_lock:
+            # Save everything except the domains list (can be large)
+            to_save = {}
+            for jid, j in _jobs.items():
+                to_save[jid] = {k: v for k, v in j.items() if k != 'domains'}
+        with open(JOBS_META_FILE, 'w') as f:
+            json.dump(to_save, f)
+    except Exception as e:
+        logger.warning(f"Could not save jobs meta: {e}")
+
+def _load_jobs_meta():
+    """Load and resume any interrupted jobs on startup."""
+    try:
+        if not os.path.exists(JOBS_META_FILE):
+            return
+        with open(JOBS_META_FILE) as f:
+            saved = json.load(f)
+        for jid, j in saved.items():
+            # Only resume jobs that were running or queued
+            if j.get('status') in ('running', 'queued'):
+                # Check if result file exists — means it was partially processed
+                result_count = _count_results(jid)
+                j['done']   = result_count  # pick up where we left off
+                j['status'] = 'queued'      # re-queue for processing
+                # Try to restore domain list from disk
+                domains_path = os.path.join(RESULTS_DIR, f'job_{jid}_domains.json')
+                if os.path.exists(domains_path):
+                    try:
+                        with open(domains_path) as df:
+                            all_domains = json.load(df)
+                        # Skip already-processed domains
+                        j['domains'] = all_domains[result_count:]
+                        logger.info(f"Restored {len(j['domains'])} remaining domains for job {jid}")
+                    except Exception:
+                        j['domains'] = []
+                else:
+                    j['domains'] = []  # no domain file — job can't be resumed
+                with _jobs_lock:
+                    _jobs[jid] = j
+                logger.info(f"Restored job {jid} — {result_count} results already saved")
+                # Re-submit to worker pool if has domains to process
+                if j.get('domains'):
+                    j['status'] = 'running'
+                    _worker_pool.submit(_run_job, jid)
+            elif j.get('status') == 'complete':
+                # Keep completed jobs so UI can query clusters
+                with _jobs_lock:
+                    _jobs[jid] = j
+    except Exception as e:
+        logger.warning(f"Could not load jobs meta: {e}")
 
 def _results_path(job_id: str) -> str:
     return os.path.join(RESULTS_DIR, f'job_{job_id}.jsonl')
@@ -1749,6 +1807,7 @@ def _run_job(job_id: str):
         if j and j["status"] == "running":
             j["status"] = "complete"
             j["updated_at"] = datetime.utcnow().isoformat()
+    _save_jobs_meta()
 
 
 # ── Job routes ─────────────────────────────────────────────────────────────────
@@ -1802,6 +1861,16 @@ def job_submit():
 
     with _jobs_lock:
         _jobs[job_id] = job
+
+    # Save domain list to disk so job can resume after restart
+    try:
+        domains_path = os.path.join(RESULTS_DIR, f'job_{job_id}_domains.json')
+        with open(domains_path, 'w') as f:
+            json.dump(cleaned, f)
+    except Exception as e:
+        logger.warning(f"Could not save domains for job {job_id}: {e}")
+
+    _save_jobs_meta()
 
     # Start background worker
     _worker_pool.submit(_run_job, job_id)
