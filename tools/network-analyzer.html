@@ -9,8 +9,8 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/sigma.js/2.4.0/sigma.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/graphology/0.25.1/graphology.umd.min.js"></script>
+<script src="https://unpkg.com/graphology@0.25.1/dist/graphology.umd.min.js"></script>
+<script src="https://unpkg.com/sigma@2.4.0/build/sigma.min.js"></script>
 <style>
 :root{
   --bg:#050505;--bg2:#0d0d0d;--bg3:#141414;
@@ -663,6 +663,28 @@ h1 em{font-style:italic;color:var(--gold);}
   background:var(--bg3);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .cluster-sel-count{font-family:var(--mono);font-size:10px;color:var(--muted);flex:1;}
 .cluster-sel-count strong{color:var(--gold2);}
+
+
+/* ── CRAWL PROGRESS ANIMATION ── */
+.crawl-ghost{position:absolute;font-size:28px;pointer-events:none;
+  transition:all 0.8s ease-in-out;z-index:5;opacity:0.6;
+  animation:ghostBounce 3s ease-in-out infinite;}
+@keyframes ghostBounce{
+  0%,100%{transform:translateY(0) scale(1);}
+  50%{transform:translateY(-20px) scale(1.1);}
+}
+.crawl-status-overlay{position:absolute;bottom:20px;left:50%;
+  transform:translateX(-50%);font-family:var(--mono);font-size:11px;
+  color:rgba(78,201,148,0.7);text-align:center;pointer-events:none;
+  z-index:5;line-height:2;}
+.crawl-progress-ring{position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);pointer-events:none;z-index:4;
+  display:flex;flex-direction:column;align-items:center;gap:12px;}
+.crawl-ring{width:60px;height:60px;border:2px solid rgba(78,201,148,.1);
+  border-top:2px solid rgba(78,201,148,.6);border-radius:50%;
+  animation:spin 1.2s linear infinite;}
+.crawl-ring-text{font-family:var(--mono);font-size:10px;
+  color:rgba(78,201,148,.6);text-align:center;line-height:1.8;}
 
 @media(max-width:800px){
   .lower-grid{grid-template-columns:1fr;}
@@ -3648,25 +3670,48 @@ async function pollCrawl(crawlId) {
 }
 
 function updateBgProgress(data) {
-  const done  = data.done  || 0;
-  const seen  = data.seen  || 0;
-  const pct   = data.pct   || 0;
-  const eta   = data.eta_seconds;
+  const done   = data.done  || 0;
+  const seen   = data.seen  || 0;
+  const pct    = data.pct   || 0;
+  const queued = data.queued || 0;
+  const eta    = data.eta_seconds;
+  const active = data.status === 'running' || data.status === 'queued';
 
-  const fill  = document.getElementById('bgProgressFill');
-  const pctEl = document.getElementById('bgPct');
-  const statEl= document.getElementById('bgStat');
-  const etaEl = document.getElementById('bgEta');
-  const badge = document.getElementById('bgBadge');
-  const bidEl = document.getElementById('bgCrawlId');
+  const fill    = document.getElementById('bgProgressFill');
+  const pctEl   = document.getElementById('bgPct');
+  const statEl  = document.getElementById('bgStat');
+  const etaEl   = document.getElementById('bgEta');
+  const badge   = document.getElementById('bgBadge');
+  const bidEl   = document.getElementById('bgCrawlId');
+  const ring    = document.getElementById('bgCrawlProgress');
+  const ringTxt = document.getElementById('bgRingText');
+  const overlay = document.getElementById('bgStatusOverlay');
+  const empty   = document.getElementById('bgGraphEmpty');
 
-  if (fill)  fill.style.width = pct + '%';
-  if (pctEl) pctEl.textContent = pct + '%';
-  if (statEl) statEl.textContent =
-    `${done.toLocaleString()} analyzed · ${seen.toLocaleString()} discovered · ${data.queued||0} queued`;
-  if (etaEl) etaEl.textContent = eta ? '~' + formatETA(eta) : '';
-  if (badge) badge.style.display = '';
-  if (bidEl) bidEl.textContent = data.crawl_id || '';
+  if (fill)   fill.style.width    = pct + '%';
+  if (pctEl)  pctEl.textContent   = pct + '%';
+  if (etaEl)  etaEl.textContent   = eta ? '~' + formatETA(eta) : '';
+  if (badge)  badge.style.display = '';
+  if (bidEl)  bidEl.textContent   = data.crawl_id || '';
+
+  const statMsg = `${done.toLocaleString()} analyzed · ${seen.toLocaleString()} discovered · ${queued.toLocaleString()} queued`;
+  if (statEl) statEl.textContent = statMsg;
+
+  // Show progress ring while crawling, hide when graph has nodes
+  const nodeCount = bgGraph ? bgGraph.order : bgCanvasNodes.length;
+  if (ring) {
+    ring.style.display = (active && nodeCount === 0) ? 'block' : 'none';
+  }
+  if (ringTxt) {
+    ringTxt.innerHTML = `${done.toLocaleString()} analyzed<br>${seen.toLocaleString()} discovered<br>${queued.toLocaleString()} queued`;
+  }
+  if (overlay) {
+    overlay.textContent = active
+      ? `Crawl ${data.crawl_id || ''} · ${pct}% · ${eta ? '~'+formatETA(eta)+' remaining' : 'running...'}`
+      : '';
+  }
+  // Hide empty state once crawl starts
+  if (active && empty) empty.style.display = 'none';
 }
 
 async function cancelCrawl() {
