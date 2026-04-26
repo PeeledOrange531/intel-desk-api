@@ -1796,30 +1796,29 @@ def _run_crawl(crawl_id):
     max_doms    = crawl.get('max_domains', MAX_DOMAINS)
     triage_only = crawl.get('triage_only', True)
 
-    # Restore already-processed domains from results file (handles resume)
+    # Build seen set from already-processed results
+    # seen = domains already analyzed (don't re-analyze)
+    # queue = domains discovered but not yet analyzed
     seen  = set()
+    queue = deque()
+
     count = _count_crawl_results(crawl_id)
     if count > 0:
-        logger.info(f"Resuming crawl {crawl_id} — restoring {count} already-processed domains")
+        logger.info(f"Resuming crawl {crawl_id} — {count} already processed")
         try:
-            results = _read_crawl_results(crawl_id, offset=0, limit=count)
-            for r in results:
+            all_results = _read_crawl_results(crawl_id, offset=0, limit=500000)
+            for r in all_results:
                 if r.get('domain'):
                     seen.add(r['domain'])
         except Exception as e:
             logger.warning(f"Could not restore seen set: {e}")
 
-    # Start queue from seed if not already seen
-    queue = deque()
-    if seed not in seen:
-        queue.append(seed)
+    # Always start from seed — if already seen, it won't be re-processed
+    # but its neighbors will be re-discovered and queued if not in seen
     seen.add(seed)
+    queue.append(seed)
 
-    # If queue is empty after restore, we're done
-    if not queue and not seen:
-        queue.append(seed)
-
-    logger.info(f"Crawl {crawl_id} starting from {seed}, max={max_doms}, triage={triage_only}")
+    logger.info(f"Crawl {crawl_id} starting — seed={seed}, seen={len(seen)}, max={max_doms}")
 
     try:
         while queue:
@@ -1852,6 +1851,10 @@ def _run_crawl(crawl_id):
                     c['queued']      = len(queue)
                     c['seen']        = len(seen)
                     c['updated_at']  = datetime.utcnow().isoformat()
+                    done_count       = c['done']
+            # Save meta every 10 domains so restarts can recover
+            if done_count % 10 == 0:
+                _save_crawl_meta(crawl_id)
 
             # Discover neighbors from this domain
             neighbors = _discover_neighbors(domain, result)
