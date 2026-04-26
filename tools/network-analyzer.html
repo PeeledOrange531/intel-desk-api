@@ -3530,12 +3530,20 @@ function hitTest(mx, my) {
   return null;
 }
 
+let bgEdges = [];        // [{from: domain, to: domain}]
+let bgAsnPositions = {}; // asn -> {centerX, centerY, count}
+let bgSeedDomain = null;
+
 function renderBgCanvas() {
   if (!bgCtx || !bgCanvas) return;
   const W = bgCanvas.width, H = bgCanvas.height;
   if (!W || !H) return;
 
-  bgCtx.fillStyle = '#050505';
+  // Background — subtle gradient
+  const grad = bgCtx.createRadialGradient(W/2, H/2, 50, W/2, H/2, Math.max(W,H));
+  grad.addColorStop(0, '#0a0a0a');
+  grad.addColorStop(1, '#050505');
+  bgCtx.fillStyle = grad;
   bgCtx.fillRect(0, 0, W, H);
 
   if (!bgCanvasNodes.length) return;
@@ -3544,23 +3552,121 @@ function renderBgCanvas() {
   const cy = H/2 + bgCamera.y * bgCamera.zoom;
   const z  = bgCamera.zoom;
 
+  // Concentric depth rings (background grid)
+  bgCtx.strokeStyle = 'rgba(78,201,148,0.04)';
+  bgCtx.lineWidth = 1;
+  for (let depth = 1; depth <= 4; depth++) {
+    const ringR = (200 + depth * 150) * z;
+    bgCtx.beginPath();
+    bgCtx.arc(cx, cy, ringR, 0, Math.PI*2);
+    bgCtx.stroke();
+  }
+
+  // Build node lookup
+  const nodeMap = {};
+  bgCanvasNodes.forEach(n => { nodeMap[n.id] = n; });
+
+  // Draw edges first (under nodes)
+  bgCtx.strokeStyle = 'rgba(240,236,228,0.07)';
+  bgCtx.lineWidth = 0.6;
+  bgEdges.forEach(e => {
+    const a = nodeMap[e.from];
+    const b = nodeMap[e.to];
+    if (!a || !b) return;
+    const ax = cx + a.x * z;
+    const ay = cy + a.y * z;
+    const bx = cx + b.x * z;
+    const by = cy + b.y * z;
+    // Cull off-screen edges
+    if ((ax<0&&bx<0) || (ax>W&&bx>W) || (ay<0&&by<0) || (ay>H&&by>H)) return;
+    bgCtx.beginPath();
+    bgCtx.moveTo(ax, ay);
+    bgCtx.lineTo(bx, by);
+    bgCtx.stroke();
+  });
+
+  // Draw nodes
   bgCanvasNodes.forEach(n => {
     const px = cx + n.x * z;
     const py = cy + n.y * z;
-    // Skip if off screen
-    if (px < -10 || px > W+10 || py < -10 || py > H+10) return;
-    const r = Math.max(1.5, (n.size||2) * Math.min(z, 3));
+    if (px < -20 || px > W+20 || py < -20 || py > H+20) return;
+
+    const isSeed = (n.id === bgSeedDomain);
+    const baseR = n.size || 3;
+    const r = Math.max(2, baseR * Math.min(z, 2.5));
+
+    // Outer glow for seed and suspicious nodes
+    if (isSeed || n.suspicious) {
+      const glowR = r * 2.5;
+      const glowGrad = bgCtx.createRadialGradient(px, py, r*0.5, px, py, glowR);
+      glowGrad.addColorStop(0, isSeed ? 'rgba(200,169,110,0.3)' : 'rgba(192,57,43,0.25)');
+      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
+      bgCtx.fillStyle = glowGrad;
+      bgCtx.beginPath();
+      bgCtx.arc(px, py, glowR, 0, Math.PI*2);
+      bgCtx.fill();
+    }
+
+    // Node body
     bgCtx.beginPath();
     bgCtx.arc(px, py, r, 0, Math.PI*2);
     bgCtx.fillStyle = n.color || '#4ec994';
     bgCtx.fill();
-    // Draw label at high zoom
-    if (z > 4 && n.id) {
-      bgCtx.fillStyle = 'rgba(240,236,228,0.6)';
-      bgCtx.font = '9px monospace';
-      bgCtx.fillText(n.id.slice(0,20), px+r+2, py+3);
+
+    // Border for definition
+    bgCtx.strokeStyle = isSeed ? 'rgba(200,169,110,0.9)' : 'rgba(0,0,0,0.6)';
+    bgCtx.lineWidth = isSeed ? 1.5 : 0.8;
+    bgCtx.stroke();
+
+    // Labels — always for seed, at higher zoom for others
+    if (isSeed || (z > 1.5 && r > 4) || z > 3) {
+      bgCtx.fillStyle = isSeed ? 'rgba(200,169,110,0.95)' : 'rgba(240,236,228,0.7)';
+      bgCtx.font = isSeed
+        ? `bold ${Math.min(13, 10 + z)}px monospace`
+        : `${Math.min(11, 8 + z*0.5)}px monospace`;
+      const label = n.id.length > 28 ? n.id.slice(0,25)+'...' : n.id;
+      bgCtx.fillText(label, px + r + 4, py + 3);
     }
   });
+
+  // Render legend overlay
+  renderBgLegend();
+}
+
+function renderBgLegend() {
+  const legend = document.getElementById('bgLegend');
+  if (!legend) return;
+  // Count nodes per ASN
+  const asnCounts = {};
+  bgCanvasNodes.forEach(n => {
+    const d = bgNodeData[n.id] || {};
+    const asn = d.asn || 'UNKNOWN';
+    if (!asnCounts[asn]) asnCounts[asn] = { count: 0, color: n.color, country: d.country, suspicious: n.suspicious };
+    asnCounts[asn].count++;
+  });
+  // Top 8 by count
+  const sorted = Object.entries(asnCounts)
+    .sort((a,b) => b[1].count - a[1].count)
+    .slice(0, 8);
+  if (!sorted.length) {
+    legend.style.display = 'none';
+    return;
+  }
+  legend.style.display = 'block';
+  const html = ['<div style="font-size:8px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);margin-bottom:8px;">Top ASN clusters</div>'];
+  sorted.forEach(([asn, info]) => {
+    html.push(
+      '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:10px;font-family:var(--mono);' +
+      'cursor:pointer;" onclick="highlightBgCluster(\''+esc(asn)+'\')">' +
+      '<div style="width:10px;height:10px;border-radius:50%;background:'+info.color+
+      ';border:1px solid rgba(0,0,0,.5);flex-shrink:0;"></div>' +
+      '<div style="color:'+(info.suspicious?'var(--red)':'var(--muted)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+
+      (info.suspicious?'⚠ ':'')+esc(asn)+(info.country?' · '+info.country:'')+'</div>' +
+      '<div style="color:var(--dim);font-size:9px;margin-left:auto;">'+info.count+'</div>' +
+      '</div>'
+    );
+  });
+  legend.innerHTML = html.join('');
 }
 
 function fitBgCamera() {
@@ -3593,27 +3699,89 @@ function addBgNode(domain, data) {
     if (container) initBgCanvas(container);
   }
 
-  const color = bgNodeColor(data);
-  const size  = isSuspiciousASN(data.asn||'', data.org||'', data.country||'') ? 5 : 2;
-  const depth = data._crawl_depth || 0;
+  const depth      = data._crawl_depth || 0;
+  const isSeed     = (depth === 0 && !bgSeedDomain) || domain === bgSeedDomain;
+  const suspicious = isSuspiciousASN(data.asn||'', data.org||'', data.country||'');
+  const color      = bgNodeColor(data);
 
-  // Position by ASN cluster with depth-based radius
-  const asn = data.asn || 'UNKNOWN';
-  let hash = 0;
-  for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash<<5)-hash);
-  const angle = (Math.abs(hash) % 360) * Math.PI / 180;
-  const r     = 200 + depth * 150 + (Math.abs(hash>>8) % 100);
-  const x     = r * Math.cos(angle) + (Math.random()-0.5) * 60;
-  const y     = r * Math.sin(angle) + (Math.random()-0.5) * 60;
+  // Track seed domain
+  if (isSeed && !bgSeedDomain) bgSeedDomain = domain;
 
-  bgCanvasNodes.push({ id: domain, color, size, x, y });
+  // Size: seed largest, then by depth (closer = larger), suspicious bumped
+  let size;
+  if (isSeed)            size = 8;
+  else if (depth === 0)  size = 5;
+  else if (depth === 1)  size = 4;
+  else if (depth === 2)  size = 3;
+  else                   size = 2.5;
+  if (suspicious && !isSeed) size += 1;
 
-  // For first 30 nodes, always auto-fit so nodes are always visible
+  // Position: seed at origin, others by ASN cluster
+  let x, y;
+  if (isSeed) {
+    x = 0; y = 0;
+  } else {
+    const asn = data.asn || 'UNKNOWN';
+    // Compute or fetch cluster center for this ASN
+    if (!bgAsnPositions[asn]) {
+      // Place ASN cluster around the unit circle, evenly distributed
+      const asnIndex = Object.keys(bgAsnPositions).length;
+      const totalAsns = asnIndex + 1;
+      // Spread ASN clusters out — depth 1 clusters at radius 350
+      let hash = 0;
+      for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash<<5)-hash);
+      // Use hash for stable angle, slightly nudged by index
+      const angle = ((Math.abs(hash) % 360) + asnIndex * 17) * Math.PI / 180;
+      const radius = 380;
+      bgAsnPositions[asn] = {
+        centerX: radius * Math.cos(angle),
+        centerY: radius * Math.sin(angle),
+        count: 0,
+      };
+    }
+    const cluster = bgAsnPositions[asn];
+    cluster.count++;
+    // Node within cluster: spiral around cluster center
+    const localAngle = cluster.count * 0.6;
+    const localRadius = 20 + Math.sqrt(cluster.count) * 14 + depth * 15;
+    x = cluster.centerX + localRadius * Math.cos(localAngle);
+    y = cluster.centerY + localRadius * Math.sin(localAngle);
+  }
+
+  bgCanvasNodes.push({
+    id: domain, color, size, x, y,
+    suspicious, depth, asn: data.asn || 'UNKNOWN',
+  });
+
+  // Track edge: connect this domain to its discovery source if known
+  // For depth 1+, parent should be the seed or a previously-found node
+  // Without explicit parent info, link depth-N to a depth-(N-1) node in the same ASN cluster (best guess)
+  if (!isSeed && bgSeedDomain) {
+    if (depth === 1) {
+      bgEdges.push({ from: bgSeedDomain, to: domain });
+    } else {
+      // Find a node at depth-1 in the same ASN to link to
+      const parent = bgCanvasNodes.find(n =>
+        n.id !== domain &&
+        n.depth === depth - 1 &&
+        (bgNodeData[n.id]||{}).asn === data.asn
+      );
+      if (parent) {
+        bgEdges.push({ from: parent.id, to: domain });
+      } else {
+        // Fall back to seed
+        bgEdges.push({ from: bgSeedDomain, to: domain });
+      }
+    }
+  }
+
+  // For first 30 nodes always auto-fit; after that only re-render
   if (bgCanvasNodes.length <= 30) {
     fitBgCamera();
   } else {
     renderBgCanvas();
   }
+
   // Hide empty overlay
   const empty = document.getElementById('bgGraphEmpty');
   if (empty) empty.style.display = 'none';
@@ -3650,8 +3818,9 @@ async function startCrawl() {
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    bgCrawlId  = data.crawl_id;
-    bgLastSeen = 0;
+    bgCrawlId    = data.crawl_id;
+    bgLastSeen   = 0;
+    bgSeedDomain = seed;
     updateBgHeader(data.crawl_id, seed);
     // Show progress indicator immediately
     const ring = document.getElementById('bgCrawlProgress');
@@ -4231,6 +4400,7 @@ function clearBgGraph() {
   bgCanvasNodes = []; bgNodeData = {}; bgSeen = new Set(); bgLastSeen = 0;
   bgCamera = {x:0, y:0, zoom:1};
   bgTableData = []; bgRecentDomains = []; bgRateHistory = []; bgLastDoneCount = 0;
+  bgEdges = []; bgAsnPositions = {}; bgSeedDomain = null;
   if (bgCanvas) renderBgCanvas();
   updateBgStats();
   renderBgTable();
@@ -4238,6 +4408,8 @@ function clearBgGraph() {
   if (ticker) ticker.textContent = '—';
   const empty = document.getElementById('bgGraphEmpty');
   if (empty) empty.style.display = '';
+  const legend = document.getElementById('bgLegend');
+  if (legend) legend.style.display = 'none';
 }
 
 // ── RECORDING ─────────────────────────────────────────────────────────────────
@@ -4561,6 +4733,11 @@ document.addEventListener('keydown', e => {
       <div id="bgGraphView" style="display:none;flex:1;position:relative;overflow:hidden;
         background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.02) 0%,transparent 70%),var(--bg);">
         <div id="bgSigmaContainer" style="width:100%;height:100%;"></div>
+        <!-- ASN Cluster Legend -->
+        <div id="bgLegend" style="display:none;position:absolute;top:10px;left:10px;
+          background:rgba(5,5,5,.92);border:1px solid var(--border);
+          padding:10px 12px;font-family:var(--mono);min-width:200px;max-width:280px;
+          backdrop-filter:blur(6px);"></div>
         <div id="bgGraphEmpty" style="position:absolute;inset:0;display:flex;
           flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;">
           <div style="font-size:48px;opacity:.06;">◎</div>
