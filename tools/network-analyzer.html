@@ -3766,9 +3766,13 @@ function pushToTicker(domain) {
 
 // Master update function — called from pollCrawl
 function updateBgHero(data) {
-  const done    = data.done    || 0;
-  const seen    = data.seen    || 0;
-  const queued  = data.queued  || 0;
+  // Prefer real table count over server's `done` if table has more (server may be stale)
+  const tableCount = bgTableData.length;
+  let done    = data.done    || 0;
+  let seen    = data.seen    || 0;
+  let queued  = data.queued  || 0;
+  if (tableCount > done) done = tableCount;
+  if (seen < done) seen = done;
   const active  = data.status === 'running' || data.status === 'queued';
 
   // Animate counters
@@ -3818,26 +3822,26 @@ function pushToTable(domain, data) {
     depth:   data._crawl_depth || 0,
     ts:      Date.now(),
   });
-  // Render only if we're on table view & not too many — debounce rendering
-  if (bgCurrentView === 'table') {
-    if (bgTableData.length < 100 || bgTableData.length % 20 === 0) {
-      renderBgTable();
-    }
-  }
+  // Always re-render on table view
+  if (bgCurrentView === 'table') renderBgTable();
 }
 
 function renderBgTable() {
   const body   = document.getElementById('bgTableBody');
   const count  = document.getElementById('bgTableCount');
-  if (!body) return;
+  if (!body) {
+    console.warn('renderBgTable: bgTableBody element not found');
+    return;
+  }
 
   const filter = (document.getElementById('bgTableFilter')?.value || '').toLowerCase().trim();
   const sort   = document.getElementById('bgTableSort')?.value || 'newest';
 
+  // Filter
   let rows = bgTableData;
   if (filter) {
     rows = rows.filter(r =>
-      r.domain.toLowerCase().includes(filter) ||
+      (r.domain||'').toLowerCase().includes(filter) ||
       (r.asn||'').toLowerCase().includes(filter) ||
       (r.org||'').toLowerCase().includes(filter) ||
       (r.country||'').toLowerCase().includes(filter) ||
@@ -3845,54 +3849,66 @@ function renderBgTable() {
     );
   }
 
-  // Sort
-  rows = [...rows];
-  if (sort === 'newest')      rows.sort((a,b) => b.ts - a.ts);
-  else if (sort === 'oldest') rows.sort((a,b) => a.ts - b.ts);
-  else if (sort === 'asn')    rows.sort((a,b) => (a.asn||'').localeCompare(b.asn||''));
-  else if (sort === 'country')rows.sort((a,b) => (a.country||'').localeCompare(b.country||''));
-  else if (sort === 'domain') rows.sort((a,b) => a.domain.localeCompare(b.domain));
+  // Sort — make a copy so we don't mutate the source
+  rows = rows.slice();
+  if (sort === 'newest')       rows.sort((a,b) => (b.ts||0) - (a.ts||0));
+  else if (sort === 'oldest')  rows.sort((a,b) => (a.ts||0) - (b.ts||0));
+  else if (sort === 'asn')     rows.sort((a,b) => (a.asn||'').localeCompare(b.asn||''));
+  else if (sort === 'country') rows.sort((a,b) => (a.country||'').localeCompare(b.country||''));
+  else if (sort === 'domain')  rows.sort((a,b) => (a.domain||'').localeCompare(b.domain||''));
 
-  if (count) count.textContent = `${rows.length.toLocaleString()} of ${bgTableData.length.toLocaleString()} domains`;
+  // Update count
+  if (count) {
+    count.textContent = `${rows.length.toLocaleString()} of ${bgTableData.length.toLocaleString()} domains`;
+  }
 
-  if (!rows.length) {
-    body.innerHTML = `<div style="padding:30px;text-align:center;color:var(--dim);">
-      ${bgTableData.length ? 'No matches for filter' : 'Run a crawl to see results here'}</div>`;
+  // If no rows at all, show empty state
+  if (bgTableData.length === 0) {
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:11px;">Run a crawl to see results here</div>';
     return;
   }
 
-  // Limit displayed rows for performance
+  // If filter eliminated everything, show no-match state
+  if (rows.length === 0) {
+    body.innerHTML = '<div style="padding:30px;text-align:center;color:var(--dim);font-family:var(--mono);font-size:11px;">No matches for filter</div>';
+    return;
+  }
+
+  // Build rows
   const limit = 500;
   const displayed = rows.slice(0, limit);
+  const html = [];
 
-  body.innerHTML = displayed.map((r, i) => {
+  for (let i = 0; i < displayed.length; i++) {
+    const r = displayed[i];
     const sus = isSuspiciousASN(r.asn||'', r.org||'', r.country||'');
-    return `<div class="bg-table-row" onclick="bgTableRowClick('${esc(r.domain)}')"
-      style="display:grid;grid-template-columns:30px 1fr 100px 50px 120px 60px;
-      gap:10px;padding:8px 18px;border-bottom:1px solid rgba(255,255,255,.03);
-      align-items:center;cursor:pointer;transition:background .1s;
-      ${sus ? 'background:rgba(192,57,43,.04);' : ''}"
-      onmouseover="this.style.background='${sus?'rgba(192,57,43,.08)':'rgba(255,255,255,.02)'}'"
-      onmouseout="this.style.background='${sus?'rgba(192,57,43,.04)':'transparent'}'">
-      <div style="color:var(--dim);font-size:9px;">${i+1}</div>
-      <div style="color:${sus?'var(--red)':'var(--gold2)'};overflow:hidden;
-        text-overflow:ellipsis;white-space:nowrap;">
-        ${sus ? '⚠ ' : ''}${esc(r.domain)}
-      </div>
-      <div style="color:var(--muted);font-size:10px;overflow:hidden;
-        text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.org)}">${esc(r.asn || '—')}</div>
-      <div style="color:var(--dim);font-size:10px;text-align:center;">${esc(r.country || '—')}</div>
-      <div style="color:var(--dim);font-size:10px;font-family:var(--mono);">${esc(r.ip || '—')}</div>
-      <div style="color:var(--dim);font-size:10px;text-align:center;">${r.depth}</div>
-    </div>`;
-  }).join('');
+    const bg = sus ? 'background:rgba(192,57,43,.04);' : '';
+    html.push(
+      '<div onclick="bgTableRowClick(\'' + esc(r.domain) + '\')" ' +
+      'style="display:grid;grid-template-columns:30px 1fr 100px 50px 120px 60px;' +
+      'gap:10px;padding:8px 18px;border-bottom:1px solid rgba(255,255,255,.03);' +
+      'align-items:center;cursor:pointer;' + bg + '">' +
+      '<div style="color:var(--dim);font-size:9px;">' + (i+1) + '</div>' +
+      '<div style="color:' + (sus?'var(--red)':'var(--gold2)') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+        (sus ? '⚠ ' : '') + esc(r.domain) + '</div>' +
+      '<div style="color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.org||'') + '">' + esc(r.asn || '—') + '</div>' +
+      '<div style="color:var(--dim);font-size:10px;text-align:center;">' + esc(r.country || '—') + '</div>' +
+      '<div style="color:var(--dim);font-size:10px;">' + esc(r.ip || '—') + '</div>' +
+      '<div style="color:var(--dim);font-size:10px;text-align:center;">' + (r.depth||0) + '</div>' +
+      '</div>'
+    );
+  }
 
   if (rows.length > limit) {
-    body.innerHTML += `<div style="padding:14px;text-align:center;color:var(--dim);
-      font-size:10px;border-top:1px solid var(--border);">
-      Showing first ${limit.toLocaleString()} of ${rows.length.toLocaleString()} matches.
-      Use filter to narrow results.</div>`;
+    html.push(
+      '<div style="padding:14px;text-align:center;color:var(--dim);font-size:10px;' +
+      'border-top:1px solid var(--border);font-family:var(--mono);">' +
+      'Showing first ' + limit.toLocaleString() + ' of ' + rows.length.toLocaleString() +
+      ' matches. Use filter to narrow.</div>'
+    );
   }
+
+  body.innerHTML = html.join('');
 }
 
 function bgTableRowClick(domain) {
