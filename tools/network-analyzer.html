@@ -3375,29 +3375,41 @@ const ASN_COLORS  = {};
 
 
 
+// Vibrant, saturated palette designed for dark backgrounds
+const VIBRANT_PALETTE = [
+  '#00d9ff','#ff5e57','#7c3aed','#fbbf24','#10b981',
+  '#f43f5e','#06b6d4','#a855f7','#84cc16','#f97316',
+  '#3b82f6','#ec4899','#22d3ee','#eab308','#14b8a6',
+  '#ef4444','#8b5cf6','#22c55e','#f59e0b','#0ea5e9',
+];
 function asnColor(asn) {
   if (!ASN_COLORS[asn]) {
+    // Suspicious ASNs always get the high-impact red/orange spectrum
+    const SUSPICIOUS = new Set(['AS37963','AS45090','AS55967','AS4134','AS4837',
+      'AS197695','AS8334','AS58461','AS9829','AS55960','AS37840','AS55990','AS56040','AS9808']);
     let hash = 0;
     for (let i = 0; i < asn.length; i++)
       hash = asn.charCodeAt(i) + ((hash << 5) - hash);
-    const hue = Math.abs(hash) % 360;
-    const SUSPICIOUS = new Set(['AS37963','AS45090','AS55967','AS4134','AS4837',
-      'AS197695','AS8334','AS58461']);
-    ASN_COLORS[asn] = SUSPICIOUS.has(asn)
-      ? `hsl(${Math.abs(hash)%40},80%,55%)`
-      : `hsl(${hue},60%,65%)`;
+    if (SUSPICIOUS.has(asn)) {
+      // Red-orange spectrum: 0-30 hue
+      const hue = Math.abs(hash) % 30;
+      ASN_COLORS[asn] = `hsl(${hue}, 90%, 60%)`;
+    } else {
+      // Pull from vibrant palette for stable, saturated colors
+      ASN_COLORS[asn] = VIBRANT_PALETTE[Math.abs(hash) % VIBRANT_PALETTE.length];
+    }
   }
   return ASN_COLORS[asn];
 }
 
 const CC_COLORS = {
-  CN:'#c0392b',RU:'#e87b4a',IR:'#e8d5a3',KP:'#c0392b',
-  BY:'#e87b4a',US:'#7eb8e4',GB:'#7eb8e4',FR:'#7eb8e4',DE:'#7eb8e4',
+  CN:'#ff5e57',RU:'#f97316',IR:'#fbbf24',KP:'#ef4444',
+  BY:'#f43f5e',US:'#3b82f6',GB:'#06b6d4',FR:'#8b5cf6',DE:'#22c55e',JP:'#ec4899',
 };
 function bgNodeColor(data) {
-  if (bgColorMode === 'country') return CC_COLORS[data.country] || '#4ec994';
+  if (bgColorMode === 'country') return CC_COLORS[data.country] || '#10b981';
   if (bgColorMode === 'asn')     return asnColor(data.asn || 'UNKNOWN');
-  return '#4ec994';
+  return '#10b981';
 }
 
 function enterBackgroundMode() {
@@ -3467,8 +3479,12 @@ function initBgCanvas(container) {
       bgCamera.y = bgDragState.camY + (e.clientY - bgDragState.startY) / bgCamera.zoom;
       renderBgCanvas();
     }
-    // Hover tooltip
+    // Hover tooltip + node highlight
     const hit = hitTest(e.offsetX, e.offsetY);
+    if (hit !== bgHoverNode) {
+      bgHoverNode = hit;
+      renderBgCanvas();
+    }
     const tip = document.getElementById('bgTooltip');
     if (hit && tip) {
       const d = bgNodeData[hit] || {};
@@ -3533,16 +3549,186 @@ function hitTest(mx, my) {
 let bgEdges = [];        // [{from: domain, to: domain}]
 let bgAsnPositions = {}; // asn -> {centerX, centerY, count}
 let bgSeedDomain = null;
+let bgLayoutMode = 'network'; // 'network' (with edges) or 'cluster' (no edges)
+let bgHoverNode  = null;
+let bgSearchHighlight = null;
+
+// ── ZOOM CONTROLS ──────────────────────────────────────────────────────────
+function bgZoomIn() {
+  bgCamera.zoom = Math.min(50, bgCamera.zoom * 1.4);
+  renderBgCanvas();
+}
+function bgZoomOut() {
+  bgCamera.zoom = Math.max(0.05, bgCamera.zoom / 1.4);
+  renderBgCanvas();
+}
+function bgZoomFit() {
+  fitBgCamera();
+}
+function bgResetView() {
+  bgCamera = {x:0, y:0, zoom:1};
+  fitBgCamera();
+}
+
+// ── LAYOUT TOGGLE ──────────────────────────────────────────────────────────
+function bgSetLayout(mode) {
+  bgLayoutMode = mode;
+  // Update button states
+  const netBtn = document.getElementById('bgLayoutNetwork');
+  const clusBtn = document.getElementById('bgLayoutCluster');
+  if (netBtn && clusBtn) {
+    if (mode === 'network') {
+      netBtn.style.background = 'rgba(0,217,255,0.2)';
+      netBtn.style.color = '#00d9ff';
+      clusBtn.style.background = 'transparent';
+      clusBtn.style.color = 'var(--dim)';
+    } else {
+      clusBtn.style.background = 'rgba(0,217,255,0.2)';
+      clusBtn.style.color = '#00d9ff';
+      netBtn.style.background = 'transparent';
+      netBtn.style.color = 'var(--dim)';
+    }
+  }
+  // In cluster mode, tighten the layout — pack ASN clusters closer
+  if (mode === 'cluster') {
+    repositionForCluster();
+  } else {
+    repositionForNetwork();
+  }
+  renderBgCanvas();
+}
+
+function repositionForCluster() {
+  // Tighter ASN cluster grid layout — no edges, pack neighborhoods together
+  const asnList = Object.keys(bgAsnPositions);
+  const cols = Math.ceil(Math.sqrt(asnList.length));
+  const spacing = 280;
+  asnList.forEach((asn, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    const cX = (col - cols/2) * spacing + spacing/2;
+    const cY = (row - cols/2) * spacing + spacing/2;
+    bgAsnPositions[asn].clusterX = cX;
+    bgAsnPositions[asn].clusterY = cY;
+  });
+  // Re-place every node within its new cluster center
+  bgCanvasNodes.forEach(n => {
+    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; return; }
+    const d = bgNodeData[n.id] || {};
+    const asn = d.asn || 'UNKNOWN';
+    const pos = bgAsnPositions[asn];
+    if (!pos) return;
+    // Stable sub-position via hash
+    let hash = 0;
+    for (let i=0; i<n.id.length; i++) hash = n.id.charCodeAt(i) + ((hash<<5)-hash);
+    const angle = Math.abs(hash) % 360 * Math.PI / 180;
+    const r = 30 + (Math.abs(hash>>4) % 60);
+    n.x = pos.clusterX + r * Math.cos(angle);
+    n.y = pos.clusterY + r * Math.sin(angle);
+  });
+  setTimeout(() => fitBgCamera(), 50);
+}
+
+function repositionForNetwork() {
+  // Restore original radial layout
+  bgCanvasNodes.forEach(n => {
+    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; return; }
+    const d = bgNodeData[n.id] || {};
+    const asn = d.asn || 'UNKNOWN';
+    const depth = d._crawl_depth || 1;
+    const pos = bgAsnPositions[asn];
+    if (!pos) return;
+    let hash = 0;
+    for (let i=0; i<n.id.length; i++) hash = n.id.charCodeAt(i) + ((hash<<5)-hash);
+    const localAngle = (Math.abs(hash) % 100) * 0.06;
+    const localRadius = 20 + Math.sqrt(Math.abs(hash) % 100) * 14 + depth * 15;
+    n.x = pos.centerX + localRadius * Math.cos(localAngle);
+    n.y = pos.centerY + localRadius * Math.sin(localAngle);
+  });
+  setTimeout(() => fitBgCamera(), 50);
+}
+
+// ── GRAPH SEARCH ───────────────────────────────────────────────────────────
+function bgGraphSearch(query) {
+  query = (query || '').toLowerCase().trim();
+  if (!query) {
+    bgSearchHighlight = null;
+    renderBgCanvas();
+    return;
+  }
+  // Find first matching node
+  const match = bgCanvasNodes.find(n => n.id.toLowerCase().includes(query));
+  if (match) {
+    bgSearchHighlight = match.id;
+    // Fly camera to node
+    bgCamera.x = -match.x;
+    bgCamera.y = -match.y;
+    bgCamera.zoom = Math.max(2, bgCamera.zoom);
+    renderBgCanvas();
+  } else {
+    bgSearchHighlight = null;
+    renderBgCanvas();
+  }
+}
+
+// ── MINIMAP ────────────────────────────────────────────────────────────────
+function renderBgMinimap() {
+  const mini = document.getElementById('bgMinimap');
+  if (!mini || !bgCanvasNodes.length) return;
+  const ctx = mini.getContext('2d');
+  const MW = mini.width, MH = mini.height;
+  ctx.fillStyle = 'rgba(5,5,8,0.95)';
+  ctx.fillRect(0, 0, MW, MH);
+
+  // Find bounds of all nodes
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  bgCanvasNodes.forEach(n => {
+    if (n.x<minX) minX=n.x; if (n.x>maxX) maxX=n.x;
+    if (n.y<minY) minY=n.y; if (n.y>maxY) maxY=n.y;
+  });
+  const rX = (maxX-minX) || 200;
+  const rY = (maxY-minY) || 200;
+  const pad = 4;
+  const sx = (MW - pad*2) / rX;
+  const sy = (MH - pad*2) / rY;
+  const s  = Math.min(sx, sy);
+
+  // Draw all nodes as tiny dots
+  bgCanvasNodes.forEach(n => {
+    const px = pad + (n.x - minX) * s;
+    const py = pad + (n.y - minY) * s;
+    ctx.fillStyle = n.color || '#10b981';
+    ctx.fillRect(px-1, py-1, 2, 2);
+  });
+
+  // Draw current viewport rectangle
+  if (bgCanvas) {
+    const W = bgCanvas.width, H = bgCanvas.height;
+    const z = bgCamera.zoom;
+    const viewMinX = -bgCamera.x - W/(2*z);
+    const viewMaxX = -bgCamera.x + W/(2*z);
+    const viewMinY = -bgCamera.y - H/(2*z);
+    const viewMaxY = -bgCamera.y + H/(2*z);
+    const rx = pad + (viewMinX - minX) * s;
+    const ry = pad + (viewMinY - minY) * s;
+    const rw = (viewMaxX - viewMinX) * s;
+    const rh = (viewMaxY - viewMinY) * s;
+    ctx.strokeStyle = 'rgba(0,217,255,0.85)';
+    ctx.lineWidth = 1.5;
+    ctx.strokeRect(rx, ry, rw, rh);
+  }
+}
 
 function renderBgCanvas() {
   if (!bgCtx || !bgCanvas) return;
   const W = bgCanvas.width, H = bgCanvas.height;
   if (!W || !H) return;
 
-  // Background — subtle gradient
-  const grad = bgCtx.createRadialGradient(W/2, H/2, 50, W/2, H/2, Math.max(W,H));
-  grad.addColorStop(0, '#0a0a0a');
-  grad.addColorStop(1, '#050505');
+  // Deep dark background with subtle radial gradient
+  const grad = bgCtx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
+  grad.addColorStop(0, '#0e0e12');
+  grad.addColorStop(0.5, '#070709');
+  grad.addColorStop(1, '#030305');
   bgCtx.fillStyle = grad;
   bgCtx.fillRect(0, 0, W, H);
 
@@ -3552,54 +3738,109 @@ function renderBgCanvas() {
   const cy = H/2 + bgCamera.y * bgCamera.zoom;
   const z  = bgCamera.zoom;
 
-  // Concentric depth rings (background grid)
-  bgCtx.strokeStyle = 'rgba(78,201,148,0.04)';
-  bgCtx.lineWidth = 1;
-  for (let depth = 1; depth <= 4; depth++) {
-    const ringR = (200 + depth * 150) * z;
-    bgCtx.beginPath();
-    bgCtx.arc(cx, cy, ringR, 0, Math.PI*2);
-    bgCtx.stroke();
+  // Concentric depth rings (very faint, only in network mode)
+  if (bgLayoutMode === 'network') {
+    bgCtx.strokeStyle = 'rgba(78,201,148,0.05)';
+    bgCtx.lineWidth = 1;
+    for (let depth = 1; depth <= 4; depth++) {
+      const ringR = (200 + depth * 150) * z;
+      bgCtx.beginPath();
+      bgCtx.arc(cx, cy, ringR, 0, Math.PI*2);
+      bgCtx.stroke();
+    }
   }
 
   // Build node lookup
   const nodeMap = {};
   bgCanvasNodes.forEach(n => { nodeMap[n.id] = n; });
 
-  // Draw edges first (under nodes)
-  bgCtx.strokeStyle = 'rgba(240,236,228,0.07)';
-  bgCtx.lineWidth = 0.6;
-  bgEdges.forEach(e => {
-    const a = nodeMap[e.from];
-    const b = nodeMap[e.to];
-    if (!a || !b) return;
-    const ax = cx + a.x * z;
-    const ay = cy + a.y * z;
-    const bx = cx + b.x * z;
-    const by = cy + b.y * z;
-    // Cull off-screen edges
-    if ((ax<0&&bx<0) || (ax>W&&bx>W) || (ay<0&&by<0) || (ay>H&&by>H)) return;
-    bgCtx.beginPath();
-    bgCtx.moveTo(ax, ay);
-    bgCtx.lineTo(bx, by);
-    bgCtx.stroke();
+  // Determine highlighted set (hover or search)
+  let highlightSet = null;
+  if (bgHoverNode) {
+    highlightSet = new Set([bgHoverNode]);
+    bgEdges.forEach(e => {
+      if (e.from === bgHoverNode) highlightSet.add(e.to);
+      if (e.to   === bgHoverNode) highlightSet.add(e.from);
+    });
+  }
+  if (bgSearchHighlight) {
+    highlightSet = new Set([bgSearchHighlight]);
+  }
+
+  // Edges: only in network mode, dimmed when hovering
+  if (bgLayoutMode === 'network') {
+    bgEdges.forEach(e => {
+      const a = nodeMap[e.from];
+      const b = nodeMap[e.to];
+      if (!a || !b) return;
+      const ax = cx + a.x * z;
+      const ay = cy + a.y * z;
+      const bx = cx + b.x * z;
+      const by = cy + b.y * z;
+      if ((ax<0&&bx<0)||(ax>W&&bx>W)||(ay<0&&by<0)||(ay>H&&by>H)) return;
+
+      const isHl = highlightSet && (highlightSet.has(e.from) && highlightSet.has(e.to));
+      bgCtx.strokeStyle = isHl
+        ? 'rgba(0,217,255,0.85)'
+        : highlightSet
+          ? 'rgba(255,255,255,0.04)'
+          : 'rgba(255,255,255,0.18)';
+      bgCtx.lineWidth = isHl ? 1.6 : 0.7;
+      bgCtx.beginPath();
+      bgCtx.moveTo(ax, ay);
+      bgCtx.lineTo(bx, by);
+      bgCtx.stroke();
+    });
+  }
+
+  // ASN cluster labels (cluster mode only) — show ASN name at cluster center
+  if (bgLayoutMode === 'cluster' && z > 0.4) {
+    Object.entries(bgAsnPositions).forEach(([asn, pos]) => {
+      if (pos.count < 2) return;
+      const labelX = cx + pos.centerX * z;
+      const labelY = cy + pos.centerY * z - 60 * z;
+      if (labelX < 0 || labelX > W) return;
+      bgCtx.fillStyle = 'rgba(255,255,255,0.65)';
+      bgCtx.font = 'bold 11px monospace';
+      bgCtx.textAlign = 'center';
+      bgCtx.fillText(asn, labelX, labelY);
+      bgCtx.fillStyle = 'rgba(255,255,255,0.35)';
+      bgCtx.font = '9px monospace';
+      bgCtx.fillText(`${pos.count} domains`, labelX, labelY + 14);
+      bgCtx.textAlign = 'left';
+    });
+  }
+
+  // Nodes — sorted so seed and suspicious draw last (on top)
+  const drawOrder = bgCanvasNodes.slice().sort((a, b) => {
+    const aPri = (a.id === bgSeedDomain ? 100 : 0) + (a.suspicious ? 10 : 0);
+    const bPri = (b.id === bgSeedDomain ? 100 : 0) + (b.suspicious ? 10 : 0);
+    return aPri - bPri;
   });
 
-  // Draw nodes
-  bgCanvasNodes.forEach(n => {
+  drawOrder.forEach(n => {
     const px = cx + n.x * z;
     const py = cy + n.y * z;
-    if (px < -20 || px > W+20 || py < -20 || py > H+20) return;
+    if (px < -50 || px > W+50 || py < -50 || py > H+50) return;
 
-    const isSeed = (n.id === bgSeedDomain);
-    const baseR = n.size || 3;
-    const r = Math.max(2, baseR * Math.min(z, 2.5));
+    const isSeed   = (n.id === bgSeedDomain);
+    const isHover  = (n.id === bgHoverNode);
+    const isSearch = (n.id === bgSearchHighlight);
+    const isHl     = highlightSet ? highlightSet.has(n.id) : true;
+    const baseR    = n.size || 3;
+    const r        = Math.max(2.5, baseR * Math.min(z, 2.5));
+    const opacity  = isHl ? 1 : 0.18;
 
-    // Outer glow for seed and suspicious nodes
-    if (isSeed || n.suspicious) {
-      const glowR = r * 2.5;
-      const glowGrad = bgCtx.createRadialGradient(px, py, r*0.5, px, py, glowR);
-      glowGrad.addColorStop(0, isSeed ? 'rgba(200,169,110,0.3)' : 'rgba(192,57,43,0.25)');
+    // Outer glow — bigger and more vivid
+    if (isSeed || isHover || isSearch || n.suspicious) {
+      const glowR = r * 3.5;
+      const glowGrad = bgCtx.createRadialGradient(px, py, r*0.3, px, py, glowR);
+      let glowColor;
+      if (isSeed)        glowColor = 'rgba(251,191,36,0.55)';
+      else if (isSearch) glowColor = 'rgba(0,217,255,0.65)';
+      else if (isHover)  glowColor = 'rgba(255,255,255,0.45)';
+      else               glowColor = 'rgba(255,94,87,0.50)';
+      glowGrad.addColorStop(0, glowColor);
       glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
       bgCtx.fillStyle = glowGrad;
       bgCtx.beginPath();
@@ -3608,29 +3849,70 @@ function renderBgCanvas() {
     }
 
     // Node body
+    bgCtx.globalAlpha = opacity;
     bgCtx.beginPath();
     bgCtx.arc(px, py, r, 0, Math.PI*2);
-    bgCtx.fillStyle = n.color || '#4ec994';
+    bgCtx.fillStyle = n.color || '#10b981';
     bgCtx.fill();
 
-    // Border for definition
-    bgCtx.strokeStyle = isSeed ? 'rgba(200,169,110,0.9)' : 'rgba(0,0,0,0.6)';
-    bgCtx.lineWidth = isSeed ? 1.5 : 0.8;
-    bgCtx.stroke();
+    // Inner highlight (gives 3D pop)
+    const innerGrad = bgCtx.createRadialGradient(px - r*0.3, py - r*0.3, 0, px, py, r);
+    innerGrad.addColorStop(0, 'rgba(255,255,255,0.4)');
+    innerGrad.addColorStop(1, 'rgba(255,255,255,0)');
+    bgCtx.fillStyle = innerGrad;
+    bgCtx.fill();
 
-    // Labels — always for seed, at higher zoom for others
-    if (isSeed || (z > 1.5 && r > 4) || z > 3) {
-      bgCtx.fillStyle = isSeed ? 'rgba(200,169,110,0.95)' : 'rgba(240,236,228,0.7)';
+    // Border
+    bgCtx.strokeStyle = isSeed
+      ? 'rgba(251,191,36,1)'
+      : isHover
+        ? 'rgba(255,255,255,0.95)'
+        : 'rgba(0,0,0,0.7)';
+    bgCtx.lineWidth = isSeed || isHover ? 2 : 0.8;
+    bgCtx.stroke();
+    bgCtx.globalAlpha = 1;
+
+    // ALWAYS-ON labels under each node
+    // Adapt visibility by zoom: at z<0.4 only seed+suspicious shown, at z>=0.6 all visible
+    const showLabel = isSeed || isHover || isSearch ||
+                      (z >= 0.6) ||
+                      (z >= 0.35 && n.suspicious);
+    if (showLabel) {
+      const label = n.id.length > 30 ? n.id.slice(0,27)+'...' : n.id;
+      const fontSize = isSeed ? 13 : isHover || isSearch ? 12 : 10;
       bgCtx.font = isSeed
-        ? `bold ${Math.min(13, 10 + z)}px monospace`
-        : `${Math.min(11, 8 + z*0.5)}px monospace`;
-      const label = n.id.length > 28 ? n.id.slice(0,25)+'...' : n.id;
-      bgCtx.fillText(label, px + r + 4, py + 3);
+        ? `bold ${fontSize}px monospace`
+        : `${fontSize}px monospace`;
+      bgCtx.textAlign = 'center';
+      bgCtx.textBaseline = 'top';
+
+      // Text background pill for readability
+      const textW = bgCtx.measureText(label).width;
+      const padX = 4, padY = 2;
+      const labelY = py + r + 6;
+      bgCtx.fillStyle = isSeed
+        ? 'rgba(251,191,36,0.18)'
+        : isHover
+          ? 'rgba(0,217,255,0.20)'
+          : 'rgba(0,0,0,0.65)';
+      bgCtx.fillRect(px - textW/2 - padX, labelY - padY,
+                     textW + padX*2, fontSize + padY*2);
+
+      bgCtx.fillStyle = isSeed
+        ? '#fbbf24'
+        : isHover || isSearch
+          ? '#00d9ff'
+          : 'rgba(255,255,255,0.92)';
+      bgCtx.fillText(label, px, labelY);
+      bgCtx.textAlign = 'left';
+      bgCtx.textBaseline = 'alphabetic';
     }
   });
 
   // Render legend overlay
   renderBgLegend();
+  // Render minimap
+  renderBgMinimap();
 }
 
 function renderBgLegend() {
@@ -4733,11 +5015,73 @@ document.addEventListener('keydown', e => {
       <div id="bgGraphView" style="display:none;flex:1;position:relative;overflow:hidden;
         background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.02) 0%,transparent 70%),var(--bg);">
         <div id="bgSigmaContainer" style="width:100%;height:100%;"></div>
-        <!-- ASN Cluster Legend -->
+
+        <!-- ASN Cluster Legend (top-left) -->
         <div id="bgLegend" style="display:none;position:absolute;top:10px;left:10px;
-          background:rgba(5,5,5,.92);border:1px solid var(--border);
-          padding:10px 12px;font-family:var(--mono);min-width:200px;max-width:280px;
-          backdrop-filter:blur(6px);"></div>
+          background:rgba(5,5,8,.92);border:1px solid rgba(255,255,255,.1);
+          padding:12px 14px;font-family:var(--mono);min-width:220px;max-width:300px;
+          backdrop-filter:blur(8px);box-shadow:0 4px 24px rgba(0,0,0,.6);
+          border-radius:2px;z-index:5;"></div>
+
+        <!-- Graph Search (top-center) -->
+        <div style="position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:5;">
+          <input id="bgGraphSearch" placeholder="🔍 Search domain in graph..."
+            oninput="bgGraphSearch(this.value)"
+            style="background:rgba(5,5,8,.92);border:1px solid rgba(255,255,255,.1);
+            font-family:var(--mono);font-size:11px;color:var(--text);
+            padding:8px 14px;width:280px;outline:none;backdrop-filter:blur(8px);
+            border-radius:2px;">
+        </div>
+
+        <!-- Layout Toggle (top-right) -->
+        <div style="position:absolute;top:10px;right:10px;display:flex;gap:0;
+          background:rgba(5,5,8,.92);border:1px solid rgba(255,255,255,.1);
+          backdrop-filter:blur(8px);z-index:5;border-radius:2px;overflow:hidden;">
+          <button id="bgLayoutNetwork" onclick="bgSetLayout('network')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.12em;background:rgba(0,217,255,0.2);color:#00d9ff;
+            border:none;padding:8px 14px;cursor:pointer;
+            border-right:1px solid rgba(255,255,255,.08);">
+            ⚡ Network
+          </button>
+          <button id="bgLayoutCluster" onclick="bgSetLayout('cluster')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.12em;background:transparent;color:var(--dim);
+            border:none;padding:8px 14px;cursor:pointer;">
+            ◉ Cluster
+          </button>
+        </div>
+
+        <!-- Zoom Controls (bottom-right) -->
+        <div style="position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;
+          gap:4px;z-index:5;">
+          <button onclick="bgZoomIn()" title="Zoom in"
+            style="width:36px;height:36px;background:rgba(5,5,8,.92);
+            border:1px solid rgba(255,255,255,.12);color:#fff;font-size:18px;
+            cursor:pointer;backdrop-filter:blur(8px);font-family:var(--mono);
+            display:flex;align-items:center;justify-content:center;border-radius:2px;">+</button>
+          <button onclick="bgZoomOut()" title="Zoom out"
+            style="width:36px;height:36px;background:rgba(5,5,8,.92);
+            border:1px solid rgba(255,255,255,.12);color:#fff;font-size:18px;
+            cursor:pointer;backdrop-filter:blur(8px);font-family:var(--mono);
+            display:flex;align-items:center;justify-content:center;border-radius:2px;">−</button>
+          <button onclick="bgZoomFit()" title="Fit to screen"
+            style="width:36px;height:36px;background:rgba(5,5,8,.92);
+            border:1px solid rgba(255,255,255,.12);color:#fff;font-size:14px;
+            cursor:pointer;backdrop-filter:blur(8px);font-family:var(--mono);
+            display:flex;align-items:center;justify-content:center;border-radius:2px;">⛶</button>
+        </div>
+
+        <!-- Minimap (bottom-left) -->
+        <div style="position:absolute;bottom:20px;left:20px;z-index:5;
+          background:rgba(5,5,8,.92);border:1px solid rgba(255,255,255,.12);
+          padding:6px;backdrop-filter:blur(8px);border-radius:2px;">
+          <div style="font-family:var(--mono);font-size:8px;color:var(--dim);
+            text-transform:uppercase;letter-spacing:.16em;margin-bottom:4px;
+            text-align:center;">Overview</div>
+          <canvas id="bgMinimap" width="160" height="120"
+            style="display:block;border:1px solid rgba(255,255,255,.05);"></canvas>
+        </div>
         <div id="bgGraphEmpty" style="position:absolute;inset:0;display:flex;
           flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;">
           <div style="font-size:48px;opacity:.06;">◎</div>
