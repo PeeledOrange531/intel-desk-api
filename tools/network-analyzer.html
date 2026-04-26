@@ -3823,12 +3823,17 @@ function pushToTable(domain, data) {
     ts:      Date.now(),
   });
   // Always re-render on table view
-  if (bgCurrentView === 'table') renderBgTable();
+  if (bgCurrentView === 'table') {
+    renderBgTable();
+  } else {
+    console.log('[PUSH_TABLE] Skipping render — current view:', bgCurrentView);
+  }
 }
 
 function renderBgTable() {
   const body   = document.getElementById('bgTableBody');
   const count  = document.getElementById('bgTableCount');
+  console.log('[RENDER_TABLE] bgTableData.length:', bgTableData.length, '| body found:', !!body, '| count found:', !!count);
   if (!body) {
     console.warn('renderBgTable: bgTableBody element not found');
     return;
@@ -3908,7 +3913,9 @@ function renderBgTable() {
     );
   }
 
-  body.innerHTML = html.join('');
+  const finalHtml = html.join('');
+  body.innerHTML = finalHtml;
+  console.log('[RENDER_TABLE] Set innerHTML — length:', finalHtml.length, '| body now has children:', body.children.length);
 }
 
 function bgTableRowClick(domain) {
@@ -3972,13 +3979,26 @@ async function pollCrawl(crawlId) {
     // Add new nodes — to graph AND table
     const results = data.results || [];
     let added = 0;
+    if (results.length > 0) {
+      console.log('[POLL] Got', results.length, 'results. First:', results[0]);
+      console.log('[POLL] bgTableData.length BEFORE:', bgTableData.length);
+    }
     for (const r of results) {
       if (r.domain && !r.error) {
-        addBgNode(r.domain, r);
-        pushToTable(r.domain, r);
-        pushToTicker(r.domain);
+        try {
+          addBgNode(r.domain, r);
+        } catch(e) { console.error('[POLL] addBgNode error:', e); }
+        try {
+          pushToTable(r.domain, r);
+        } catch(e) { console.error('[POLL] pushToTable error:', e); }
+        try {
+          pushToTicker(r.domain);
+        } catch(e) { console.error('[POLL] pushToTicker error:', e); }
         added++;
       }
+    }
+    if (results.length > 0) {
+      console.log('[POLL] bgTableData.length AFTER:', bgTableData.length, '— added:', added);
     }
     // Always advance offset regardless of errors
     if (results.length > 0) {
