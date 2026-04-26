@@ -1595,455 +1595,369 @@ def deep_analyze():
     return resp
 
 
+
 # ══════════════════════════════════════════════════════════════════════════════
-# ASYNC JOB QUEUE
+# BACKGROUND RECURSIVE CRAWLER
 # ══════════════════════════════════════════════════════════════════════════════
 import threading
 import uuid
 from datetime import datetime
+from collections import deque
 
-# Job store — metadata persisted to disk, results streamed to JSONL files
-_jobs = {}
-_jobs_lock = threading.Lock()
-_worker_pool = ThreadPoolExecutor(max_workers=16)
+# Crawl store — persisted to disk
+_crawls      = {}        # crawl_id → metadata dict
+_crawls_lock = threading.Lock()
+CRAWL_DIR    = '/tmp'
+MAX_DOMAINS  = 500_000
 
-RESULTS_DIR  = '/tmp'
-JOBS_META_FILE = '/tmp/inteldesk_jobs.json'  # persists job metadata across restarts
+def _crawl_meta_path(crawl_id):
+    return os.path.join(CRAWL_DIR, f'crawl_{crawl_id}_meta.json')
 
-def _save_jobs_meta():
-    """Persist job metadata to disk so restarts can resume jobs."""
+def _crawl_results_path(crawl_id):
+    return os.path.join(CRAWL_DIR, f'crawl_{crawl_id}_results.jsonl')
+
+def _save_crawl_meta(crawl_id):
     try:
-        with _jobs_lock:
-            # Save everything except the domains list (can be large)
-            to_save = {}
-            for jid, j in _jobs.items():
-                to_save[jid] = {k: v for k, v in j.items() if k != 'domains'}
-        with open(JOBS_META_FILE, 'w') as f:
-            json.dump(to_save, f)
+        with _crawls_lock:
+            meta = {k:v for k,v in _crawls.get(crawl_id, {}).items()
+                    if k not in ('thread',)}
+        with open(_crawl_meta_path(crawl_id), 'w') as f:
+            json.dump(meta, f)
     except Exception as e:
-        logger.warning(f"Could not save jobs meta: {e}")
+        logger.warning(f"Could not save crawl meta {crawl_id}: {e}")
 
-def _load_jobs_meta():
-    """Load and resume any interrupted jobs on startup."""
+def _append_crawl_result(crawl_id, result):
     try:
-        if not os.path.exists(JOBS_META_FILE):
-            return
-        with open(JOBS_META_FILE) as f:
-            saved = json.load(f)
-        for jid, j in saved.items():
-            # Only resume jobs that were running or queued
-            if j.get('status') in ('running', 'queued'):
-                # Check if result file exists — means it was partially processed
-                result_count = _count_results(jid)
-                j['done']   = result_count  # pick up where we left off
-                j['status'] = 'queued'      # re-queue for processing
-                # Try to restore domain list from disk
-                domains_path = os.path.join(RESULTS_DIR, f'job_{jid}_domains.json')
-                if os.path.exists(domains_path):
-                    try:
-                        with open(domains_path) as df:
-                            all_domains = json.load(df)
-                        # Skip already-processed domains
-                        j['domains'] = all_domains[result_count:]
-                        logger.info(f"Restored {len(j['domains'])} remaining domains for job {jid}")
-                    except Exception:
-                        j['domains'] = []
-                else:
-                    j['domains'] = []  # no domain file — job can't be resumed
-                with _jobs_lock:
-                    _jobs[jid] = j
-                logger.info(f"Restored job {jid} — {result_count} results already saved")
-                # Re-submit to worker pool if has domains to process
-                if j.get('domains'):
-                    j['status'] = 'running'
-                    _worker_pool.submit(_run_job, jid)
-            elif j.get('status') == 'complete':
-                # Keep completed jobs so UI can query clusters
-                with _jobs_lock:
-                    _jobs[jid] = j
-    except Exception as e:
-        logger.warning(f"Could not load jobs meta: {e}")
-
-def _results_path(job_id: str) -> str:
-    return os.path.join(RESULTS_DIR, f'job_{job_id}.jsonl')
-
-def _append_result(job_id: str, result: dict):
-    """Append one result line to the job's JSONL file."""
-    try:
-        with open(_results_path(job_id), 'a') as f:
+        with open(_crawl_results_path(crawl_id), 'a') as f:
             f.write(json.dumps(result) + '\n')
     except Exception as e:
-        logger.warning(f"Failed to write result for job {job_id}: {e}")
+        logger.warning(f"Could not append crawl result {crawl_id}: {e}")
 
-def _read_results(job_id: str, offset: int = 0, limit: int = 1000) -> list:
-    """Read results from JSONL file starting at line offset."""
-    path = _results_path(job_id)
+def _read_crawl_results(crawl_id, offset=0, limit=500):
+    path = _crawl_results_path(crawl_id)
     if not os.path.exists(path):
         return []
     results = []
     try:
-        with open(path, 'r') as f:
+        with open(path) as f:
             for i, line in enumerate(f):
-                if i < offset:
-                    continue
-                if len(results) >= limit:
-                    break
+                if i < offset: continue
+                if len(results) >= limit: break
                 line = line.strip()
                 if line:
-                    try:
-                        results.append(json.loads(line))
-                    except Exception:
-                        pass
+                    try: results.append(json.loads(line))
+                    except: pass
     except Exception as e:
-        logger.warning(f"Failed to read results for job {job_id}: {e}")
+        logger.warning(f"Could not read crawl results {crawl_id}: {e}")
     return results
 
-def _count_results(job_id: str) -> int:
-    path = _results_path(job_id)
-    if not os.path.exists(path):
-        return 0
+def _count_crawl_results(crawl_id):
+    path = _crawl_results_path(crawl_id)
+    if not os.path.exists(path): return 0
     try:
-        with open(path, 'r') as f:
-            return sum(1 for line in f if line.strip())
-    except Exception:
-        return 0
+        with open(path) as f:
+            return sum(1 for l in f if l.strip())
+    except: return 0
 
 
-def _triage_domain(domain: str, dns_only: bool = False) -> dict:
+def _run_crawl(crawl_id):
     """
-    Fast triage — IP + ASN only. No WHOIS, no SSL, no scraping.
-    dns_only=True: just DNS resolution, no ipinfo call (faster, no rate limits)
-    dns_only=False: IP + full ASN lookup via ipinfo (~2s, 50k/month free)
+    Recursive network crawler.
+    Starts from seed, follows SSL SANs + reverse IP + nameserver neighbors,
+    expanding the graph until max_domains or queue empty.
     """
-    domain = clean_domain(domain)
-    result = {
-        "domain":  domain,
-        "ip":      None,
-        "asn":     None,
-        "org":     None,
-        "country": None,
-        "error":   None,
-    }
+    with _crawls_lock:
+        crawl = _crawls.get(crawl_id)
+        if not crawl: return
+        crawl['status'] = 'running'
+
+    seed       = crawl.get('seed', '')
+    max_doms   = crawl.get('max_domains', MAX_DOMAINS)
+    triage_only= crawl.get('triage_only', True)
+    seen       = set()   # domains already queued or processed
+    queue      = deque([seed])
+    seen.add(seed)
+
+    logger.info(f"Crawl {crawl_id} starting from {seed}, max={max_doms}, triage={triage_only}")
+
     try:
-        ip_res = resolve_ip(domain)
-        ip = ip_res.get("ip")
-        result["ip"] = ip
-        if ip and not dns_only:
-            asn_info = get_asn_info(ip)
-            result["asn"]     = asn_info.get("asn", "")
-            result["org"]     = asn_info.get("org", "")
-            result["country"] = asn_info.get("country", "")
-    except Exception as e:
-        result["error"] = str(e)[:80]
-    return result
+        while queue:
+            # Check cancellation
+            with _crawls_lock:
+                if _crawls.get(crawl_id, {}).get('status') == 'cancelled':
+                    return
 
+            # Check cap
+            if len(seen) >= max_doms:
+                logger.info(f"Crawl {crawl_id} hit max_domains cap {max_doms}")
+                break
 
-def _run_job(job_id: str):
-    """Background worker — processes all domains in a job."""
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-        if not job:
-            return
-        job["status"] = "running"
+            domain = queue.popleft()
 
-    domains  = job.get("domains", [])
-    job_type = job.get("type", "triage")
-    dns_only = job.get("dns_only", False)
-
-    # Use a dedicated thread pool per job — avoids nesting in _worker_pool
-    # 20 workers for triage, 4 for full analysis
-    n_workers  = 20 if job_type == "triage" else 4
-    batch_size = n_workers * 2  # submit ahead of completion
-
-    with ThreadPoolExecutor(max_workers=n_workers) as ex:
-        futures = {}
-
-        for i, domain in enumerate(domains):
-            # Check cancellation every batch
-            if i % batch_size == 0:
-                with _jobs_lock:
-                    if _jobs.get(job_id, {}).get("status") == "cancelled":
-                        ex.shutdown(wait=False)
-                        return
-
-            # Submit work
-            if job_type == "triage":
-                futures[ex.submit(_triage_domain, domain, dns_only)] = domain
+            # Triage: fast IP + ASN only
+            if triage_only:
+                result = _triage_domain(domain, dns_only=False)
             else:
-                futures[ex.submit(analyze_domain, domain)] = domain
+                result = analyze_domain(domain)
 
-            # Collect completed futures when we have a full batch
-            if len(futures) >= batch_size:
-                done_futures = [f for f in futures if f.done()]
-                for future in done_futures:
-                    domain_done = futures.pop(future)
-                    try:
-                        result = future.result(timeout=1)
-                    except Exception as e:
-                        result = {"domain": domain_done, "error": str(e)[:80]}
-                    _append_result(job_id, result)
-                    with _jobs_lock:
-                        j = _jobs.get(job_id)
-                        if j:
-                            j["done"] += 1
-                            j["updated_at"] = datetime.utcnow().isoformat()
+            result['_crawl_depth'] = crawl.get('depth_map', {}).get(domain, 0)
+            _append_crawl_result(crawl_id, result)
 
-        # Collect remaining futures
-        for future, domain_done in futures.items():
+            with _crawls_lock:
+                c = _crawls.get(crawl_id)
+                if c:
+                    c['done']       += 1
+                    c['queued']      = len(queue)
+                    c['seen']        = len(seen)
+                    c['updated_at']  = datetime.utcnow().isoformat()
+
+            # Discover neighbors from this domain
+            neighbors = _discover_neighbors(domain, result)
+
+            depth_map = crawl.setdefault('depth_map', {})
+            cur_depth = depth_map.get(domain, 0)
+
+            for n in neighbors:
+                if n not in seen and len(seen) < max_doms:
+                    seen.add(n)
+                    queue.append(n)
+                    depth_map[n] = cur_depth + 1
+
+        # Complete
+        with _crawls_lock:
+            c = _crawls.get(crawl_id)
+            if c and c['status'] == 'running':
+                c['status'] = 'complete'
+                c['updated_at'] = datetime.utcnow().isoformat()
+        _save_crawl_meta(crawl_id)
+        logger.info(f"Crawl {crawl_id} complete — {_count_crawl_results(crawl_id)} domains")
+
+    except Exception as e:
+        logger.exception(f"Crawl {crawl_id} fatal error: {e}")
+        with _crawls_lock:
+            c = _crawls.get(crawl_id)
+            if c:
+                c['status'] = 'error'
+                c['error']  = str(e)
+        _save_crawl_meta(crawl_id)
+
+
+def _discover_neighbors(domain, triage_result):
+    """
+    Given a triage/analysis result, find neighboring domains to expand.
+    Uses SSL SANs, reverse IP, and nameserver lookups.
+    """
+    neighbors = []
+    ip = triage_result.get('ip')
+
+    # SSL SANs — most productive expansion signal
+    try:
+        sans = get_ssl_sans(domain)
+        neighbors.extend(sans[:30])
+    except Exception:
+        pass
+
+    # Reverse IP — find co-hosted domains
+    if ip:
+        try:
+            rip = get_reverse_ip(ip)
+            neighbors.extend(rip[:20])
+        except Exception:
+            pass
+
+    # Nameserver expansion — finds operationally linked domains
+    try:
+        whois_data = get_rdap_whois(domain)
+        for ns in whois_data.get('nameservers', [])[:2]:
             try:
-                result = future.result(timeout=30)
-            except Exception as e:
-                result = {"domain": domain_done, "error": str(e)[:80]}
-            _append_result(job_id, result)
-            with _jobs_lock:
-                j = _jobs.get(job_id)
-                if j:
-                    j["done"] += 1
-                    j["updated_at"] = datetime.utcnow().isoformat()
-
-    # Mark complete
-    with _jobs_lock:
-        j = _jobs.get(job_id)
-        if j and j["status"] == "running":
-            j["status"] = "complete"
-            j["updated_at"] = datetime.utcnow().isoformat()
-    _save_jobs_meta()
-
-
-# ── Job routes ─────────────────────────────────────────────────────────────────
-
-@network_bp.route("/job/submit", methods=["POST", "OPTIONS"])
-def job_submit():
-    """Submit a bulk job. Returns job_id immediately."""
-    if request.method == "OPTIONS":
-        return _corsify(""), 200
-
-    data     = request.get_json(force=True, silent=True) or {}
-    domains  = data.get("domains", [])
-    job_type = data.get("type", "triage")  # "triage" or "analyze"
-
-    if not domains:
-        return jsonify({"error": "domains list required"}), 400
-    if job_type not in ("triage", "analyze"):
-        return jsonify({"error": "type must be triage or analyze"}), 400
+                ns_neighbors = _hackertarget_nameserver_lookup(ns)
+                neighbors.extend(ns_neighbors[:15])
+            except Exception:
+                pass
+    except Exception:
+        pass
 
     # Clean and deduplicate
     cleaned = []
-    seen = set()
-    for d in domains:
-        d = clean_domain(str(d).strip())
-        if d and d not in seen:
-            seen.add(d)
-            cleaned.append(d)
+    seen_local = set()
+    for n in neighbors:
+        n = clean_domain(n)
+        if n and n != domain and n not in seen_local:
+            seen_local.add(n)
+            cleaned.append(n)
 
-    if not cleaned:
-        return jsonify({"error": "no valid domains after cleaning"}), 400
-
-    # Cap job size
-    MAX_DOMAINS = 500000
-    if len(cleaned) > MAX_DOMAINS:
-        cleaned = cleaned[:MAX_DOMAINS]
-
-    job_id = str(uuid.uuid4())[:8]
-    dns_only = bool(data.get("dns_only", False))
-    job = {
-        "id":         job_id,
-        "type":       job_type,
-        "status":     "queued",
-        "domains":    cleaned,
-        "done":       0,
-        "total":      len(cleaned),
-        "dns_only":   dns_only,
-        "created_at": datetime.utcnow().isoformat(),
-        "updated_at": datetime.utcnow().isoformat(),
-        "errors":     [],
-    }
-
-    with _jobs_lock:
-        _jobs[job_id] = job
-
-    # Save domain list to disk so job can resume after restart
-    try:
-        domains_path = os.path.join(RESULTS_DIR, f'job_{job_id}_domains.json')
-        with open(domains_path, 'w') as f:
-            json.dump(cleaned, f)
-    except Exception as e:
-        logger.warning(f"Could not save domains for job {job_id}: {e}")
-
-    _save_jobs_meta()
-
-    # Start background worker
-    _worker_pool.submit(_run_job, job_id)
-
-    resp = jsonify({
-        "job_id":  job_id,
-        "total":   len(cleaned),
-        "type":    job_type,
-        "status":  "queued",
-    })
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    return resp
+    return cleaned[:60]  # cap per domain
 
 
-@network_bp.route("/job/<job_id>", methods=["GET"])
-def job_status(job_id):
-    """
-    Poll job status. Returns new results since last_seen index.
-    Pass ?since=N to get only results after index N.
-    """
-    with _jobs_lock:
-        job = _jobs.get(job_id)
+# ── Crawl routes ───────────────────────────────────────────────────────────────
 
-    if not job:
-        resp = jsonify({"error": "job not found"})
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        return resp, 404
-
-    since = int(request.args.get("since", 0))
-    limit = int(request.args.get("limit", 500))
-    new_results = _read_results(job["id"], offset=since, limit=limit)
-
-    pct = round((job["done"] / job["total"] * 100), 1) if job["total"] else 0
-
-    # Estimate time remaining
-    eta_seconds = None
-    if job["status"] == "running" and job["done"] > 0:
-        elapsed = (datetime.utcnow() - datetime.fromisoformat(job["created_at"])).total_seconds()
-        rate    = job["done"] / elapsed  # domains per second
-        remaining = job["total"] - job["done"]
-        eta_seconds = int(remaining / rate) if rate > 0 else None
-
-    resp = jsonify({
-        "job_id":      job_id,
-        "status":      job["status"],
-        "type":        job["type"],
-        "done":        job["done"],
-        "total":       job["total"],
-        "pct":         pct,
-        "eta_seconds": eta_seconds,
-        "results":     new_results,
-        "results_from": since,
-    })
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    return resp
-
-
-@network_bp.route("/job/<job_id>/cancel", methods=["POST", "OPTIONS"])
-def job_cancel(job_id):
-    """Cancel a running job."""
+@network_bp.route("/crawl/start", methods=["POST", "OPTIONS"])
+def crawl_start():
+    """Start a recursive background crawl from a seed domain."""
     if request.method == "OPTIONS":
         return _corsify(""), 200
 
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-        if job:
-            job["status"] = "cancelled"
+    data        = request.get_json(force=True, silent=True) or {}
+    seed        = clean_domain((data.get("seed") or "").strip())
+    max_domains = min(int(data.get("max_domains", 10000)), MAX_DOMAINS)
+    triage_only = bool(data.get("triage_only", True))
 
-    resp = jsonify({"job_id": job_id, "status": "cancelled"})
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    return resp
+    if not seed:
+        return jsonify({"error": "seed domain required"}), 400
 
+    crawl_id = str(uuid.uuid4())[:8]
+    crawl = {
+        "id":          crawl_id,
+        "seed":        seed,
+        "status":      "queued",
+        "done":        0,
+        "queued":      1,
+        "seen":        1,
+        "max_domains": max_domains,
+        "triage_only": triage_only,
+        "depth_map":   {seed: 0},
+        "created_at":  datetime.utcnow().isoformat(),
+        "updated_at":  datetime.utcnow().isoformat(),
+        "error":       None,
+    }
 
+    with _crawls_lock:
+        _crawls[crawl_id] = crawl
+    _save_crawl_meta(crawl_id)
 
+    # Start in background thread
+    t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
+    t.start()
 
-
-@network_bp.route("/job/<job_id>/debug", methods=["GET"])
-def job_debug(job_id):
-    """Debug endpoint — shows raw job state."""
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-    if not job:
-        resp = jsonify({"error": "not found", "all_jobs": list(_jobs.keys())})
-        resp.headers["Access-Control-Allow-Origin"] = "*"
-        return resp, 404
-    # Count lines in result file
-    result_count = _count_results(job_id)
     resp = jsonify({
-        "job_id":       job_id,
-        "status":       job.get("status"),
-        "done":         job.get("done"),
-        "total":        job.get("total"),
-        "dns_only":     job.get("dns_only"),
-        "type":         job.get("type"),
-        "result_file":  _results_path(job_id),
-        "result_count": result_count,
-        "domains_in_job": len(job.get("domains", [])),
-        "created_at":   job.get("created_at"),
-        "updated_at":   job.get("updated_at"),
+        "crawl_id":    crawl_id,
+        "seed":        seed,
+        "max_domains": max_domains,
+        "triage_only": triage_only,
+        "status":      "queued",
     })
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
 
-@network_bp.route("/job/<job_id>/clusters", methods=["GET"])
-def job_clusters(job_id):
-    """
-    Aggregate triage results by ASN — returns cluster heatmap data.
-    Used for the ASN cluster view before deciding what to graph.
-    """
-    with _jobs_lock:
-        job = _jobs.get(job_id)
-    if not job:
-        resp = jsonify({"error": "job not found"})
+
+@network_bp.route("/crawl/<crawl_id>", methods=["GET"])
+def crawl_status(crawl_id):
+    """Poll crawl status and get new results since offset."""
+    with _crawls_lock:
+        crawl = _crawls.get(crawl_id)
+
+    if not crawl:
+        # Try loading from disk
+        meta_path = _crawl_meta_path(crawl_id)
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path) as f:
+                    crawl = json.load(f)
+                with _crawls_lock:
+                    _crawls[crawl_id] = crawl
+            except Exception:
+                pass
+
+    if not crawl:
+        resp = jsonify({"error": "crawl not found"})
         resp.headers["Access-Control-Allow-Origin"] = "*"
         return resp, 404
 
-    # Read ALL results from disk and cluster by ASN
-    all_results = _read_results(job_id, offset=0, limit=500000)
+    since  = int(request.args.get("since", 0))
+    limit  = int(request.args.get("limit", 500))
+    results = _read_crawl_results(crawl_id, offset=since, limit=limit)
+    total   = crawl.get('seen', 0)
+    done    = crawl.get('done', 0)
+    pct     = round(done / total * 100, 1) if total > 0 else 0
 
-    clusters = {}  # asn → {asn, org, country, domains: [], count}
+    # ETA
+    eta = None
+    if crawl.get('status') == 'running' and done > 0:
+        try:
+            elapsed = (datetime.utcnow() - datetime.fromisoformat(
+                crawl['created_at'])).total_seconds()
+            rate = done / elapsed
+            eta  = int((total - done) / rate) if rate > 0 else None
+        except Exception:
+            pass
+
+    resp = jsonify({
+        "crawl_id":     crawl_id,
+        "status":       crawl.get("status"),
+        "seed":         crawl.get("seed"),
+        "done":         done,
+        "queued":       crawl.get("queued", 0),
+        "seen":         total,
+        "max_domains":  crawl.get("max_domains"),
+        "pct":          pct,
+        "eta_seconds":  eta,
+        "results":      results,
+        "results_from": since,
+        "error":        crawl.get("error"),
+    })
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@network_bp.route("/crawl/<crawl_id>/cancel", methods=["POST", "OPTIONS"])
+def crawl_cancel(crawl_id):
+    if request.method == "OPTIONS":
+        return _corsify(""), 200
+    with _crawls_lock:
+        c = _crawls.get(crawl_id)
+        if c: c["status"] = "cancelled"
+    _save_crawl_meta(crawl_id)
+    resp = jsonify({"crawl_id": crawl_id, "status": "cancelled"})
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+
+@network_bp.route("/crawl/<crawl_id>/clusters", methods=["GET"])
+def crawl_clusters(crawl_id):
+    """Aggregate crawl results by ASN for heatmap."""
+    results_path = _crawl_results_path(crawl_id)
+    if not os.path.exists(results_path):
+        resp = jsonify({"error": "no results yet"})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 404
+
+    clusters = {}
+    total    = 0
     errors   = 0
-    no_ip    = 0
 
-    for r in all_results:
-        if r.get("error"):
-            errors += 1
-            continue
-        if not r.get("ip"):
-            no_ip += 1
-            continue
-        asn = r.get("asn") or "UNKNOWN"
-        org = r.get("org") or asn
-        cc  = r.get("country") or "?"
-        if asn not in clusters:
-            clusters[asn] = {"asn": asn, "org": org, "country": cc,
-                             "domains": [], "count": 0}
-        clusters[asn]["domains"].append(r["domain"])
-        clusters[asn]["count"] += 1
+    try:
+        with open(results_path) as f:
+            for line in f:
+                line = line.strip()
+                if not line: continue
+                try:
+                    r = json.loads(line)
+                except: continue
+                total += 1
+                if r.get('error'):
+                    errors += 1
+                    continue
+                asn = r.get('asn') or 'UNKNOWN'
+                org = r.get('org') or asn
+                cc  = r.get('country') or '?'
+                if asn not in clusters:
+                    clusters[asn] = {"asn":asn,"org":org,"country":cc,
+                                     "sample_domains":[],"count":0}
+                clusters[asn]['count'] += 1
+                if len(clusters[asn]['sample_domains']) < 100:
+                    clusters[asn]['sample_domains'].append(r['domain'])
+    except Exception as e:
+        resp = jsonify({"error": str(e)})
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        return resp, 500
 
-    # Sort by count descending
-    sorted_clusters = sorted(clusters.values(), key=lambda x: x["count"], reverse=True)
-
-    # For display, truncate domain list to first 100 per cluster
-    for cl in sorted_clusters:
-        cl["sample_domains"] = cl["domains"][:100]
-        del cl["domains"]
-
+    sorted_clusters = sorted(clusters.values(),
+                             key=lambda x: x['count'], reverse=True)
     resp = jsonify({
-        "job_id":          job_id,
-        "total_processed": job["done"],
-        "total_domains":   job["total"],
-        "clusters":        sorted_clusters[:200],  # top 200 ASNs
+        "crawl_id":        crawl_id,
+        "total_processed": total,
+        "clusters":        sorted_clusters[:200],
         "errors":          errors,
-        "no_ip":           no_ip,
-        "timestamp":       datetime.utcnow().isoformat(),
     })
-    resp.headers["Access-Control-Allow-Origin"] = "*"
-    return resp
-
-@network_bp.route("/jobs", methods=["GET"])
-def jobs_list():
-    """List all active jobs."""
-    with _jobs_lock:
-        summary = [{
-            "job_id": jid,
-            "type":   j["type"],
-            "status": j["status"],
-            "done":   j["done"],
-            "total":  j["total"],
-            "pct":    round(j["done"] / j["total"] * 100, 1) if j["total"] else 0,
-            "created_at": j["created_at"],
-        } for jid, j in _jobs.items()]
-
-    resp = jsonify({"jobs": summary})
     resp.headers["Access-Control-Allow-Origin"] = "*"
     return resp
