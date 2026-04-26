@@ -9,8 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.26.0/cytoscape.min.js"></script>
-<script src="https://unpkg.com/graphology@0.25.1/dist/graphology.umd.min.js"></script>
-<script src="https://unpkg.com/sigma@2.4.0/build/sigma.min.js"></script>
+<!-- No external graph CDN needed — self-contained canvas renderer -->
 <style>
 :root{
   --bg:#050505;--bg2:#0d0d0d;--bg3:#141414;
@@ -3402,117 +3401,158 @@ function exitBackgroundMode() {
   document.body.style.overflow = '';
 }
 
+// ── SELF-CONTAINED CANVAS GRAPH RENDERER ─────────────────────────────────────
+// No external CDN dependencies — pure Canvas2D
+let bgCanvas = null, bgCtx = null, bgCanvasNodes = [];
+let bgCamera = {x:0, y:0, zoom:1};
+let bgDragState = null;
+
 function initBgSigma() {
-  if (bgSigma || bgGraph) return;
+  if (bgCanvas) return;
   const container = document.getElementById('bgSigmaContainer');
   if (!container) return;
-
-  // Check if CDNs loaded
-  const sigmaLoaded     = typeof Sigma !== 'undefined';
-  const graphologyLoaded= typeof graphology !== 'undefined' || typeof Graph !== 'undefined';
-  console.log('Sigma loaded:', sigmaLoaded, '| Graphology loaded:', graphologyLoaded);
-
-  if (!sigmaLoaded || !graphologyLoaded) {
-    console.warn('Sigma/Graphology CDN not loaded — using canvas fallback');
-    initBgCanvas(container);
-    return;
-  }
-
-  try {
-    if (typeof graphology !== 'undefined') {
-      bgGraph = new graphology.Graph({multi: false});
-    } else if (typeof Graph !== 'undefined') {
-      bgGraph = new Graph({multi: false});
-    } else {
-      throw new Error('Graphology not loaded');
-    }
-
-    bgSigma = new Sigma(bgGraph, container, {
-      renderEdgeLabels: false,
-      defaultEdgeColor: 'rgba(255,255,255,0.06)',
-      defaultNodeColor: '#4ec994',
-      labelColor:       {color:'rgba(240,236,228,0.5)'},
-      labelSize:        9,
-      minCameraRatio:   0.0001,
-      maxCameraRatio:   200,
-      labelRenderedSizeThreshold: 8,
-    });
-
-    bgSigma.on('clickNode', ({node}) => {
-      exitBackgroundMode();
-      document.getElementById('seedInput').value = node;
-      showHint(`${node} loaded — click Analyze to investigate`);
-    });
-
-    bgSigma.on('enterNode', ({node, event}) => {
-      const d = bgNodeData[node] || {};
-      const tip = document.getElementById('bgTooltip');
-      if (!tip) return;
-      tip.style.display = 'block';
-      tip.style.left    = (event.x + 14) + 'px';
-      tip.style.top     = (event.y + 14) + 'px';
-      tip.innerHTML = `<strong style="color:var(--gold2)">${esc(node)}</strong><br>
-        ${d.asn?`<span style="color:var(--dim)">${esc(d.asn)}</span><br>`:''}
-        ${d.org?`${esc((d.org||'').slice(0,40))}<br>`:''}
-        ${d.country?`${esc(d.country)}<br>`:''}
-        ${d.ip?`<span style="color:var(--dim)">${esc(d.ip)}</span><br>`:''}
-        <span style="color:var(--dim);font-size:9px">Click → investigate</span>`;
-    });
-    bgSigma.on('leaveNode', () => {
-      const tip = document.getElementById('bgTooltip');
-      if (tip) tip.style.display = 'none';
-    });
-
-  } catch(e) {
-    console.warn('Sigma init failed:', e.message);
-    initBgCanvas(container);
-  }
+  initBgCanvas(container);
 }
 
-// Canvas fallback
-let bgCanvas = null, bgCtx = null, bgCanvasNodes = [];
 function initBgCanvas(container) {
   bgCanvas = document.createElement('canvas');
-  bgCanvas.style.cssText = 'width:100%;height:100%;';
+  bgCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;cursor:grab;';
   container.appendChild(bgCanvas);
   bgCtx = bgCanvas.getContext('2d');
-  const ro = new ResizeObserver(() => {
-    bgCanvas.width  = container.offsetWidth;
-    bgCanvas.height = container.offsetHeight;
+
+  function resize() {
+    bgCanvas.width  = container.offsetWidth  || window.innerWidth  - 300;
+    bgCanvas.height = container.offsetHeight || window.innerHeight  - 120;
     renderBgCanvas();
+  }
+  new ResizeObserver(resize).observe(container);
+  resize();
+
+  // Mouse interactions — pan and click
+  bgCanvas.addEventListener('mousedown', e => {
+    bgDragState = {startX: e.clientX, startY: e.clientY,
+                   camX: bgCamera.x, camY: bgCamera.y};
+    bgCanvas.style.cursor = 'grabbing';
   });
-  ro.observe(container);
-  bgCanvas.width  = container.offsetWidth;
-  bgCanvas.height = container.offsetHeight;
+  bgCanvas.addEventListener('mousemove', e => {
+    if (bgDragState) {
+      bgCamera.x = bgDragState.camX + (e.clientX - bgDragState.startX) / bgCamera.zoom;
+      bgCamera.y = bgDragState.camY + (e.clientY - bgDragState.startY) / bgCamera.zoom;
+      renderBgCanvas();
+    }
+    // Hover tooltip
+    const hit = hitTest(e.offsetX, e.offsetY);
+    const tip = document.getElementById('bgTooltip');
+    if (hit && tip) {
+      const d = bgNodeData[hit] || {};
+      tip.style.display = 'block';
+      tip.style.left = (e.clientX + 14) + 'px';
+      tip.style.top  = (e.clientY + 14) + 'px';
+      tip.innerHTML  = `<strong style="color:var(--gold2)">${esc(hit)}</strong><br>
+        ${d.asn ? esc(d.asn)+'<br>' : ''}
+        ${d.org ? esc((d.org||'').slice(0,40))+'<br>' : ''}
+        ${d.country ? esc(d.country)+'<br>' : ''}
+        <span style="color:var(--dim);font-size:9px">Click → investigate</span>`;
+    } else if (tip) {
+      tip.style.display = 'none';
+    }
+  });
+  bgCanvas.addEventListener('mouseup', e => {
+    if (bgDragState) {
+      const dx = Math.abs(e.clientX - bgDragState.startX);
+      const dy = Math.abs(e.clientY - bgDragState.startY);
+      if (dx < 4 && dy < 4) {
+        // Click — find hit node
+        const hit = hitTest(e.offsetX, e.offsetY);
+        if (hit) {
+          exitBackgroundMode();
+          document.getElementById('seedInput').value = hit;
+          showHint(hit + ' loaded — click Analyze to investigate');
+        }
+      }
+    }
+    bgDragState = null;
+    bgCanvas.style.cursor = 'grab';
+  });
+  bgCanvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 0.85 : 1.18;
+    // Zoom toward mouse position
+    const rect = bgCanvas.getBoundingClientRect();
+    const mx = (e.clientX - rect.left - bgCanvas.width/2)  / bgCamera.zoom;
+    const my = (e.clientY - rect.top  - bgCanvas.height/2) / bgCamera.zoom;
+    bgCamera.zoom = Math.max(0.01, Math.min(50, bgCamera.zoom * factor));
+    bgCamera.x -= mx * (1 - 1/factor);
+    bgCamera.y -= my * (1 - 1/factor);
+    renderBgCanvas();
+  }, {passive: false});
+}
+
+function hitTest(mx, my) {
+  if (!bgCanvas || !bgCanvasNodes.length) return null;
+  const W = bgCanvas.width, H = bgCanvas.height;
+  const cx = W/2 + bgCamera.x * bgCamera.zoom;
+  const cy = H/2 + bgCamera.y * bgCamera.zoom;
+  for (let i = bgCanvasNodes.length-1; i >= 0; i--) {
+    const n  = bgCanvasNodes[i];
+    const px = cx + n.x * bgCamera.zoom;
+    const py = cy + n.y * bgCamera.zoom;
+    const r  = Math.max(4, (n.size||2) * bgCamera.zoom);
+    if ((mx-px)*(mx-px) + (my-py)*(my-py) < r*r) return n.id;
+  }
+  return null;
 }
 
 function renderBgCanvas() {
   if (!bgCtx || !bgCanvas) return;
-  const W = bgCanvas.width || bgCanvas.offsetWidth;
-  const H = bgCanvas.height || bgCanvas.offsetHeight;
+  const W = bgCanvas.width, H = bgCanvas.height;
   if (!W || !H) return;
+
   bgCtx.fillStyle = '#050505';
   bgCtx.fillRect(0, 0, W, H);
-  // Find bounds of all nodes for auto-fit
-  if (bgCanvasNodes.length === 0) return;
-  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+
+  if (!bgCanvasNodes.length) return;
+
+  const cx = W/2 + bgCamera.x * bgCamera.zoom;
+  const cy = H/2 + bgCamera.y * bgCamera.zoom;
+  const z  = bgCamera.zoom;
+
   bgCanvasNodes.forEach(n => {
-    if (n.x < minX) minX = n.x;
-    if (n.x > maxX) maxX = n.x;
-    if (n.y < minY) minY = n.y;
-    if (n.y > maxY) maxY = n.y;
-  });
-  const rangeX = (maxX - minX) || 1;
-  const rangeY = (maxY - minY) || 1;
-  const pad = 40;
-  bgCanvasNodes.forEach(n => {
-    const px = pad + ((n.x - minX) / rangeX) * (W - pad*2);
-    const py = pad + ((n.y - minY) / rangeY) * (H - pad*2);
+    const px = cx + n.x * z;
+    const py = cy + n.y * z;
+    // Skip if off screen
+    if (px < -10 || px > W+10 || py < -10 || py > H+10) return;
+    const r = Math.max(1.5, (n.size||2) * Math.min(z, 3));
     bgCtx.beginPath();
-    bgCtx.arc(px, py, n.size || 3, 0, Math.PI*2);
+    bgCtx.arc(px, py, r, 0, Math.PI*2);
     bgCtx.fillStyle = n.color || '#4ec994';
     bgCtx.fill();
+    // Draw label at high zoom
+    if (z > 4 && n.id) {
+      bgCtx.fillStyle = 'rgba(240,236,228,0.6)';
+      bgCtx.font = '9px monospace';
+      bgCtx.fillText(n.id.slice(0,20), px+r+2, py+3);
+    }
   });
+}
+
+function fitBgCamera() {
+  if (!bgCanvasNodes.length || !bgCanvas) return;
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
+  bgCanvasNodes.forEach(n => {
+    if (n.x<minX) minX=n.x; if (n.x>maxX) maxX=n.x;
+    if (n.y<minY) minY=n.y; if (n.y>maxY) maxY=n.y;
+  });
+  const rangeX = (maxX-minX)||200, rangeY = (maxY-minY)||200;
+  const pad = 60;
+  bgCamera.zoom = Math.min(
+    (bgCanvas.width  - pad*2) / rangeX,
+    (bgCanvas.height - pad*2) / rangeY,
+    10
+  );
+  bgCamera.x = -((minX+maxX)/2);
+  bgCamera.y = -((minY+maxY)/2);
+  renderBgCanvas();
 }
 
 function addBgNode(domain, data) {
@@ -3533,26 +3573,14 @@ function addBgNode(domain, data) {
   const x     = r * Math.cos(angle) + (Math.random()-0.5) * 60;
   const y     = r * Math.sin(angle) + (Math.random()-0.5) * 60;
 
-  if (bgGraph) {
-    try {
-      if (!bgGraph.hasNode(domain)) {
-        bgGraph.addNode(domain, {x, y, size, color, label: domain.slice(0,20)});
-      }
-    } catch(e) {
-      console.warn('addBgNode graph error:', e.message, domain);
-    }
-  } else if (bgCanvasNodes) {
-    bgCanvasNodes.push({
-      id: domain, color,
-      x: (x + 800) / 1600, y: (y + 800) / 1600,
-    });
-    renderBgCanvas();
-  }
+  // Always use canvas renderer
+  bgCanvasNodes.push({ id: domain, color, size, x, y });
+  renderBgCanvas();
 }
 
 function updateBgStats() {
-  const n = bgGraph ? bgGraph.order : bgCanvasNodes.length;
-  const e = bgGraph ? bgGraph.size  : 0;
+  const n = bgCanvasNodes.length;
+  const e = 0;
   const nc = document.getElementById('bgNodeCount');
   const ec = document.getElementById('bgEdgeCount');
   if (nc) nc.textContent = n.toLocaleString();
@@ -3702,6 +3730,8 @@ function updateBgProgress(data) {
   if (ring) {
     ring.style.display = (active && nodeCount === 0) ? 'block' : 'none';
   }
+  // Auto-fit camera when first nodes appear
+  if (nodeCount > 0 && nodeCount <= 5) fitBgCamera();
   if (ringTxt) {
     ringTxt.innerHTML = `${done.toLocaleString()} analyzed<br>${seen.toLocaleString()} discovered<br>${queued.toLocaleString()} queued`;
   }
@@ -3776,67 +3806,63 @@ function renderBgClusters(clusters, total) {
 }
 
 function highlightBgCluster(asn) {
-  if (!bgGraph || !bgSigma) return;
-  bgGraph.forEachNode((node, attrs) => {
-    const d = bgNodeData[node] || {};
-    bgGraph.setNodeAttribute(node,'color', d.asn===asn?'#ffffff':'rgba(240,236,228,0.1)');
-    bgGraph.setNodeAttribute(node,'size',  d.asn===asn?6:1);
+  bgCanvasNodes.forEach(n => {
+    const d = bgNodeData[n.id] || {};
+    n.color = d.asn===asn ? '#ffffff' : 'rgba(240,236,228,0.08)';
+    n.size  = d.asn===asn ? 6 : 1;
   });
-  bgSigma.refresh();
+  renderBgCanvas();
   setTimeout(() => {
-    bgGraph.forEachNode((node) => {
-      const d = bgNodeData[node] || {};
-      bgGraph.setNodeAttribute(node,'color', bgNodeColor(d));
-      bgGraph.setNodeAttribute(node,'size',  isSuspiciousASN(d.asn||'',d.org||'',d.country||'')?5:2);
+    bgCanvasNodes.forEach(n => {
+      const d = bgNodeData[n.id] || {};
+      n.color = bgNodeColor(d);
+      n.size  = isSuspiciousASN(d.asn||'',d.org||'',d.country||'') ? 5 : 2;
     });
-    bgSigma.refresh();
+    renderBgCanvas();
   }, 3000);
 }
 
 function changeBgLayout(mode) {
-  if (!bgGraph) return;
-  bgGraph.forEachNode((node) => {
-    const d = bgNodeData[node] || {};
+  bgCanvasNodes.forEach(n => {
+    const d = bgNodeData[n.id] || {};
     const asn = d.asn || 'UNKNOWN';
-    let x, y;
+    let hash = 0;
+    for (let i=0;i<asn.length;i++) hash = asn.charCodeAt(i)+((hash<<5)-hash);
     if (mode === 'asn') {
-      let hash = 0;
-      for (let i=0;i<asn.length;i++) hash = asn.charCodeAt(i)+((hash<<5)-hash);
       const angle = (Math.abs(hash)%360)*Math.PI/180;
       const r = 200+(d._crawl_depth||0)*150+(Math.abs(hash>>8)%100);
-      x = r*Math.cos(angle)+(Math.random()-.5)*60;
-      y = r*Math.sin(angle)+(Math.random()-.5)*60;
+      n.x = r*Math.cos(angle)+(Math.random()-.5)*60;
+      n.y = r*Math.sin(angle)+(Math.random()-.5)*60;
     } else if (mode === 'country') {
       const CP = {CN:{x:-600,y:-200},RU:{x:-300,y:-400},US:{x:400,y:0},GB:{x:100,y:-400}};
       const p = CP[d.country]||{x:0,y:0};
-      x = p.x+(Math.random()-.5)*200; y = p.y+(Math.random()-.5)*200;
+      n.x = p.x+(Math.random()-.5)*200;
+      n.y = p.y+(Math.random()-.5)*200;
     } else {
-      x = (Math.random()-.5)*2000; y = (Math.random()-.5)*2000;
+      n.x = (Math.random()-.5)*2000;
+      n.y = (Math.random()-.5)*2000;
     }
-    bgGraph.setNodeAttribute(node,'x',x);
-    bgGraph.setNodeAttribute(node,'y',y);
   });
-  if (bgSigma) bgSigma.refresh();
+  fitBgCamera();
 }
 
 function colorBgGraph(mode) {
   bgColorMode = mode;
-  if (!bgGraph) return;
-  bgGraph.forEachNode((node) => {
-    const d = bgNodeData[node] || {};
-    bgGraph.setNodeAttribute(node,'color', bgNodeColor(d));
+  bgCanvasNodes.forEach(n => {
+    n.color = bgNodeColor(bgNodeData[n.id] || {});
   });
-  if (bgSigma) bgSigma.refresh();
-  if (bgCanvas) renderBgCanvas();
+  renderBgCanvas();
 }
 
 function clearBgGraph() {
-  if (bgGraph) { bgGraph.clear(); if (bgSigma) bgSigma.refresh(); }
-  bgNodeData = {}; bgSeen = new Set(); bgLastSeen = 0; bgCanvasNodes = [];
-  if (bgCanvas) renderBgCanvas();
+  bgCanvasNodes = []; bgNodeData = {}; bgSeen = new Set(); bgLastSeen = 0;
+  bgCamera = {x:0, y:0, zoom:1};
+  renderBgCanvas();
   updateBgStats();
   const empty = document.getElementById('bgGraphEmpty');
   if (empty) empty.style.display = '';
+  const ring = document.getElementById('bgCrawlProgress');
+  if (ring) ring.style.display = 'none';
 }
 
 // ── RECORDING ─────────────────────────────────────────────────────────────────
@@ -3875,9 +3901,9 @@ function stopBgRecord() {
 
 // ── GEXF EXPORT ───────────────────────────────────────────────────────────────
 function exportBgGEXF() {
-  if (!bgGraph || bgGraph.order === 0) { showHint('No nodes to export'); return; }
+  if (!bgCanvasNodes.length) { showHint('No nodes to export'); return; }
   let ns='',es='';
-  bgGraph.forEachNode((node,attrs) => {
+  bgCanvasNodes.forEach(n => { const node = n.id; const attrs = n;
     const d = bgNodeData[node]||{};
     ns += `<node id="${esc(node)}" label="${esc(node)}"><attvalues>
       <attvalue for="0" value="${esc(d.asn||'')}"/>
@@ -3904,7 +3930,7 @@ function exportBgGEXF() {
   const a    = document.createElement('a');
   a.href=url; a.download='inteldesk-crawl-'+new Date().toISOString().slice(0,10)+'.gexf';
   a.click(); URL.revokeObjectURL(url);
-  showHint(`Exported ${bgGraph.order.toLocaleString()} nodes`);
+  showHint(`Exported ${bgCanvasNodes.length.toLocaleString()} nodes`);
 }
 
 document.addEventListener('keydown', e => {
