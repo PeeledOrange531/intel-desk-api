@@ -3385,6 +3385,17 @@ function initBgSigma() {
   const container = document.getElementById('bgSigmaContainer');
   if (!container) return;
 
+  // Check if CDNs loaded
+  const sigmaLoaded     = typeof Sigma !== 'undefined';
+  const graphologyLoaded= typeof graphology !== 'undefined' || typeof Graph !== 'undefined';
+  console.log('Sigma loaded:', sigmaLoaded, '| Graphology loaded:', graphologyLoaded);
+
+  if (!sigmaLoaded || !graphologyLoaded) {
+    console.warn('Sigma/Graphology CDN not loaded — using canvas fallback');
+    initBgCanvas(container);
+    return;
+  }
+
   try {
     if (typeof graphology !== 'undefined') {
       bgGraph = new graphology.Graph({multi: false});
@@ -3489,7 +3500,9 @@ function addBgNode(domain, data) {
       if (!bgGraph.hasNode(domain)) {
         bgGraph.addNode(domain, {x, y, size, color, label: domain.slice(0,20)});
       }
-    } catch(e) {}
+    } catch(e) {
+      console.warn('addBgNode graph error:', e.message, domain);
+    }
   } else if (bgCanvasNodes) {
     bgCanvasNodes.push({
       id: domain, color,
@@ -3509,6 +3522,11 @@ function updateBgStats() {
   if (n > 0) {
     const empty = document.getElementById('bgGraphEmpty');
     if (empty) empty.style.display = 'none';
+  }
+  // Also update stat bar with live count
+  const stat = document.getElementById('bgStat');
+  if (stat && n > 0) {
+    stat.textContent = `${n.toLocaleString()} nodes discovered`;
   }
 }
 
@@ -3573,36 +3591,44 @@ async function pollCrawl(crawlId) {
         added++;
       }
     }
-    if (added > 0) {
+    // Always advance offset regardless of errors
+    if (results.length > 0) {
       bgLastSeen += results.length;
-      updateBgStats();
-      if (bgSigma) bgSigma.refresh();
-      if (bgCanvas) renderBgCanvas();
-
-      // Update localStorage
       try {
         const saved = JSON.parse(localStorage.getItem('inteldesk_crawl') || '{}');
         saved.last_seen = bgLastSeen;
         localStorage.setItem('inteldesk_crawl', JSON.stringify(saved));
       } catch(e) {}
     }
+    if (added > 0) {
+      updateBgStats();
+      if (bgSigma) bgSigma.refresh();
+      if (bgCanvas) renderBgCanvas();
+    }
 
     // Update progress
     updateBgProgress(data);
 
     // Render cluster list periodically
-    if (bgLastSeen % 500 === 0 || data.status === 'complete') {
+    if (data.status === 'complete' || (bgLastSeen > 0 && bgLastSeen % 500 === 0)) {
       loadBgClusters(crawlId);
     }
+
+    // Always show progress in hint bar so user knows it's working
+    const statusMsg = `Crawl ${crawlId}: ${data.done || 0} analyzed · ${data.seen || 0} discovered · ${data.queued || 0} queued`;
+    const statEl = document.getElementById('bgStat');
+    if (statEl) statEl.textContent = statusMsg;
 
     if (data.status === 'complete' || data.status === 'cancelled' || data.status === 'error') {
       clearInterval(bgPollTimer);
       bgPollTimer = null;
-      const saved = JSON.parse(localStorage.getItem('inteldesk_crawl') || '{}');
-      saved.status = data.status;
-      localStorage.setItem('inteldesk_crawl', JSON.stringify(saved));
+      try {
+        const saved = JSON.parse(localStorage.getItem('inteldesk_crawl') || '{}');
+        saved.status = data.status;
+        localStorage.setItem('inteldesk_crawl', JSON.stringify(saved));
+      } catch(e) {}
       loadBgClusters(crawlId);
-      showHint(`Crawl ${crawlId} ${data.status} — ${data.done.toLocaleString()} domains mapped`);
+      showHint(`Crawl ${crawlId} ${data.status} — ${(data.done||0).toLocaleString()} domains mapped`);
     }
   } catch(err) {
     // Ignore parse errors — server may be restarting
