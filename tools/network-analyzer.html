@@ -3379,7 +3379,10 @@ function bgNodeColor(data) {
 function enterBackgroundMode() {
   document.getElementById('backgroundMode').style.display = 'flex';
   document.body.style.overflow = 'hidden';
-  initBgSigma();
+  // Don't init Sigma until user switches to graph view
+  // initBgSigma();
+  // Render table whenever entering
+  setTimeout(() => renderBgTable(), 100);
   // Restore any active crawl from localStorage
   const saved = localStorage.getItem('inteldesk_crawl');
   if (saved) {
@@ -3581,12 +3584,15 @@ function addBgNode(domain, data) {
 
   bgCanvasNodes.push({ id: domain, color, size, x, y });
 
-  // First node — fit camera then render
-  if (bgCanvasNodes.length === 1) {
-    bgCamera = {x: -x, y: -y, zoom: 1};
+  // For first 30 nodes, always auto-fit so nodes are always visible
+  if (bgCanvasNodes.length <= 30) {
+    fitBgCamera();
+  } else {
+    renderBgCanvas();
   }
-  if (bgCanvasNodes.length <= 10) fitBgCamera();
-  renderBgCanvas();
+  // Hide empty overlay
+  const empty = document.getElementById('bgGraphEmpty');
+  if (empty) empty.style.display = 'none';
 }
 
 function updateBgStats() {
@@ -3623,6 +3629,12 @@ async function startCrawl() {
     bgCrawlId  = data.crawl_id;
     bgLastSeen = 0;
     updateBgHeader(data.crawl_id, seed);
+    // Show progress indicator immediately
+    const ring = document.getElementById('bgCrawlProgress');
+    if (ring) ring.style.display = 'block';
+    const empty = document.getElementById('bgGraphEmpty');
+    if (empty) empty.style.display = 'none';
+    bounceGhost();
 
     // Persist to localStorage so we can resume
     localStorage.setItem('inteldesk_crawl', JSON.stringify({
@@ -3645,6 +3657,295 @@ function startBgPolling(crawlId) {
   pollCrawl(crawlId); // immediate
 }
 
+
+// ══ HERO STRIP — LIVE METRICS ════════════════════════════════════════════════
+let bgCurrentView      = 'table';  // 'table' or 'graph'
+let bgRecentDomains    = [];       // ticker queue
+let bgRateHistory      = [];       // [{ts, count}] for sparkline
+let bgLastDoneCount    = 0;
+let bgPulseInterval    = null;
+
+// Smooth count-up animation
+function animateCountUp(el, target, duration = 600) {
+  if (!el) return;
+  const start = parseInt(el.textContent.replace(/[^0-9]/g, '')) || 0;
+  if (start === target) return;
+  const startTime = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - startTime) / duration);
+    const eased = 1 - Math.pow(1 - t, 3);  // ease-out cubic
+    const val = Math.round(start + (target - start) * eased);
+    el.textContent = val.toLocaleString();
+    if (t < 1) requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// Pulse the dot — speed varies with activity
+function startBgPulse() {
+  if (bgPulseInterval) return;
+  let phase = 0;
+  bgPulseInterval = setInterval(() => {
+    const dot = document.getElementById('bgPulseDot');
+    if (!dot) return;
+    phase = (phase + 1) % 2;
+    dot.style.background = phase === 0
+      ? 'rgba(78,201,148,1)'
+      : 'rgba(78,201,148,.25)';
+    dot.style.boxShadow = phase === 0
+      ? '0 0 12px rgba(78,201,148,.7)'
+      : 'none';
+  }, 600);
+}
+function stopBgPulse() {
+  if (bgPulseInterval) clearInterval(bgPulseInterval);
+  bgPulseInterval = null;
+  const dot = document.getElementById('bgPulseDot');
+  if (dot) {
+    dot.style.background = 'rgba(78,201,148,.2)';
+    dot.style.boxShadow  = 'none';
+  }
+}
+
+// Update sparkline based on rate history
+function renderSparkline() {
+  const canvas = document.getElementById('bgSparkline');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Trim old entries (>60s)
+  const now = Date.now();
+  bgRateHistory = bgRateHistory.filter(r => now - r.ts < 60000);
+
+  if (bgRateHistory.length < 2) {
+    // Draw flat baseline
+    ctx.strokeStyle = 'rgba(78,201,148,.15)';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, H/2);
+    ctx.lineTo(W, H/2);
+    ctx.stroke();
+    return;
+  }
+
+  const maxRate = Math.max(...bgRateHistory.map(r => r.count), 1);
+  const oldestTs = now - 60000;
+
+  ctx.strokeStyle = 'rgba(78,201,148,.7)';
+  ctx.lineWidth   = 1.5;
+  ctx.beginPath();
+  bgRateHistory.forEach((r, i) => {
+    const x = ((r.ts - oldestTs) / 60000) * W;
+    const y = H - (r.count / maxRate) * (H - 4) - 2;
+    if (i === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // Fill below the line
+  ctx.lineTo(W, H);
+  ctx.lineTo(0, H);
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(78,201,148,.08)';
+  ctx.fill();
+}
+
+// Add a domain to the ticker
+function pushToTicker(domain) {
+  bgRecentDomains.unshift(domain);
+  if (bgRecentDomains.length > 8) bgRecentDomains.pop();
+  const ticker = document.getElementById('bgTicker');
+  if (ticker) {
+    ticker.innerHTML = bgRecentDomains.map((d, i) => {
+      const opacity = 1 - (i * 0.1);
+      return `<span style="opacity:${opacity}">→ ${esc(d)}</span>`;
+    }).join('  ');
+  }
+}
+
+// Master update function — called from pollCrawl
+function updateBgHero(data) {
+  const done    = data.done    || 0;
+  const seen    = data.seen    || 0;
+  const queued  = data.queued  || 0;
+  const active  = data.status === 'running' || data.status === 'queued';
+
+  // Animate counters
+  animateCountUp(document.getElementById('bgCountAnalyzed'),   done);
+  animateCountUp(document.getElementById('bgCountDiscovered'), seen);
+  animateCountUp(document.getElementById('bgCountQueued'),     queued);
+
+  // Update status label
+  const status   = document.getElementById('bgHeroStatus');
+  const subtitle = document.getElementById('bgHeroSubtitle');
+  if (status) {
+    status.textContent = active ? 'Crawling' : (data.status || 'Idle');
+    status.style.color = active ? 'var(--green)' : 'var(--dim)';
+  }
+  if (subtitle) {
+    if (active) {
+      subtitle.textContent = `${data.crawl_id || ''} · ${data.eta_seconds ? '~'+formatETA(data.eta_seconds) : 'discovering...'}`;
+    } else if (data.status === 'complete') {
+      subtitle.textContent = `Complete · ${done.toLocaleString()} domains mapped`;
+    } else {
+      subtitle.textContent = 'Click Start to begin';
+    }
+  }
+
+  // Pulse
+  if (active) startBgPulse(); else stopBgPulse();
+
+  // Track rate
+  const delta = done - bgLastDoneCount;
+  if (delta > 0) {
+    bgRateHistory.push({ ts: Date.now(), count: delta });
+    bgLastDoneCount = done;
+  }
+  renderSparkline();
+}
+
+// ══ TABLE VIEW ═══════════════════════════════════════════════════════════════
+let bgTableData = []; // [{domain, ip, asn, org, country, depth, ts}]
+
+function pushToTable(domain, data) {
+  bgTableData.push({
+    domain,
+    ip:      data.ip      || '',
+    asn:     data.asn     || '',
+    org:     data.org     || '',
+    country: data.country || '',
+    depth:   data._crawl_depth || 0,
+    ts:      Date.now(),
+  });
+  // Render only if we're on table view & not too many — debounce rendering
+  if (bgCurrentView === 'table') {
+    if (bgTableData.length < 100 || bgTableData.length % 20 === 0) {
+      renderBgTable();
+    }
+  }
+}
+
+function renderBgTable() {
+  const body   = document.getElementById('bgTableBody');
+  const count  = document.getElementById('bgTableCount');
+  if (!body) return;
+
+  const filter = (document.getElementById('bgTableFilter')?.value || '').toLowerCase().trim();
+  const sort   = document.getElementById('bgTableSort')?.value || 'newest';
+
+  let rows = bgTableData;
+  if (filter) {
+    rows = rows.filter(r =>
+      r.domain.toLowerCase().includes(filter) ||
+      (r.asn||'').toLowerCase().includes(filter) ||
+      (r.org||'').toLowerCase().includes(filter) ||
+      (r.country||'').toLowerCase().includes(filter) ||
+      (r.ip||'').includes(filter)
+    );
+  }
+
+  // Sort
+  rows = [...rows];
+  if (sort === 'newest')      rows.sort((a,b) => b.ts - a.ts);
+  else if (sort === 'oldest') rows.sort((a,b) => a.ts - b.ts);
+  else if (sort === 'asn')    rows.sort((a,b) => (a.asn||'').localeCompare(b.asn||''));
+  else if (sort === 'country')rows.sort((a,b) => (a.country||'').localeCompare(b.country||''));
+  else if (sort === 'domain') rows.sort((a,b) => a.domain.localeCompare(b.domain));
+
+  if (count) count.textContent = `${rows.length.toLocaleString()} of ${bgTableData.length.toLocaleString()} domains`;
+
+  if (!rows.length) {
+    body.innerHTML = `<div style="padding:30px;text-align:center;color:var(--dim);">
+      ${bgTableData.length ? 'No matches for filter' : 'Run a crawl to see results here'}</div>`;
+    return;
+  }
+
+  // Limit displayed rows for performance
+  const limit = 500;
+  const displayed = rows.slice(0, limit);
+
+  body.innerHTML = displayed.map((r, i) => {
+    const sus = isSuspiciousASN(r.asn||'', r.org||'', r.country||'');
+    return `<div class="bg-table-row" onclick="bgTableRowClick('${esc(r.domain)}')"
+      style="display:grid;grid-template-columns:30px 1fr 100px 50px 120px 60px;
+      gap:10px;padding:8px 18px;border-bottom:1px solid rgba(255,255,255,.03);
+      align-items:center;cursor:pointer;transition:background .1s;
+      ${sus ? 'background:rgba(192,57,43,.04);' : ''}"
+      onmouseover="this.style.background='${sus?'rgba(192,57,43,.08)':'rgba(255,255,255,.02)'}'"
+      onmouseout="this.style.background='${sus?'rgba(192,57,43,.04)':'transparent'}'">
+      <div style="color:var(--dim);font-size:9px;">${i+1}</div>
+      <div style="color:${sus?'var(--red)':'var(--gold2)'};overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap;">
+        ${sus ? '⚠ ' : ''}${esc(r.domain)}
+      </div>
+      <div style="color:var(--muted);font-size:10px;overflow:hidden;
+        text-overflow:ellipsis;white-space:nowrap;" title="${esc(r.org)}">${esc(r.asn || '—')}</div>
+      <div style="color:var(--dim);font-size:10px;text-align:center;">${esc(r.country || '—')}</div>
+      <div style="color:var(--dim);font-size:10px;font-family:var(--mono);">${esc(r.ip || '—')}</div>
+      <div style="color:var(--dim);font-size:10px;text-align:center;">${r.depth}</div>
+    </div>`;
+  }).join('');
+
+  if (rows.length > limit) {
+    body.innerHTML += `<div style="padding:14px;text-align:center;color:var(--dim);
+      font-size:10px;border-top:1px solid var(--border);">
+      Showing first ${limit.toLocaleString()} of ${rows.length.toLocaleString()} matches.
+      Use filter to narrow results.</div>`;
+  }
+}
+
+function bgTableRowClick(domain) {
+  exitBackgroundMode();
+  document.getElementById('seedInput').value = domain;
+  showHint(`${domain} loaded — click Analyze to investigate`);
+}
+
+// ══ VIEW SWITCHER ═════════════════════════════════════════════════════════════
+function switchBgView(view) {
+  bgCurrentView = view;
+  const tableView = document.getElementById('bgTableView');
+  const graphView = document.getElementById('bgGraphView');
+  const tableBtn  = document.getElementById('bgViewTableBtn');
+  const graphBtn  = document.getElementById('bgViewGraphBtn');
+
+  if (view === 'table') {
+    if (tableView) tableView.style.display = 'flex';
+    if (graphView) graphView.style.display = 'none';
+    if (tableBtn) {
+      tableBtn.style.background = 'rgba(200,169,110,.15)';
+      tableBtn.style.color      = 'var(--gold)';
+    }
+    if (graphBtn) {
+      graphBtn.style.background = 'transparent';
+      graphBtn.style.color      = 'var(--dim)';
+    }
+    renderBgTable();
+  } else {
+    if (tableView) tableView.style.display = 'none';
+    if (graphView) graphView.style.display = 'block';
+    if (graphBtn) {
+      graphBtn.style.background = 'rgba(200,169,110,.15)';
+      graphBtn.style.color      = 'var(--gold)';
+    }
+    if (tableBtn) {
+      tableBtn.style.background = 'transparent';
+      tableBtn.style.color      = 'var(--dim)';
+    }
+    // Initialize canvas if not already
+    initBgSigma();
+    // Re-render whatever nodes we have
+    setTimeout(() => {
+      if (bgCanvas) {
+        bgCanvas.width  = bgCanvas.parentElement.offsetWidth;
+        bgCanvas.height = bgCanvas.parentElement.offsetHeight;
+        if (bgCanvasNodes.length > 0) fitBgCamera();
+      }
+    }, 50);
+  }
+}
+
+
 async function pollCrawl(crawlId) {
   try {
     const res = await fetch(`${API}/network/crawl/${crawlId}?since=${bgLastSeen}&limit=500`);
@@ -3652,20 +3953,16 @@ async function pollCrawl(crawlId) {
     const data = await res.json();
     if (data.error) return;
 
-    // Add new nodes to graph
+    // Add new nodes — to graph AND table
     const results = data.results || [];
     let added = 0;
-    if (results.length > 0) {
-      console.log(`Poll: got ${results.length} results, first:`, results[0]);
-    }
     for (const r of results) {
       if (r.domain && !r.error) {
         addBgNode(r.domain, r);
+        pushToTable(r.domain, r);
+        pushToTicker(r.domain);
         added++;
       }
-    }
-    if (results.length > 0 && added === 0) {
-      console.warn('Poll got results but added 0 nodes — all had errors:', results.slice(0,3));
     }
     // Always advance offset regardless of errors
     if (results.length > 0) {
@@ -3682,8 +3979,9 @@ async function pollCrawl(crawlId) {
       if (bgCanvas) renderBgCanvas();
     }
 
-    // Update progress
+    // Update progress + hero strip
     updateBgProgress(data);
+    updateBgHero(data);
 
     // Render cluster list periodically
     if (data.status === 'complete' || (bgLastSeen > 0 && bgLastSeen % 500 === 0)) {
@@ -3722,44 +4020,65 @@ function updateBgProgress(data) {
   const eta    = data.eta_seconds;
   const active = data.status === 'running' || data.status === 'queued';
 
-  const fill    = document.getElementById('bgProgressFill');
-  const pctEl   = document.getElementById('bgPct');
-  const statEl  = document.getElementById('bgStat');
-  const etaEl   = document.getElementById('bgEta');
-  const badge   = document.getElementById('bgBadge');
-  const bidEl   = document.getElementById('bgCrawlId');
-  const ring    = document.getElementById('bgCrawlProgress');
-  const ringTxt = document.getElementById('bgRingText');
-  const overlay = document.getElementById('bgStatusOverlay');
-  const empty   = document.getElementById('bgGraphEmpty');
+  const fill   = document.getElementById('bgProgressFill');
+  const pctEl  = document.getElementById('bgPct');
+  const statEl = document.getElementById('bgStat');
+  const etaEl  = document.getElementById('bgEta');
+  const badge  = document.getElementById('bgBadge');
+  const bidEl  = document.getElementById('bgCrawlId');
+  const ring   = document.getElementById('bgCrawlProgress');
+  const rStat  = document.getElementById('bgRingStatus');
+  const rDet   = document.getElementById('bgRingDetail');
+  const empty  = document.getElementById('bgGraphEmpty');
 
-  if (fill)   fill.style.width    = pct + '%';
-  if (pctEl)  pctEl.textContent   = pct + '%';
-  if (etaEl)  etaEl.textContent   = eta ? '~' + formatETA(eta) : '';
-  if (badge)  badge.style.display = '';
-  if (bidEl)  bidEl.textContent   = data.crawl_id || '';
+  if (fill)  fill.style.width    = pct + '%';
+  if (pctEl) pctEl.textContent   = pct + '%';
+  if (etaEl) etaEl.textContent   = eta ? '~' + formatETA(eta) : '';
+  if (badge) badge.style.display = '';
+  if (bidEl) bidEl.textContent   = data.crawl_id || '';
 
   const statMsg = `${done.toLocaleString()} analyzed · ${seen.toLocaleString()} discovered · ${queued.toLocaleString()} queued`;
   if (statEl) statEl.textContent = statMsg;
 
-  // Show progress ring while crawling, hide when graph has nodes
-  const nodeCount = bgGraph ? bgGraph.order : bgCanvasNodes.length;
+  const nodeCount = bgCanvasNodes.length;
+
+  // Keep ring visible while crawl is active — even if graph has nodes
   if (ring) {
-    ring.style.display = (active && nodeCount === 0) ? 'block' : 'none';
+    ring.style.display = active ? 'block' : 'none';
   }
-  // Auto-fit camera when first nodes appear
-  if (nodeCount > 0 && nodeCount <= 5) fitBgCamera();
-  if (ringTxt) {
-    ringTxt.innerHTML = `${done.toLocaleString()} analyzed<br>${seen.toLocaleString()} discovered<br>${queued.toLocaleString()} queued`;
-  }
-  if (overlay) {
-    overlay.textContent = active
-      ? `Crawl ${data.crawl_id || ''} · ${pct}% · ${eta ? '~'+formatETA(eta)+' remaining' : 'running...'}`
-      : '';
-  }
-  // Hide empty state once crawl starts
+  if (rStat) rStat.textContent = `Crawling ${data.crawl_id || ''}`;
+  if (rDet)  rDet.innerHTML = `${done.toLocaleString()} analyzed · ${seen.toLocaleString()} discovered · ${queued.toLocaleString()} queued${eta ? ' · ~'+formatETA(eta)+' left' : ''}`;
+
   if (active && empty) empty.style.display = 'none';
+  if (nodeCount > 0 && nodeCount <= 5) fitBgCamera();
+
+  // Bounce the ghost while crawling
+  if (active) bounceGhost();
 }
+
+let bgGhostTimer = null;
+function bounceGhost() {
+  const ghost = document.getElementById('bgGhost');
+  if (!ghost || bgGhostTimer) return;
+  function move() {
+    if (!ghost) return;
+    const container = ghost.parentElement;
+    if (!container) return;
+    const w = container.offsetWidth  || 800;
+    const h = container.offsetHeight || 600;
+    const x = 60 + Math.random() * (w - 120);
+    const y = 60 + Math.random() * (h - 120);
+    ghost.style.left = x + 'px';
+    ghost.style.top  = y + 'px';
+    bgGhostTimer = setTimeout(() => {
+      bgGhostTimer = null;
+      const ringEl = document.getElementById('bgCrawlProgress');
+      if (ringEl && ringEl.style.display !== 'none') move();
+    }, 1400);
+  }
+  move();
+}
+
 
 async function cancelCrawl() {
   if (!bgCrawlId) return;
@@ -3874,12 +4193,14 @@ function colorBgGraph(mode) {
 function clearBgGraph() {
   bgCanvasNodes = []; bgNodeData = {}; bgSeen = new Set(); bgLastSeen = 0;
   bgCamera = {x:0, y:0, zoom:1};
-  renderBgCanvas();
+  bgTableData = []; bgRecentDomains = []; bgRateHistory = []; bgLastDoneCount = 0;
+  if (bgCanvas) renderBgCanvas();
   updateBgStats();
+  renderBgTable();
+  const ticker = document.getElementById('bgTicker');
+  if (ticker) ticker.textContent = '—';
   const empty = document.getElementById('bgGraphEmpty');
   if (empty) empty.style.display = '';
-  const ring = document.getElementById('bgCrawlProgress');
-  if (ring) ring.style.display = 'none';
 }
 
 // ── RECORDING ─────────────────────────────────────────────────────────────────
@@ -4076,28 +4397,152 @@ document.addEventListener('keydown', e => {
         </div>
       </div>
     </div>
-    <div style="flex:1;position:relative;overflow:hidden;
-      background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.02) 0%,transparent 70%),var(--bg);">
-      <div id="bgSigmaContainer" style="width:100%;height:100%;"></div>
-      <div id="bgGraphEmpty" style="position:absolute;inset:0;display:flex;
-        flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;">
-        <div style="font-size:48px;opacity:.06;">◎</div>
-        <div style="font-family:var(--mono);font-size:11px;color:var(--dim);
-          text-align:center;line-height:2.2;max-width:400px;">
-          Enter a seed domain → <strong style="color:var(--muted)">▶ Start Crawl</strong><br>
-          Follows SSL SANs · Shared IPs · Nameservers — recursively<br>
-          Cap: 500,000 domains · Runs while laptop sleeps<br>
-          <span style="color:rgba(78,201,148,.4)">Nodes appear live as the server crawls</span>
+    <div id="bgRightPanel" style="flex:1;display:flex;flex-direction:column;overflow:hidden;
+      background:var(--bg);">
+
+      <!-- HERO STRIP — always visible, always animated when crawling -->
+      <div id="bgHeroStrip" style="flex-shrink:0;background:linear-gradient(180deg,var(--bg2) 0%,var(--bg) 100%);
+        border-bottom:1px solid rgba(78,201,148,.2);padding:14px 20px;
+        display:flex;align-items:center;gap:24px;flex-wrap:wrap;">
+
+        <!-- Left: Status + pulse -->
+        <div style="display:flex;align-items:center;gap:10px;min-width:140px;">
+          <div id="bgPulseDot" style="width:10px;height:10px;border-radius:50%;
+            background:rgba(78,201,148,.3);transition:background .3s;"></div>
+          <div>
+            <div id="bgHeroStatus" style="font-family:var(--mono);font-size:9px;
+              text-transform:uppercase;letter-spacing:.20em;color:var(--dim);">Idle</div>
+            <div id="bgHeroSubtitle" style="font-family:var(--mono);font-size:9px;
+              color:rgba(255,255,255,.3);margin-top:3px;">Click Start to begin</div>
+          </div>
+        </div>
+
+        <!-- Counters with smooth count-up -->
+        <div style="display:flex;gap:18px;flex-wrap:wrap;">
+          <div style="text-align:center;">
+            <div id="bgCountAnalyzed" style="font-family:var(--mono);font-size:24px;
+              font-weight:600;color:var(--gold2);line-height:1;">0</div>
+            <div style="font-family:var(--mono);font-size:8px;text-transform:uppercase;
+              letter-spacing:.16em;color:var(--dim);margin-top:4px;">Analyzed</div>
+          </div>
+          <div style="text-align:center;">
+            <div id="bgCountDiscovered" style="font-family:var(--mono);font-size:24px;
+              font-weight:600;color:var(--green);line-height:1;">0</div>
+            <div style="font-family:var(--mono);font-size:8px;text-transform:uppercase;
+              letter-spacing:.16em;color:var(--dim);margin-top:4px;">Discovered</div>
+          </div>
+          <div style="text-align:center;">
+            <div id="bgCountQueued" style="font-family:var(--mono);font-size:24px;
+              font-weight:600;color:var(--muted);line-height:1;">0</div>
+            <div style="font-family:var(--mono);font-size:8px;text-transform:uppercase;
+              letter-spacing:.16em;color:var(--dim);margin-top:4px;">Queued</div>
+          </div>
+        </div>
+
+        <!-- Sparkline showing rate of discovery -->
+        <div style="flex:1;min-width:160px;">
+          <div style="font-family:var(--mono);font-size:8px;text-transform:uppercase;
+            letter-spacing:.16em;color:var(--dim);margin-bottom:4px;">Rate · last 60s</div>
+          <canvas id="bgSparkline" width="200" height="32"
+            style="width:100%;height:32px;display:block;"></canvas>
+        </div>
+
+        <!-- Live ticker showing recently found domains -->
+        <div style="flex:2;min-width:240px;max-width:500px;overflow:hidden;
+          border-left:1px solid rgba(255,255,255,.06);padding-left:18px;">
+          <div style="font-family:var(--mono);font-size:8px;text-transform:uppercase;
+            letter-spacing:.16em;color:var(--dim);margin-bottom:4px;">Latest finds</div>
+          <div id="bgTicker" style="font-family:var(--mono);font-size:11px;
+            color:var(--gold2);overflow:hidden;white-space:nowrap;
+            text-overflow:ellipsis;line-height:1.7;height:36px;">—</div>
+        </div>
+
+        <!-- View toggle -->
+        <div style="display:flex;gap:0;border:1px solid var(--border);">
+          <button id="bgViewTableBtn" onclick="switchBgView('table')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.12em;background:rgba(200,169,110,.15);color:var(--gold);
+            border:none;padding:8px 14px;cursor:pointer;border-right:1px solid var(--border);">
+            ☰ Table
+          </button>
+          <button id="bgViewGraphBtn" onclick="switchBgView('graph')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.12em;background:transparent;color:var(--dim);
+            border:none;padding:8px 14px;cursor:pointer;">
+            ◎ Graph
+          </button>
         </div>
       </div>
-      <div style="position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:10px;
-        color:var(--dim);background:rgba(5,5,5,.85);padding:5px 12px;border:1px solid var(--border);">
-        <span id="bgNodeCount">0</span> nodes · <span id="bgEdgeCount">0</span> edges
+
+      <!-- TABLE VIEW (default) -->
+      <div id="bgTableView" style="flex:1;overflow:hidden;display:flex;flex-direction:column;">
+        <!-- Table filters -->
+        <div style="padding:10px 18px;border-bottom:1px solid var(--border);
+          background:var(--bg2);display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <input id="bgTableFilter" placeholder="Filter by domain, ASN, country, IP…"
+            oninput="renderBgTable()"
+            style="flex:1;min-width:200px;background:var(--bg3);border:1px solid var(--border);
+            outline:none;font-family:var(--mono);font-size:11px;color:var(--text);
+            padding:7px 11px;">
+          <select id="bgTableSort" onchange="renderBgTable()"
+            style="background:var(--bg3);border:1px solid var(--border);
+            font-family:var(--mono);font-size:10px;color:var(--muted);
+            padding:6px 10px;outline:none;">
+            <option value="newest">Newest first</option>
+            <option value="oldest">Oldest first</option>
+            <option value="asn">By ASN</option>
+            <option value="country">By Country</option>
+            <option value="domain">By Domain</option>
+          </select>
+          <span id="bgTableCount" style="font-family:var(--mono);font-size:10px;
+            color:var(--dim);">0 results</span>
+        </div>
+        <!-- Table header -->
+        <div style="display:grid;grid-template-columns:30px 1fr 100px 50px 120px 60px;
+          gap:10px;padding:8px 18px;background:var(--bg3);
+          border-bottom:1px solid var(--border);font-family:var(--mono);font-size:8px;
+          text-transform:uppercase;letter-spacing:.14em;color:var(--dim);
+          flex-shrink:0;align-items:center;">
+          <div>#</div>
+          <div>Domain</div>
+          <div>ASN</div>
+          <div>CC</div>
+          <div>IP</div>
+          <div>Depth</div>
+        </div>
+        <!-- Scrollable table body -->
+        <div id="bgTableBody" style="flex:1;overflow-y:auto;font-family:var(--mono);
+          font-size:11px;">
+          <div style="padding:30px;text-align:center;color:var(--dim);
+            font-family:var(--mono);font-size:11px;">
+            Run a crawl to see results here
+          </div>
+        </div>
       </div>
-      <div id="bgTooltip" style="display:none;position:absolute;background:var(--bg3);
-        border:1px solid var(--border);padding:8px 12px;font-family:var(--mono);font-size:10px;
-        color:var(--muted);pointer-events:none;z-index:100;
-        box-shadow:0 8px 32px rgba(0,0,0,.7);max-width:240px;line-height:1.8;"></div>
+
+      <!-- GRAPH VIEW (toggleable) -->
+      <div id="bgGraphView" style="display:none;flex:1;position:relative;overflow:hidden;
+        background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.02) 0%,transparent 70%),var(--bg);">
+        <div id="bgSigmaContainer" style="width:100%;height:100%;"></div>
+        <div id="bgGraphEmpty" style="position:absolute;inset:0;display:flex;
+          flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;">
+          <div style="font-size:48px;opacity:.06;">◎</div>
+          <div style="font-family:var(--mono);font-size:11px;color:var(--dim);
+            text-align:center;line-height:2.2;max-width:400px;">
+            Graph view — same data, visual shape<br>
+            <span style="color:rgba(78,201,148,.4)">Nodes appear here when crawl produces results</span>
+          </div>
+        </div>
+        <div style="position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:10px;
+          color:var(--dim);background:rgba(5,5,5,.85);padding:5px 12px;border:1px solid var(--border);">
+          <span id="bgNodeCount">0</span> nodes · <span id="bgEdgeCount">0</span> edges
+        </div>
+        <div id="bgTooltip" style="display:none;position:absolute;background:var(--bg3);
+          border:1px solid var(--border);padding:8px 12px;font-family:var(--mono);font-size:10px;
+          color:var(--muted);pointer-events:none;z-index:100;
+          box-shadow:0 8px 32px rgba(0,0,0,.7);max-width:240px;line-height:1.8;"></div>
+      </div>
+
     </div>
   </div>
 </div>
