@@ -1950,6 +1950,62 @@ def _discover_neighbors(domain, triage_result):
 
 # ── Crawl routes ───────────────────────────────────────────────────────────────
 
+
+@network_bp.route("/test-discovery", methods=["GET"])
+def test_discovery():
+    """Debug: test all discovery methods for a domain."""
+    domain = request.args.get("domain", "cgtn.com")
+    result = {"domain": domain, "methods": {}}
+
+    # IP
+    ip_res = resolve_ip(domain)
+    ip = ip_res.get("ip")
+    result["ip"] = ip
+
+    # SSL SANs
+    try:
+        sans = get_ssl_sans(domain)
+        result["methods"]["ssl_sans"] = {"count": len(sans), "sample": sans[:5]}
+    except Exception as e:
+        result["methods"]["ssl_sans"] = {"error": str(e)}
+
+    # Reverse IP
+    try:
+        rip = get_reverse_ip(ip) if ip else []
+        result["methods"]["reverse_ip"] = {"count": len(rip), "sample": rip[:5]}
+    except Exception as e:
+        result["methods"]["reverse_ip"] = {"error": str(e)}
+
+    # HackerTarget hostsearch
+    try:
+        r = requests.get(f"https://api.hackertarget.com/hostsearch/?q={domain}",
+                        headers=HEADERS, timeout=8)
+        lines = [l for l in r.text.strip().split("\n") if "," in l]
+        result["methods"]["hackertarget_hostsearch"] = {
+            "status": r.status_code,
+            "count": len(lines),
+            "sample": lines[:5]
+        }
+    except Exception as e:
+        result["methods"]["hackertarget_hostsearch"] = {"error": str(e)}
+
+    # WHOIS nameservers
+    try:
+        whois = get_rdap_whois(domain)
+        ns = whois.get("nameservers", [])
+        result["methods"]["nameservers"] = ns[:4]
+        if ns:
+            ns_result = _hackertarget_nameserver_lookup(ns[0])
+            result["methods"]["nameserver_lookup"] = {
+                "ns": ns[0], "count": len(ns_result), "sample": ns_result[:5]
+            }
+    except Exception as e:
+        result["methods"]["nameservers"] = {"error": str(e)}
+
+    resp = jsonify(result)
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
 @network_bp.route("/crawl/start", methods=["POST", "OPTIONS"])
 def crawl_start():
     """Start a recursive background crawl from a seed domain."""
