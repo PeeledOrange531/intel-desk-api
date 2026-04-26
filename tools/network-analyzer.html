@@ -3605,7 +3605,10 @@ async function pollCrawl(crawlId) {
       showHint(`Crawl ${crawlId} ${data.status} — ${data.done.toLocaleString()} domains mapped`);
     }
   } catch(err) {
-    console.warn('Poll error:', err.message);
+    // Ignore parse errors — server may be restarting
+    if (!err.message.includes('JSON') && !err.message.includes('token')) {
+      console.warn('Poll error:', err.message);
+    }
   }
 }
 
