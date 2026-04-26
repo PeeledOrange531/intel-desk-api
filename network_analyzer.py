@@ -1660,6 +1660,40 @@ def _count_crawl_results(crawl_id):
     except: return 0
 
 
+
+def _triage_domain(domain: str, dns_only: bool = False) -> dict:
+    """
+    Fast triage — IP + ASN only. No WHOIS, no SSL, no scraping.
+    dns_only=True: just DNS resolution, no ipinfo (faster, no rate limits)
+    dns_only=False: IP + ASN via ipinfo (~2s per domain)
+    """
+    domain = clean_domain(domain)
+    result = {
+        "domain":  domain,
+        "ip":      None,
+        "asn":     None,
+        "org":     None,
+        "country": None,
+        "error":   None,
+    }
+    try:
+        ip_res = resolve_ip(domain)
+        ip = ip_res.get("ip")
+        result["ip"] = ip
+        if ip and not dns_only:
+            asn_info = get_asn_info(ip)
+            result["asn"]     = asn_info.get("asn", "")
+            result["org"]     = asn_info.get("org", "")
+            result["country"] = asn_info.get("country", "")
+        elif ip and dns_only:
+            # DNS-only: just store IP, skip ASN lookup
+            result["asn"]     = ""
+            result["org"]     = ""
+            result["country"] = ""
+    except Exception as e:
+        result["error"] = str(e)[:80]
+    return result
+
 def _run_crawl(crawl_id):
     """
     Recursive network crawler.
