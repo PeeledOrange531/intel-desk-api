@@ -1944,6 +1944,7 @@ def _discover_neighbors(domain, triage_result):
             seen_local.add(n)
             cleaned.append(n)
 
+    logger.info(f"_discover_neighbors({domain}): found {len(cleaned)} neighbors")
     return cleaned[:60]
 
 
@@ -2032,18 +2033,9 @@ def crawl_status(crawl_id):
                     _crawls[crawl_id] = crawl
                 logger.info(f"Restored crawl {crawl_id} from disk")
                 # If it was running when server died, resume it
-                if crawl.get('status') in ('running', 'queued', 'resuming'):
-                    with _crawls_lock:
-                        already = crawl_id in _crawl_threads
-                    if not already:
-                        _crawl_threads.add(crawl_id)
-                        crawl['status'] = 'running'
-                        _save_crawl_meta(crawl_id)
-                        t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
-                        t.start()
-                        logger.info(f"Auto-resumed crawl {crawl_id}")
-                    else:
-                        logger.info(f"Crawl {crawl_id} already has active thread — skipping auto-resume")
+                # Don't auto-resume — client must explicitly resume
+                # Auto-resume was causing duplicate threads and early termination
+                logger.info(f"Crawl {crawl_id} restored from disk (status={crawl.get('status')}) — waiting for client resume")
             except Exception as e:
                 logger.warning(f"Could not restore crawl {crawl_id}: {e}")
 
