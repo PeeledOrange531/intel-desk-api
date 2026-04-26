@@ -809,6 +809,23 @@ def check_database(domain: str) -> dict:
     Check against state media registry (all countries, neutral).
     Returns tier, nation, name, source.
     """
+    # Restore any interrupted crawls on first ping
+    if not hasattr(ping, '_initialized'):
+        ping._initialized = True
+        try:
+            import glob as _glob
+            for mf in _glob.glob(os.path.join(CRAWL_DIR, 'crawl_*_meta.json')):
+                try:
+                    with open(mf) as _f:
+                        _c = json.load(_f)
+                    _cid = _c.get('id')
+                    if _cid and _c.get('status') in ('running','queued','resuming'):
+                        with _crawls_lock:
+                            _crawls[_cid] = _c
+                        threading.Thread(target=_run_crawl, args=(_cid,), daemon=True).start()
+                        logger.info(f"Ping: restored crawl {_cid}")
+                except Exception: pass
+        except Exception: pass
     registry = NET_DB.get("state_media_registry", {})
 
     # Direct match
@@ -852,6 +869,23 @@ def check_database(domain: str) -> dict:
 
 
 def find_san_overlap(sans: list) -> list:
+    # Restore any interrupted crawls on first ping
+    if not hasattr(ping, '_initialized'):
+        ping._initialized = True
+        try:
+            import glob as _glob
+            for mf in _glob.glob(os.path.join(CRAWL_DIR, 'crawl_*_meta.json')):
+                try:
+                    with open(mf) as _f:
+                        _c = json.load(_f)
+                    _cid = _c.get('id')
+                    if _cid and _c.get('status') in ('running','queued','resuming'):
+                        with _crawls_lock:
+                            _crawls[_cid] = _c
+                        threading.Thread(target=_run_crawl, args=(_cid,), daemon=True).start()
+                        logger.info(f"Ping: restored crawl {_cid}")
+                except Exception: pass
+        except Exception: pass
     registry = NET_DB.get("state_media_registry", {})
     known    = set(registry.keys())
     for aff in NET_DB.get("covert_affiliates", []):
@@ -860,6 +894,23 @@ def find_san_overlap(sans: list) -> list:
 
 
 def find_rip_overlap(neighbors: list) -> list:
+    # Restore any interrupted crawls on first ping
+    if not hasattr(ping, '_initialized'):
+        ping._initialized = True
+        try:
+            import glob as _glob
+            for mf in _glob.glob(os.path.join(CRAWL_DIR, 'crawl_*_meta.json')):
+                try:
+                    with open(mf) as _f:
+                        _c = json.load(_f)
+                    _cid = _c.get('id')
+                    if _cid and _c.get('status') in ('running','queued','resuming'):
+                        with _crawls_lock:
+                            _crawls[_cid] = _c
+                        threading.Thread(target=_run_crawl, args=(_cid,), daemon=True).start()
+                        logger.info(f"Ping: restored crawl {_cid}")
+                except Exception: pass
+        except Exception: pass
     registry = NET_DB.get("state_media_registry", {})
     known    = set(registry.keys())
     return [n for n in neighbors if any(n == k or n.endswith("." + k) for k in known)]
@@ -1004,10 +1055,23 @@ def _corsify(r):
 
 @network_bp.route("/ping", methods=["GET"])
 def ping():
-    # Load persisted jobs on first ping (startup)
+    # Restore any interrupted crawls on first ping
     if not hasattr(ping, '_initialized'):
         ping._initialized = True
-        _load_jobs_meta()
+        try:
+            import glob as _glob
+            for mf in _glob.glob(os.path.join(CRAWL_DIR, 'crawl_*_meta.json')):
+                try:
+                    with open(mf) as _f:
+                        _c = json.load(_f)
+                    _cid = _c.get('id')
+                    if _cid and _c.get('status') in ('running','queued','resuming'):
+                        with _crawls_lock:
+                            _crawls[_cid] = _c
+                        threading.Thread(target=_run_crawl, args=(_cid,), daemon=True).start()
+                        logger.info(f"Ping: restored crawl {_cid}")
+                except Exception: pass
+        except Exception: pass
     registry = NET_DB.get("state_media_registry", {})
 
     # Test external API reachability
