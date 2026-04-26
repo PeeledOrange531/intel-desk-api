@@ -3466,12 +3466,28 @@ function initBgCanvas(container) {
 
 function renderBgCanvas() {
   if (!bgCtx || !bgCanvas) return;
-  const W = bgCanvas.width, H = bgCanvas.height;
+  const W = bgCanvas.width || bgCanvas.offsetWidth;
+  const H = bgCanvas.height || bgCanvas.offsetHeight;
+  if (!W || !H) return;
   bgCtx.fillStyle = '#050505';
-  bgCtx.fillRect(0,0,W,H);
+  bgCtx.fillRect(0, 0, W, H);
+  // Find bounds of all nodes for auto-fit
+  if (bgCanvasNodes.length === 0) return;
+  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
   bgCanvasNodes.forEach(n => {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  });
+  const rangeX = (maxX - minX) || 1;
+  const rangeY = (maxY - minY) || 1;
+  const pad = 40;
+  bgCanvasNodes.forEach(n => {
+    const px = pad + ((n.x - minX) / rangeX) * (W - pad*2);
+    const py = pad + ((n.y - minY) / rangeY) * (H - pad*2);
     bgCtx.beginPath();
-    bgCtx.arc(n.x*W, n.y*H, 2, 0, Math.PI*2);
+    bgCtx.arc(px, py, n.size || 3, 0, Math.PI*2);
     bgCtx.fillStyle = n.color || '#4ec994';
     bgCtx.fill();
   });
