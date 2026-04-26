@@ -185,6 +185,72 @@ def get_ssl_sans(domain: str) -> list:
     except Exception as e:
         logger.debug(f"hackertarget hostsearch error for {domain}: {e}")
 
+    # Method 3b: AlienVault OTX passive DNS (no key, no rate limit)
+    try:
+        r3b = requests.get(
+            f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns",
+            headers=HEADERS, timeout=10
+        )
+        if r3b.status_code == 200:
+            data = r3b.json()
+            for rec in data.get('passive_dns', [])[:200]:
+                h = rec.get('hostname', '').strip().lower()
+                if h and h != domain and '.' in h and not h.startswith('www.'):
+                    sans.add(h)
+    except Exception as e:
+        logger.debug(f"OTX error for {domain}: {e}")
+
+    # Method 3c: URLScan.io domain search
+    try:
+        r3c = requests.get(
+            f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=100",
+            headers=HEADERS, timeout=10
+        )
+        if r3c.status_code == 200:
+            data = r3c.json()
+            for result in data.get('results', [])[:100]:
+                page = result.get('page', {})
+                d = page.get('domain', '').strip().lower()
+                if d and d != domain and '.' in d:
+                    sans.add(d)
+                # Also check task domain
+                task = result.get('task', {})
+                td = task.get('domain', '').strip().lower()
+                if td and td != domain and '.' in td:
+                    sans.add(td)
+    except Exception as e:
+        logger.debug(f"URLScan error for {domain}: {e}")
+
+    # Method 3d: ThreatMiner subdomains
+    try:
+        r3d = requests.get(
+            f"https://api.threatminer.org/v2/domain.php?q={domain}&rt=5",
+            headers=HEADERS, timeout=10
+        )
+        if r3d.status_code == 200:
+            data = r3d.json()
+            for sub in data.get('results', [])[:200]:
+                sub = sub.strip().lower()
+                if sub and sub != domain and '.' in sub:
+                    sans.add(sub)
+    except Exception as e:
+        logger.debug(f"ThreatMiner error for {domain}: {e}")
+
+    # Method 3e: Direct SSL handshake — get the actual cert SANs
+    try:
+        import ssl as ssl_lib
+        ctx = ssl_lib.create_default_context()
+        with socket.create_connection((domain, 443), timeout=6) as sock:
+            with ctx.wrap_socket(sock, server_hostname=domain) as ssock:
+                cert = ssock.getpeercert()
+                for typ, val in cert.get('subjectAltName', []):
+                    if typ == 'DNS':
+                        v = val.strip().lstrip('*.').lower()
+                        if v and v != domain and '.' in v:
+                            sans.add(v)
+    except Exception as e:
+        logger.debug(f"SSL handshake error for {domain}: {e}")
+
     # Method 4: DNS brute-force common subdomains
     common = [
         "www","en","es","fr","ar","ru","de","pt","it","ja","ko","zh",
@@ -1982,12 +2048,54 @@ def test_discovery():
                         headers=HEADERS, timeout=8)
         lines = [l for l in r.text.strip().split("\n") if "," in l]
         result["methods"]["hackertarget_hostsearch"] = {
-            "status": r.status_code,
-            "count": len(lines),
-            "sample": lines[:5]
+            "status": r.status_code, "count": len(lines), "sample": lines[:5]
         }
     except Exception as e:
         result["methods"]["hackertarget_hostsearch"] = {"error": str(e)}
+
+    # AlienVault OTX
+    try:
+        r = requests.get(f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns",
+                        headers=HEADERS, timeout=10)
+        result["methods"]["otx"] = {"status": r.status_code}
+        if r.status_code == 200:
+            data = r.json()
+            recs = data.get('passive_dns', [])
+            domains_found = set(rec.get('hostname','') for rec in recs if rec.get('hostname'))
+            result["methods"]["otx"]["count"] = len(domains_found)
+            result["methods"]["otx"]["sample"] = list(domains_found)[:5]
+    except Exception as e:
+        result["methods"]["otx"] = {"error": str(e)}
+
+    # URLScan
+    try:
+        r = requests.get(f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=50",
+                        headers=HEADERS, timeout=10)
+        result["methods"]["urlscan"] = {"status": r.status_code}
+        if r.status_code == 200:
+            data = r.json()
+            results = data.get('results', [])
+            domains_found = set()
+            for res in results:
+                d = res.get('page', {}).get('domain', '')
+                if d: domains_found.add(d)
+            result["methods"]["urlscan"]["count"] = len(domains_found)
+            result["methods"]["urlscan"]["sample"] = list(domains_found)[:5]
+    except Exception as e:
+        result["methods"]["urlscan"] = {"error": str(e)}
+
+    # ThreatMiner
+    try:
+        r = requests.get(f"https://api.threatminer.org/v2/domain.php?q={domain}&rt=5",
+                        headers=HEADERS, timeout=10)
+        result["methods"]["threatminer"] = {"status": r.status_code}
+        if r.status_code == 200:
+            data = r.json()
+            subs = data.get('results', [])
+            result["methods"]["threatminer"]["count"] = len(subs)
+            result["methods"]["threatminer"]["sample"] = subs[:5]
+    except Exception as e:
+        result["methods"]["threatminer"] = {"error": str(e)}
 
     # WHOIS nameservers
     try:
