@@ -3560,6 +3560,12 @@ function addBgNode(domain, data) {
   bgSeen.add(domain);
   bgNodeData[domain] = data;
 
+  // Ensure canvas is initialized
+  if (!bgCanvas || !bgCtx) {
+    const container = document.getElementById('bgSigmaContainer');
+    if (container) initBgCanvas(container);
+  }
+
   const color = bgNodeColor(data);
   const size  = isSuspiciousASN(data.asn||'', data.org||'', data.country||'') ? 5 : 2;
   const depth = data._crawl_depth || 0;
@@ -3573,8 +3579,13 @@ function addBgNode(domain, data) {
   const x     = r * Math.cos(angle) + (Math.random()-0.5) * 60;
   const y     = r * Math.sin(angle) + (Math.random()-0.5) * 60;
 
-  // Always use canvas renderer
   bgCanvasNodes.push({ id: domain, color, size, x, y });
+
+  // First node — fit camera then render
+  if (bgCanvasNodes.length === 1) {
+    bgCamera = {x: -x, y: -y, zoom: 1};
+  }
+  if (bgCanvasNodes.length <= 10) fitBgCamera();
   renderBgCanvas();
 }
 
@@ -3644,11 +3655,17 @@ async function pollCrawl(crawlId) {
     // Add new nodes to graph
     const results = data.results || [];
     let added = 0;
+    if (results.length > 0) {
+      console.log(`Poll: got ${results.length} results, first:`, results[0]);
+    }
     for (const r of results) {
       if (r.domain && !r.error) {
         addBgNode(r.domain, r);
         added++;
       }
+    }
+    if (results.length > 0 && added === 0) {
+      console.warn('Poll got results but added 0 nodes — all had errors:', results.slice(0,3));
     }
     // Always advance offset regardless of errors
     if (results.length > 0) {
