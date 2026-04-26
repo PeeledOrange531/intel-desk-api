@@ -127,16 +127,18 @@ def get_asn_info(ip: str) -> dict:
 
 def get_ssl_sans(domain: str) -> list:
     """
-    Fetch SSL certificate SANs. Tries crt.sh first, falls back to
-    certspotter if crt.sh fails or returns 502.
+    Fetch SSL certificate SANs via multiple sources with fallback chain.
     """
     sans = set()
 
-    # Method 1: crt.sh — retry once on 502
+    # Method 1: crt.sh — direct requests to handle non-200 without exception
     for attempt in range(2):
-        r = safe_get(f"https://crt.sh/?q=%25.{domain}&output=json", timeout=CRT_TIMEOUT)
-        if r and r.status_code == 200:
-            try:
+        try:
+            r = requests.get(
+                f"https://crt.sh/?q=%25.{domain}&output=json",
+                headers=HEADERS, timeout=CRT_TIMEOUT, allow_redirects=True
+            )
+            if r.status_code == 200:
                 certs = r.json()
                 for cert in certs[:60]:
                     for name in cert.get("name_value", "").split("\n"):
@@ -145,42 +147,61 @@ def get_ssl_sans(domain: str) -> list:
                             sans.add(name)
                 if sans:
                     return sorted(sans)[:100]
-            except Exception:
-                pass
-        elif r and r.status_code == 502:
-            time.sleep(1)  # brief pause before retry
-            continue
+            elif r.status_code in (429, 503):
+                time.sleep(2)
+                continue
+        except Exception as e:
+            logger.debug(f"crt.sh error for {domain}: {e}")
         break
 
-    # Method 2: certspotter (100 req/hr free, no key)
-    if not sans:
+    # Method 2: certspotter
+    try:
+        r2 = requests.get(
+            f"https://api.certspotter.com/v1/issuances?domain={domain}"
+            f"&include_subdomains=true&expand=dns_names",
+            headers=HEADERS, timeout=10
+        )
+        if r2.status_code == 200:
+            for cert in r2.json():
+                for name in cert.get("dns_names", []):
+                    name = name.strip().lstrip("*.")
+                    if name and "." in name and name != domain:
+                        sans.add(name)
+    except Exception as e:
+        logger.debug(f"certspotter error for {domain}: {e}")
+
+    # Method 3: HackerTarget subdomain search
+    try:
+        r3 = requests.get(
+            f"https://api.hackertarget.com/hostsearch/?q={domain}",
+            headers=HEADERS, timeout=8
+        )
+        if r3.status_code == 200 and "error" not in r3.text.lower():
+            for line in r3.text.strip().split("\n"):
+                if "," in line:
+                    sub = line.split(",")[0].strip()
+                    if sub and sub != domain and "." in sub:
+                        sans.add(sub)
+    except Exception as e:
+        logger.debug(f"hackertarget hostsearch error for {domain}: {e}")
+
+    # Method 4: DNS brute-force common subdomains
+    common = [
+        "www","en","es","fr","ar","ru","de","pt","it","ja","ko","zh",
+        "africa","america","europe","asia","mideast","latin",
+        "news","live","radio","tv","video","audio","app","mobile","m",
+        "api","cdn","static","media","img","images","files","assets",
+        "mail","ftp","vpn","admin","blog","shop","staging","dev","beta",
+    ]
+    for sub in common:
         try:
-            r2 = safe_get(
-                f"https://api.certspotter.com/v1/issuances?domain={domain}"
-                f"&include_subdomains=true&expand=dns_names",
-                timeout=10
-            )
-            if r2 and r2.status_code == 200:
-                for cert in r2.json():
-                    for name in cert.get("dns_names", []):
-                        name = name.strip().lstrip("*.")
-                        if name and "." in name and name != domain:
-                            sans.add(name)
+            socket.gethostbyname(f"{sub}.{domain}")
+            sans.add(f"{sub}.{domain}")
         except Exception:
             pass
 
-    # Method 3: DNS brute-force common subdomains as last resort
-    if not sans:
-        common = ["www","mail","ftp","api","cdn","static","media","img","images",
-                  "news","en","es","fr","de","ru","ar","app","mobile","m"]
-        for sub in common:
-            try:
-                socket.gethostbyname(f"{sub}.{domain}")
-                sans.add(f"{sub}.{domain}")
-            except Exception:
-                pass
-
     return sorted(sans)[:100]
+
 
 
 def get_rdap_whois(domain: str) -> dict:
