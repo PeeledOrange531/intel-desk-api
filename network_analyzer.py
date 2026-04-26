@@ -1669,14 +1669,35 @@ def _run_crawl(crawl_id):
     with _crawls_lock:
         crawl = _crawls.get(crawl_id)
         if not crawl: return
+        if crawl.get('status') not in ('queued','running','resuming'): return
         crawl['status'] = 'running'
 
-    seed       = crawl.get('seed', '')
-    max_doms   = crawl.get('max_domains', MAX_DOMAINS)
-    triage_only= crawl.get('triage_only', True)
-    seen       = set()   # domains already queued or processed
-    queue      = deque([seed])
+    seed        = crawl.get('seed', '')
+    max_doms    = crawl.get('max_domains', MAX_DOMAINS)
+    triage_only = crawl.get('triage_only', True)
+
+    # Restore already-processed domains from results file (handles resume)
+    seen  = set()
+    count = _count_crawl_results(crawl_id)
+    if count > 0:
+        logger.info(f"Resuming crawl {crawl_id} — restoring {count} already-processed domains")
+        try:
+            results = _read_crawl_results(crawl_id, offset=0, limit=count)
+            for r in results:
+                if r.get('domain'):
+                    seen.add(r['domain'])
+        except Exception as e:
+            logger.warning(f"Could not restore seen set: {e}")
+
+    # Start queue from seed if not already seen
+    queue = deque()
+    if seed not in seen:
+        queue.append(seed)
     seen.add(seed)
+
+    # If queue is empty after restore, we're done
+    if not queue and not seen:
+        queue.append(seed)
 
     logger.info(f"Crawl {crawl_id} starting from {seed}, max={max_doms}, triage={triage_only}")
 
@@ -1821,13 +1842,25 @@ def crawl_start():
         "error":       None,
     }
 
+    # Save to disk FIRST — before thread starts — so restart can recover
     with _crawls_lock:
         _crawls[crawl_id] = crawl
+
+    # Save domains list separately (can be large)
+    try:
+        domains_path = os.path.join(CRAWL_DIR, f'crawl_{crawl_id}_domains.json')
+        with open(domains_path, 'w') as f:
+            json.dump([seed], f)  # seed is the starting point
+    except Exception as e:
+        logger.warning(f"Could not save crawl domains: {e}")
+
     _save_crawl_meta(crawl_id)
 
     # Start in background thread
     t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
+    t.daemon = True
     t.start()
+    logger.info(f"Started crawl thread for {crawl_id}")
 
     resp = jsonify({
         "crawl_id":    crawl_id,
@@ -1847,7 +1880,7 @@ def crawl_status(crawl_id):
         crawl = _crawls.get(crawl_id)
 
     if not crawl:
-        # Try loading from disk
+        # Try loading from disk — handles server restarts
         meta_path = _crawl_meta_path(crawl_id)
         if os.path.exists(meta_path):
             try:
@@ -1855,8 +1888,16 @@ def crawl_status(crawl_id):
                     crawl = json.load(f)
                 with _crawls_lock:
                     _crawls[crawl_id] = crawl
-            except Exception:
-                pass
+                logger.info(f"Restored crawl {crawl_id} from disk")
+                # If it was running when server died, resume it
+                if crawl.get('status') in ('running', 'queued'):
+                    crawl['status'] = 'resuming'
+                    _save_crawl_meta(crawl_id)
+                    t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
+                    t.start()
+                    logger.info(f"Auto-resumed crawl {crawl_id}")
+            except Exception as e:
+                logger.warning(f"Could not restore crawl {crawl_id}: {e}")
 
     if not crawl:
         resp = jsonify({"error": "crawl not found"})
