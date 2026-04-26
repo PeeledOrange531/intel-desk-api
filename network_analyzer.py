@@ -1669,8 +1669,9 @@ from datetime import datetime
 from collections import deque
 
 # Crawl store — persisted to disk
-_crawls      = {}        # crawl_id → metadata dict
-_crawls_lock = threading.Lock()
+_crawls        = {}        # crawl_id → metadata dict
+_crawls_lock   = threading.Lock()
+_crawl_threads = set()  # crawl_ids with active threads — prevents double-start
 CRAWL_DIR    = '/tmp'
 MAX_DOMAINS  = 500_000
 
@@ -1813,6 +1814,7 @@ def _run_crawl(crawl_id):
 
             domain = queue.popleft()
 
+            logger.info(f"Crawl {crawl_id}: processing {domain} ({len(seen)} seen, {len(queue)} queued)")
             # Triage: fast IP + ASN only
             if triage_only:
                 result = _triage_domain(domain, dns_only=False)
@@ -1859,42 +1861,55 @@ def _run_crawl(crawl_id):
                 c['status'] = 'error'
                 c['error']  = str(e)
         _save_crawl_meta(crawl_id)
+    finally:
+        # Always remove from active thread set
+        _crawl_threads.discard(crawl_id)
 
 
 def _discover_neighbors(domain, triage_result):
     """
-    Given a triage/analysis result, find neighboring domains to expand.
-    Uses SSL SANs, reverse IP, and nameserver lookups.
+    Find neighboring domains — runs all lookups in parallel with a hard timeout.
     """
-    neighbors = []
     ip = triage_result.get('ip')
+    neighbors = []
 
-    # SSL SANs — most productive expansion signal
-    try:
-        sans = get_ssl_sans(domain)
-        neighbors.extend(sans[:30])
-    except Exception:
-        pass
-
-    # Reverse IP — find co-hosted domains
-    if ip:
+    def _safe_ssl_sans():
         try:
-            rip = get_reverse_ip(ip)
-            neighbors.extend(rip[:20])
+            return get_ssl_sans(domain)[:30]
         except Exception:
-            pass
+            return []
 
-    # Nameserver expansion — finds operationally linked domains
-    try:
-        whois_data = get_rdap_whois(domain)
-        for ns in whois_data.get('nameservers', [])[:2]:
+    def _safe_reverse_ip():
+        if not ip: return []
+        try:
+            return get_reverse_ip(ip)[:20]
+        except Exception:
+            return []
+
+    def _safe_nameservers():
+        try:
+            whois_data = get_rdap_whois(domain)
+            result = []
+            for ns in whois_data.get('nameservers', [])[:2]:
+                try:
+                    result.extend(_hackertarget_nameserver_lookup(ns)[:15])
+                except Exception:
+                    pass
+            return result
+        except Exception:
+            return []
+
+    # Run all three in parallel, hard 20-second total timeout
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        f_ssl  = ex.submit(_safe_ssl_sans)
+        f_rip  = ex.submit(_safe_reverse_ip)
+        f_ns   = ex.submit(_safe_nameservers)
+
+        for f in [f_ssl, f_rip, f_ns]:
             try:
-                ns_neighbors = _hackertarget_nameserver_lookup(ns)
-                neighbors.extend(ns_neighbors[:15])
+                neighbors.extend(f.result(timeout=20))
             except Exception:
                 pass
-    except Exception:
-        pass
 
     # Clean and deduplicate
     cleaned = []
@@ -1905,7 +1920,7 @@ def _discover_neighbors(domain, triage_result):
             seen_local.add(n)
             cleaned.append(n)
 
-    return cleaned[:60]  # cap per domain
+    return cleaned[:60]
 
 
 # ── Crawl routes ───────────────────────────────────────────────────────────────
@@ -1954,11 +1969,16 @@ def crawl_start():
 
     _save_crawl_meta(crawl_id)
 
-    # Start in background thread
-    t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
-    t.daemon = True
-    t.start()
-    logger.info(f"Started crawl thread for {crawl_id}")
+    # Start in background thread — guard against double-start
+    with _crawls_lock:
+        if crawl_id in _crawl_threads:
+            logger.info(f"Crawl {crawl_id} thread already running — skipping")
+        else:
+            _crawl_threads.add(crawl_id)
+            t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
+            t.daemon = True
+            t.start()
+            logger.info(f"Started crawl thread for {crawl_id}")
 
     resp = jsonify({
         "crawl_id":    crawl_id,
@@ -1988,12 +2008,18 @@ def crawl_status(crawl_id):
                     _crawls[crawl_id] = crawl
                 logger.info(f"Restored crawl {crawl_id} from disk")
                 # If it was running when server died, resume it
-                if crawl.get('status') in ('running', 'queued'):
-                    crawl['status'] = 'resuming'
-                    _save_crawl_meta(crawl_id)
-                    t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
-                    t.start()
-                    logger.info(f"Auto-resumed crawl {crawl_id}")
+                if crawl.get('status') in ('running', 'queued', 'resuming'):
+                    with _crawls_lock:
+                        already = crawl_id in _crawl_threads
+                    if not already:
+                        _crawl_threads.add(crawl_id)
+                        crawl['status'] = 'running'
+                        _save_crawl_meta(crawl_id)
+                        t = threading.Thread(target=_run_crawl, args=(crawl_id,), daemon=True)
+                        t.start()
+                        logger.info(f"Auto-resumed crawl {crawl_id}")
+                    else:
+                        logger.info(f"Crawl {crawl_id} already has active thread — skipping auto-resume")
             except Exception as e:
                 logger.warning(f"Could not restore crawl {crawl_id}: {e}")
 
