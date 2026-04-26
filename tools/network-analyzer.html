@@ -3508,7 +3508,7 @@ function addBgNode(domain, data) {
       id: domain, color,
       x: (x + 800) / 1600, y: (y + 800) / 1600,
     });
-    if (bgCanvasNodes.length % 200 === 0) renderBgCanvas();
+    renderBgCanvas();
   }
 }
 
@@ -3519,15 +3519,8 @@ function updateBgStats() {
   const ec = document.getElementById('bgEdgeCount');
   if (nc) nc.textContent = n.toLocaleString();
   if (ec) ec.textContent = e.toLocaleString();
-  if (n > 0) {
-    const empty = document.getElementById('bgGraphEmpty');
-    if (empty) empty.style.display = 'none';
-  }
-  // Also update stat bar with live count
-  const stat = document.getElementById('bgStat');
-  if (stat && n > 0) {
-    stat.textContent = `${n.toLocaleString()} nodes discovered`;
-  }
+  const empty = document.getElementById('bgGraphEmpty');
+  if (empty) empty.style.display = n > 0 ? 'none' : '';
 }
 
 // ── START CRAWL ───────────────────────────────────────────────────────────────
