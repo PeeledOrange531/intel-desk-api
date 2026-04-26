@@ -1017,6 +1017,28 @@ h1 em{font-style:italic;color:var(--gold);}
 </div>
 
 <script>
+
+// CRITICAL: isSuspiciousASN must be defined first since many functions depend on it
+function isSuspiciousASN(asn, org, country) {
+  const SUSPICIOUS_ASNS = new Set([
+    'AS37963','AS45090','AS55967','AS4134','AS4837',
+    'AS197695','AS8334','AS58461','AS9829','AS55960',
+    'AS37840','AS55990','AS56040','AS9808',
+  ]);
+  const SUSPICIOUS_COUNTRIES = new Set(['CN','RU','IR','KP','BY']);
+  try {
+    if (SUSPICIOUS_ASNS.has((asn||'').toUpperCase())) return true;
+    if (SUSPICIOUS_COUNTRIES.has((country||'').toUpperCase())) return true;
+    const orgLower = (org||'').toLowerCase();
+    if (orgLower.includes('alibaba') || orgLower.includes('tencent') ||
+        orgLower.includes('baidu')   || orgLower.includes('huawei')) return true;
+  } catch(e) {}
+  return false;
+}
+// Make explicitly global for safety
+window.isSuspiciousASN = isSuspiciousASN;
+
+
 // ══ CONFIG ════════════════════════════════════════════════════════════════════
 const API = 'https://intel-desk-api.onrender.com';
 
@@ -3351,6 +3373,8 @@ let bgIsRecording = false;
 let bgColorMode   = 'asn';
 const ASN_COLORS  = {};
 
+
+
 function asnColor(asn) {
   if (!ASN_COLORS[asn]) {
     let hash = 0;
@@ -3823,21 +3847,13 @@ function pushToTable(domain, data) {
     ts:      Date.now(),
   });
   // Always re-render on table view
-  if (bgCurrentView === 'table') {
-    renderBgTable();
-  } else {
-    console.log('[PUSH_TABLE] Skipping render — current view:', bgCurrentView);
-  }
+  if (bgCurrentView === 'table') renderBgTable();
 }
 
 function renderBgTable() {
   const body   = document.getElementById('bgTableBody');
   const count  = document.getElementById('bgTableCount');
-  console.log('[RENDER_TABLE] bgTableData.length:', bgTableData.length, '| body found:', !!body, '| count found:', !!count);
-  if (!body) {
-    console.warn('renderBgTable: bgTableBody element not found');
-    return;
-  }
+  if (!body) return;
 
   const filter = (document.getElementById('bgTableFilter')?.value || '').toLowerCase().trim();
   const sort   = document.getElementById('bgTableSort')?.value || 'newest';
@@ -3913,9 +3929,7 @@ function renderBgTable() {
     );
   }
 
-  const finalHtml = html.join('');
-  body.innerHTML = finalHtml;
-  console.log('[RENDER_TABLE] Set innerHTML — length:', finalHtml.length, '| body now has children:', body.children.length);
+  body.innerHTML = html.join('');
 }
 
 function bgTableRowClick(domain) {
@@ -3979,26 +3993,13 @@ async function pollCrawl(crawlId) {
     // Add new nodes — to graph AND table
     const results = data.results || [];
     let added = 0;
-    if (results.length > 0) {
-      console.log('[POLL] Got', results.length, 'results. First:', results[0]);
-      console.log('[POLL] bgTableData.length BEFORE:', bgTableData.length);
-    }
     for (const r of results) {
       if (r.domain && !r.error) {
-        try {
-          addBgNode(r.domain, r);
-        } catch(e) { console.error('[POLL] addBgNode error:', e); }
-        try {
-          pushToTable(r.domain, r);
-        } catch(e) { console.error('[POLL] pushToTable error:', e); }
-        try {
-          pushToTicker(r.domain);
-        } catch(e) { console.error('[POLL] pushToTicker error:', e); }
+        addBgNode(r.domain, r);
+        pushToTable(r.domain, r);
+        pushToTicker(r.domain);
         added++;
       }
-    }
-    if (results.length > 0) {
-      console.log('[POLL] bgTableData.length AFTER:', bgTableData.length, '— added:', added);
     }
     // Always advance offset regardless of errors
     if (results.length > 0) {
