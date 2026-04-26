@@ -828,17 +828,17 @@ h1 em{font-style:italic;color:var(--gold);}
       Need to map a full network at scale?
     </div>
     <div style="font-family:var(--mono);font-size:11px;color:var(--dim);line-height:1.7;">
-      Initiate background jobs for larger tasks — up to 500,000 domains — that run on the 
+      Start a recursive background crawl — up to 500,000 domains — that run on the 
       server while your laptop sleeps. Results render in a full-screen WebGL graph built 
       for network-scale visualization.
     </div>
   </div>
-  <button onclick="enterBulkMode()"
+  <button onclick="enterBackgroundMode()"
     style="background:rgba(78,201,148,.12);border:1px solid rgba(78,201,148,.3);
     color:var(--green);font-family:var(--mono);font-size:10px;font-weight:600;
     text-transform:uppercase;letter-spacing:.14em;padding:10px 20px;
     cursor:pointer;transition:all .2s;white-space:nowrap;flex-shrink:0;">
-    ⚙ Bulk Analysis Mode →
+    ⚙ Background Analysis Mode →
   </button>
 </div>
 
@@ -3316,751 +3316,662 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 
-// ══ BULK MODE ════════════════════════════════════════════════════════════════
-let bulkSigma       = null;
-let bulkGraph       = null;
-let bulkActivePoll  = null;
-let bulkActiveJobId = null;
-let bulkNodeData    = {};  // domain → {asn, org, country, ip}
-let bulkRecorder    = null;
-let bulkRecChunks   = [];
-let bulkIsRecording = false;
-let bulkColorMode   = 'asn';
-const ASN_COLORS    = {};  // asn → color string
+// ══ BACKGROUND MODE ══════════════════════════════════════════════════════════
+let bgSigma       = null;
+let bgGraph       = null;
+let bgPollTimer   = null;
+let bgCrawlId     = null;
+let bgNodeData    = {};
+let bgSeen        = new Set();
+let bgLastSeen    = 0;
+let bgRecorder    = null;
+let bgRecChunks   = [];
+let bgIsRecording = false;
+let bgColorMode   = 'asn';
+const ASN_COLORS  = {};
 
-// Color palette for ASNs — generate deterministically
 function asnColor(asn) {
   if (!ASN_COLORS[asn]) {
-    // Hash the ASN string to a hue
     let hash = 0;
-    for (let i = 0; i < asn.length; i++) {
+    for (let i = 0; i < asn.length; i++)
       hash = asn.charCodeAt(i) + ((hash << 5) - hash);
-    }
     const hue = Math.abs(hash) % 360;
-    // Suspicious ASNs get red spectrum
     const SUSPICIOUS = new Set(['AS37963','AS45090','AS55967','AS4134','AS4837',
       'AS197695','AS8334','AS58461']);
-    const sat = SUSPICIOUS.has(asn) ? '80%' : '60%';
-    const lit = SUSPICIOUS.has(asn) ? '55%' : '65%';
-    ASN_COLORS[asn] = `hsl(${SUSPICIOUS.has(asn) ? Math.abs(hash)%40 : hue},${sat},${lit})`;
+    ASN_COLORS[asn] = SUSPICIOUS.has(asn)
+      ? `hsl(${Math.abs(hash)%40},80%,55%)`
+      : `hsl(${hue},60%,65%)`;
   }
   return ASN_COLORS[asn];
 }
 
 const CC_COLORS = {
-  CN:'#c0392b', RU:'#e87b4a', IR:'#e8d5a3', KP:'#c0392b',
-  BY:'#e87b4a', US:'#7eb8e4', GB:'#7eb8e4', FR:'#7eb8e4',
-  DE:'#7eb8e4', QA:'#c8a96e',
+  CN:'#c0392b',RU:'#e87b4a',IR:'#e8d5a3',KP:'#c0392b',
+  BY:'#e87b4a',US:'#7eb8e4',GB:'#7eb8e4',FR:'#7eb8e4',DE:'#7eb8e4',
 };
-function countryColor(cc) {
-  return CC_COLORS[cc] || '#4ec994';
-}
-
-function nodeColor(n) {
-  if (bulkColorMode === 'country') return countryColor(n.country || '?');
-  if (bulkColorMode === 'asn')     return asnColor(n.asn || 'UNKNOWN');
-  // category
-  const cat = n.category || 'unknown';
-  if (cat === 'anchor')    return '#c8a96e';
-  if (cat === 'affiliate') return '#c0392b';
+function bgNodeColor(data) {
+  if (bgColorMode === 'country') return CC_COLORS[data.country] || '#4ec994';
+  if (bgColorMode === 'asn')     return asnColor(data.asn || 'UNKNOWN');
   return '#4ec994';
 }
 
-function enterBulkMode() {
-  document.getElementById('bulkMode').style.display = 'flex';
+function enterBackgroundMode() {
+  document.getElementById('backgroundMode').style.display = 'flex';
   document.body.style.overflow = 'hidden';
-  initBulkSigma();
-  syncBulkJobList();
+  initBgSigma();
+  // Restore any active crawl from localStorage
+  const saved = localStorage.getItem('inteldesk_crawl');
+  if (saved) {
+    try {
+      const s = JSON.parse(saved);
+      if (s.crawl_id && s.status === 'running') {
+        bgCrawlId  = s.crawl_id;
+        bgLastSeen = s.last_seen || 0;
+        updateBgHeader(s.crawl_id, s.seed || '');
+        startBgPolling(s.crawl_id);
+        showHint(`Resumed crawl ${s.crawl_id}`);
+      }
+    } catch(e) {}
+  }
 }
 
-function exitBulkMode() {
-  document.getElementById('bulkMode').style.display = 'none';
+function exitBackgroundMode() {
+  document.getElementById('backgroundMode').style.display = 'none';
   document.body.style.overflow = '';
 }
 
-function initBulkSigma() {
-  if (bulkSigma) return;  // already initialized
-  const container = document.getElementById('bulkSigmaContainer');
+function initBgSigma() {
+  if (bgSigma || bgGraph) return;
+  const container = document.getElementById('bgSigmaContainer');
   if (!container) return;
 
-  // Use Graphology for the graph data structure
-  if (typeof graphology === 'undefined' && typeof Graph !== 'undefined') {
-    bulkGraph = new Graph();
-  } else if (typeof graphology !== 'undefined') {
-    bulkGraph = new graphology.Graph();
-  } else {
-    // Fallback — simple adjacency structure, render with canvas2d
-    initCanvasFallback(container);
-    return;
-  }
-
   try {
-    bulkSigma = new Sigma(bulkGraph, container, {
+    if (typeof graphology !== 'undefined') {
+      bgGraph = new graphology.Graph({multi: false});
+    } else if (typeof Graph !== 'undefined') {
+      bgGraph = new Graph({multi: false});
+    } else {
+      throw new Error('Graphology not loaded');
+    }
+
+    bgSigma = new Sigma(bgGraph, container, {
       renderEdgeLabels: false,
-      defaultEdgeColor: 'rgba(255,255,255,0.08)',
+      defaultEdgeColor: 'rgba(255,255,255,0.06)',
       defaultNodeColor: '#4ec994',
-      labelColor:       { color: 'rgba(240,236,228,0.5)' },
+      labelColor:       {color:'rgba(240,236,228,0.5)'},
       labelSize:        9,
-      labelWeight:      'normal',
-      minCameraRatio:   0.001,
-      maxCameraRatio:   100,
+      minCameraRatio:   0.0001,
+      maxCameraRatio:   200,
+      labelRenderedSizeThreshold: 8,
     });
 
-    // Click handler — send node to investigation tool
-    bulkSigma.on('clickNode', ({ node }) => {
-      const domain = node;
-      showBulkTooltip(null);
-      // Switch back to investigation mode with this domain
-      exitBulkMode();
-      document.getElementById('seedInput').value = domain;
-      showHint(`${domain} loaded — click Analyze to investigate`);
+    bgSigma.on('clickNode', ({node}) => {
+      exitBackgroundMode();
+      document.getElementById('seedInput').value = node;
+      showHint(`${node} loaded — click Analyze to investigate`);
     });
 
-    // Hover tooltip
-    bulkSigma.on('enterNode', ({ node, event }) => {
-      const d = bulkNodeData[node] || {};
-      showBulkTooltip(event, node, d);
+    bgSigma.on('enterNode', ({node, event}) => {
+      const d = bgNodeData[node] || {};
+      const tip = document.getElementById('bgTooltip');
+      if (!tip) return;
+      tip.style.display = 'block';
+      tip.style.left    = (event.x + 14) + 'px';
+      tip.style.top     = (event.y + 14) + 'px';
+      tip.innerHTML = `<strong style="color:var(--gold2)">${esc(node)}</strong><br>
+        ${d.asn?`<span style="color:var(--dim)">${esc(d.asn)}</span><br>`:''}
+        ${d.org?`${esc((d.org||'').slice(0,40))}<br>`:''}
+        ${d.country?`${esc(d.country)}<br>`:''}
+        ${d.ip?`<span style="color:var(--dim)">${esc(d.ip)}</span><br>`:''}
+        <span style="color:var(--dim);font-size:9px">Click → investigate</span>`;
     });
-    bulkSigma.on('leaveNode', () => showBulkTooltip(null));
+    bgSigma.on('leaveNode', () => {
+      const tip = document.getElementById('bgTooltip');
+      if (tip) tip.style.display = 'none';
+    });
 
   } catch(e) {
-    console.warn('Sigma init failed, using canvas fallback:', e.message);
-    initCanvasFallback(container);
+    console.warn('Sigma init failed:', e.message);
+    initBgCanvas(container);
   }
 }
 
-// Canvas fallback for browsers where Sigma doesn't load
-let fallbackCanvas = null, fallbackCtx = null, fallbackNodes = [];
-function initCanvasFallback(container) {
-  fallbackCanvas = document.createElement('canvas');
-  fallbackCanvas.style.cssText = 'width:100%;height:100%;';
-  container.appendChild(fallbackCanvas);
-  fallbackCtx = fallbackCanvas.getContext('2d');
-  function resize() {
-    fallbackCanvas.width  = container.offsetWidth;
-    fallbackCanvas.height = container.offsetHeight;
-    renderFallback();
-  }
-  new ResizeObserver(resize).observe(container);
-  resize();
+// Canvas fallback
+let bgCanvas = null, bgCtx = null, bgCanvasNodes = [];
+function initBgCanvas(container) {
+  bgCanvas = document.createElement('canvas');
+  bgCanvas.style.cssText = 'width:100%;height:100%;';
+  container.appendChild(bgCanvas);
+  bgCtx = bgCanvas.getContext('2d');
+  const ro = new ResizeObserver(() => {
+    bgCanvas.width  = container.offsetWidth;
+    bgCanvas.height = container.offsetHeight;
+    renderBgCanvas();
+  });
+  ro.observe(container);
+  bgCanvas.width  = container.offsetWidth;
+  bgCanvas.height = container.offsetHeight;
 }
 
-function renderFallback() {
-  if (!fallbackCtx || !fallbackCanvas) return;
-  const W = fallbackCanvas.width, H = fallbackCanvas.height;
-  fallbackCtx.fillStyle = '#050505';
-  fallbackCtx.fillRect(0, 0, W, H);
-  const nodes = fallbackNodes;
-  if (!nodes.length) return;
-  nodes.forEach(n => {
-    fallbackCtx.beginPath();
-    fallbackCtx.arc(n.x * W, n.y * H, 2, 0, Math.PI * 2);
-    fallbackCtx.fillStyle = nodeColor(n);
-    fallbackCtx.fill();
+function renderBgCanvas() {
+  if (!bgCtx || !bgCanvas) return;
+  const W = bgCanvas.width, H = bgCanvas.height;
+  bgCtx.fillStyle = '#050505';
+  bgCtx.fillRect(0,0,W,H);
+  bgCanvasNodes.forEach(n => {
+    bgCtx.beginPath();
+    bgCtx.arc(n.x*W, n.y*H, 2, 0, Math.PI*2);
+    bgCtx.fillStyle = n.color || '#4ec994';
+    bgCtx.fill();
   });
 }
 
-function showBulkTooltip(event, domain, data) {
-  const tip = document.getElementById('bulkTooltip');
-  if (!tip) return;
-  if (!event) { tip.style.display = 'none'; return; }
-  tip.style.display = 'block';
-  tip.style.left    = (event.x + 14) + 'px';
-  tip.style.top     = (event.y + 14) + 'px';
-  tip.innerHTML     = `<strong style="color:var(--gold2)">${esc(domain)}</strong><br>
-    ${data.asn ? `ASN: ${esc(data.asn)}<br>` : ''}
-    ${data.org ? `${esc(data.org.slice(0,40))}<br>` : ''}
-    ${data.country ? `Country: ${esc(data.country)}<br>` : ''}
-    ${data.ip ? `IP: ${esc(data.ip)}` : ''}
-    <br><span style="color:var(--dim);font-size:9px">Click to investigate →</span>`;
-}
+function addBgNode(domain, data) {
+  if (bgSeen.has(domain)) return;
+  bgSeen.add(domain);
+  bgNodeData[domain] = data;
 
-function addNodeToSigma(domain, data) {
-  if (!domain) return;
-  bulkNodeData[domain] = data;
+  const color = bgNodeColor(data);
+  const size  = isSuspiciousASN(data.asn||'', data.org||'', data.country||'') ? 5 : 2;
+  const depth = data._crawl_depth || 0;
 
-  // Position by layout mode
-  const layout = document.getElementById('bulkLayoutSelect')?.value || 'asn';
-  let x, y;
+  // Position by ASN cluster with depth-based radius
+  const asn = data.asn || 'UNKNOWN';
+  let hash = 0;
+  for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash<<5)-hash);
+  const angle = (Math.abs(hash) % 360) * Math.PI / 180;
+  const r     = 200 + depth * 150 + (Math.abs(hash>>8) % 100);
+  const x     = r * Math.cos(angle) + (Math.random()-0.5) * 60;
+  const y     = r * Math.sin(angle) + (Math.random()-0.5) * 60;
 
-  if (layout === 'asn') {
-    // Cluster around ASN position with jitter
-    const asn = data.asn || 'UNKNOWN';
-    if (!ASN_COLORS[asn]) asnColor(asn); // init color
-    // Hash ASN to a position
-    let hash = 0;
-    for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash << 5) - hash);
-    const angle = (Math.abs(hash) % 360) * Math.PI / 180;
-    const r = 500 + (Math.abs(hash >> 8) % 200);
-    x = r * Math.cos(angle) + (Math.random() - 0.5) * 80;
-    y = r * Math.sin(angle) + (Math.random() - 0.5) * 80;
-  } else if (layout === 'country') {
-    const CC_POS = {
-      CN: {x:-600,y:-200}, RU:{x:-300,y:-400}, US:{x:400,y:0},
-      GB:{x:100,y:-400},   DE:{x:150,y:-350},  FR:{x:100,y:-300},
-      IR:{x:-100,y:-200},  KP:{x:-500,y:-100},
-    };
-    const pos = CC_POS[data.country] || {x:0,y:0};
-    x = pos.x + (Math.random()-0.5)*200;
-    y = pos.y + (Math.random()-0.5)*200;
-  } else {
-    x = (Math.random()-0.5) * 2000;
-    y = (Math.random()-0.5) * 2000;
-  }
-
-  const color = nodeColor(data);
-  const size  = isSuspiciousASN(data.asn||'', data.org||'', data.country||'') ? 4 : 2;
-
-  try {
-    if (bulkGraph && !bulkGraph.hasNode(domain)) {
-      bulkGraph.addNode(domain, { x, y, size, color, label: domain });
-    }
-  } catch(e) {}
-
-  // Fallback canvas
-  if (fallbackNodes && !fallbackNodes.find(n => n.id === domain)) {
-    fallbackNodes.push({
-      id: domain, x: (x + 1200) / 2400, y: (y + 1200) / 2400,
-      asn: data.asn, country: data.country,
+  if (bgGraph) {
+    try {
+      if (!bgGraph.hasNode(domain)) {
+        bgGraph.addNode(domain, {x, y, size, color, label: domain.slice(0,20)});
+      }
+    } catch(e) {}
+  } else if (bgCanvasNodes) {
+    bgCanvasNodes.push({
+      id: domain, color,
+      x: (x + 800) / 1600, y: (y + 800) / 1600,
     });
-    if (fallbackNodes.length % 500 === 0) renderFallback();
+    if (bgCanvasNodes.length % 200 === 0) renderBgCanvas();
   }
 }
 
-function updateBulkGraphStats() {
-  const nodeCount = bulkGraph ? bulkGraph.order : (fallbackNodes?.length || 0);
-  const edgeCount = bulkGraph ? bulkGraph.size  : 0;
-  const nc = document.getElementById('sigmaNodeCount');
-  const ec = document.getElementById('sigmaEdgeCount');
-  if (nc) nc.textContent = nodeCount.toLocaleString();
-  if (ec) ec.textContent = edgeCount.toLocaleString();
-  // Hide empty state
-  if (nodeCount > 0) {
-    const empty = document.getElementById('bulkGraphEmpty');
+function updateBgStats() {
+  const n = bgGraph ? bgGraph.order : bgCanvasNodes.length;
+  const e = bgGraph ? bgGraph.size  : 0;
+  const nc = document.getElementById('bgNodeCount');
+  const ec = document.getElementById('bgEdgeCount');
+  if (nc) nc.textContent = n.toLocaleString();
+  if (ec) ec.textContent = e.toLocaleString();
+  if (n > 0) {
+    const empty = document.getElementById('bgGraphEmpty');
     if (empty) empty.style.display = 'none';
   }
 }
 
-function changeBulkLayout(mode) {
-  // Re-position all existing nodes
-  if (!bulkGraph) return;
-  bulkGraph.forEachNode((node, attrs) => {
-    const data = bulkNodeData[node] || {};
-    let x, y;
-    if (mode === 'asn') {
-      const asn = data.asn || 'UNKNOWN';
-      let hash = 0;
-      for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash << 5) - hash);
-      const angle = (Math.abs(hash) % 360) * Math.PI / 180;
-      const r = 500 + (Math.abs(hash >> 8) % 200);
-      x = r * Math.cos(angle) + (Math.random()-0.5)*80;
-      y = r * Math.sin(angle) + (Math.random()-0.5)*80;
-    } else if (mode === 'country') {
-      const CC_POS = {CN:{x:-600,y:-200},RU:{x:-300,y:-400},US:{x:400,y:0},GB:{x:100,y:-400}};
-      const pos = CC_POS[data.country] || {x:0,y:0};
-      x = pos.x + (Math.random()-0.5)*200;
-      y = pos.y + (Math.random()-0.5)*200;
-    } else {
-      x = (Math.random()-0.5)*2000;
-      y = (Math.random()-0.5)*2000;
-    }
-    bulkGraph.setNodeAttribute(node, 'x', x);
-    bulkGraph.setNodeAttribute(node, 'y', y);
-  });
-  if (bulkSigma) bulkSigma.refresh();
-}
+// ── START CRAWL ───────────────────────────────────────────────────────────────
+async function startCrawl() {
+  const seed      = cleanDomain(document.getElementById('bgSeedInput')?.value || '');
+  const maxDoms   = parseInt(document.getElementById('bgMaxDomains')?.value) || 10000;
+  const triageOnly= document.getElementById('bgMode')?.value !== 'full';
+  const btn       = document.getElementById('bgStartBtn');
 
-function colorBulkGraph(mode) {
-  bulkColorMode = mode;
-  if (!bulkGraph) return;
-  bulkGraph.forEachNode((node, attrs) => {
-    const data  = bulkNodeData[node] || {};
-    const color = nodeColor(data);
-    bulkGraph.setNodeAttribute(node, 'color', color);
-  });
-  if (bulkSigma) bulkSigma.refresh();
-  if (fallbackNodes) renderFallback();
-}
-
-function clearBulkGraph() {
-  if (bulkGraph) {
-    bulkGraph.clear();
-    if (bulkSigma) bulkSigma.refresh();
-  }
-  bulkNodeData = {};
-  fallbackNodes = [];
-  if (fallbackCtx && fallbackCanvas) renderFallback();
-  updateBulkGraphStats();
-  const empty = document.getElementById('bulkGraphEmpty');
-  if (empty) empty.style.display = '';
-}
-
-// ── BULK JOB SUBMISSION ───────────────────────────────────────────────────────
-async function submitBulkJob() {
-  const raw     = (document.getElementById('bulkDomains')?.value || '').trim();
-  const jobType = document.getElementById('bulkJobType')?.value || 'triage_dns';
-  const btn     = document.getElementById('bulkSubmitBtn');
-  if (!raw) return;
-
-  const domains = raw.split(/[\n,;\t]+/).map(d => cleanDomain(d.trim())).filter(Boolean);
-  if (!domains.length) return;
-
-  if (btn) { btn.disabled = true; btn.textContent = 'Submitting…'; }
-
-  const isDnsOnly  = jobType === 'triage_dns';
-  const actualType = isDnsOnly ? 'triage' : jobType;
+  if (!seed) { showHint('Enter a seed domain first'); return; }
+  if (btn) { btn.disabled = true; btn.textContent = 'Starting…'; }
 
   try {
-    const res = await fetch(`${API}/network/job/submit`, {
+    const res = await fetch(`${API}/network/crawl/start`, {
       method:  'POST',
       headers: {'Content-Type':'application/json'},
-      body:    JSON.stringify({ domains, type: actualType, dns_only: isDnsOnly }),
+      body:    JSON.stringify({seed, max_domains: maxDoms, triage_only: triageOnly}),
     });
     if (!res.ok) throw new Error(`Server ${res.status}`);
     const data = await res.json();
     if (data.error) throw new Error(data.error);
 
-    document.getElementById('bulkDomains').value = '';
-    startBulkPolling(data.job_id, data.total);
-    showHint(`Job ${data.job_id} submitted — ${data.total.toLocaleString()} domains`);
+    bgCrawlId  = data.crawl_id;
+    bgLastSeen = 0;
+    updateBgHeader(data.crawl_id, seed);
 
-    // Also register in main tool's activeJobs
-    registerJob(data.job_id, actualType, data.total);
+    // Persist to localStorage so we can resume
+    localStorage.setItem('inteldesk_crawl', JSON.stringify({
+      crawl_id: data.crawl_id, seed, status: 'running', last_seen: 0,
+    }));
+
+    startBgPolling(data.crawl_id);
+    showHint(`Crawl ${data.crawl_id} started from ${seed} — close your laptop, this runs on the server`);
 
   } catch(err) {
-    showHint(`Submission failed: ${err.message}`);
+    showHint(`Failed to start crawl: ${err.message}`);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Submit →'; }
+    if (btn) { btn.disabled = false; btn.textContent = '▶ Start Crawl'; }
   }
 }
 
-async function resumeBulkJob() {
-  const jobId = (document.getElementById('bulkResumeId')?.value || '').trim();
-  if (!jobId) return;
-  document.getElementById('bulkResumeId').value = '';
+function startBgPolling(crawlId) {
+  if (bgPollTimer) clearInterval(bgPollTimer);
+  bgPollTimer = setInterval(() => pollCrawl(crawlId), 5000);
+  pollCrawl(crawlId); // immediate
+}
+
+async function pollCrawl(crawlId) {
   try {
-    const res = await fetch(`${API}/network/job/${jobId}`);
-    if (!res.ok) throw new Error('Not found');
-    const data = await res.json();
-    startBulkPolling(jobId, data.total, data.done);
-    registerJob(jobId, data.type, data.total, data.done);
-  } catch(err) {
-    showHint(`Resume failed: ${err.message}`);
-  }
-}
-
-function startBulkPolling(jobId, total, doneAlready = 0) {
-  if (bulkActivePoll) clearInterval(bulkActivePoll);
-  bulkActiveJobId = jobId;
-  let lastSeen = doneAlready;
-
-  // Show badge
-  const badge = document.getElementById('bulkJobBadge');
-  const idEl  = document.getElementById('bulkJobId');
-  if (badge) badge.style.display = 'flex';
-  if (idEl)  idEl.textContent = jobId;
-
-  async function poll() {
-    try {
-      const res = await fetch(`${API}/network/job/${jobId}?since=${lastSeen}&limit=1000`);
-      if (!res.ok) return;
-      const data = await res.json();
-
-      // Add new results to Sigma graph
-      const results = data.results || [];
-      for (const r of results) {
-        if (r.domain && r.ip) {
-          addNodeToSigma(r.domain, r);
-        }
-      }
-      if (results.length) {
-        lastSeen += results.length;
-        updateBulkGraphStats();
-        if (bulkSigma) bulkSigma.refresh();
-      }
-
-      // Update progress
-      const pct = data.pct || 0;
-      const fill = document.getElementById('bulkProgressFill');
-      const pctEl = document.getElementById('bulkJobPct');
-      const etaEl = document.getElementById('bulkJobEta');
-      if (fill)  fill.style.width = pct + '%';
-      if (pctEl) pctEl.textContent = pct + '%';
-      if (etaEl) etaEl.textContent = data.eta_seconds ? '~' + formatETA(data.eta_seconds) : '';
-
-      // Update job list
-      syncBulkJobList();
-
-      // Load clusters when job completes
-      if (data.status === 'complete' || data.status === 'cancelled') {
-        clearInterval(bulkActivePoll);
-        bulkActivePoll = null;
-        if (data.status === 'complete') {
-          loadBulkClusters(jobId);
-          showHint(`Job complete — ${data.done.toLocaleString()} domains processed`);
-        }
-      }
-    } catch(e) {
-      console.warn('Bulk poll error:', e.message);
-    }
-  }
-
-  poll(); // immediate
-  bulkActivePoll = setInterval(poll, 8000);
-}
-
-async function loadBulkClusters(jobId) {
-  try {
-    const res = await fetch(`${API}/network/job/${jobId}/clusters`);
+    const res = await fetch(`${API}/network/crawl/${crawlId}?since=${bgLastSeen}&limit=500`);
     if (!res.ok) return;
     const data = await res.json();
-    renderBulkClusters(data.clusters || [], data.total_processed || 0);
+    if (data.error) return;
+
+    // Add new nodes to graph
+    const results = data.results || [];
+    let added = 0;
+    for (const r of results) {
+      if (r.domain && !r.error) {
+        addBgNode(r.domain, r);
+        added++;
+      }
+    }
+    if (added > 0) {
+      bgLastSeen += results.length;
+      updateBgStats();
+      if (bgSigma) bgSigma.refresh();
+      if (bgCanvas) renderBgCanvas();
+
+      // Update localStorage
+      try {
+        const saved = JSON.parse(localStorage.getItem('inteldesk_crawl') || '{}');
+        saved.last_seen = bgLastSeen;
+        localStorage.setItem('inteldesk_crawl', JSON.stringify(saved));
+      } catch(e) {}
+    }
+
+    // Update progress
+    updateBgProgress(data);
+
+    // Render cluster list periodically
+    if (bgLastSeen % 500 === 0 || data.status === 'complete') {
+      loadBgClusters(crawlId);
+    }
+
+    if (data.status === 'complete' || data.status === 'cancelled' || data.status === 'error') {
+      clearInterval(bgPollTimer);
+      bgPollTimer = null;
+      const saved = JSON.parse(localStorage.getItem('inteldesk_crawl') || '{}');
+      saved.status = data.status;
+      localStorage.setItem('inteldesk_crawl', JSON.stringify(saved));
+      loadBgClusters(crawlId);
+      showHint(`Crawl ${crawlId} ${data.status} — ${data.done.toLocaleString()} domains mapped`);
+    }
+  } catch(err) {
+    console.warn('Poll error:', err.message);
+  }
+}
+
+function updateBgProgress(data) {
+  const done  = data.done  || 0;
+  const seen  = data.seen  || 0;
+  const pct   = data.pct   || 0;
+  const eta   = data.eta_seconds;
+
+  const fill  = document.getElementById('bgProgressFill');
+  const pctEl = document.getElementById('bgPct');
+  const statEl= document.getElementById('bgStat');
+  const etaEl = document.getElementById('bgEta');
+  const badge = document.getElementById('bgBadge');
+  const bidEl = document.getElementById('bgCrawlId');
+
+  if (fill)  fill.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  if (statEl) statEl.textContent =
+    `${done.toLocaleString()} analyzed · ${seen.toLocaleString()} discovered · ${data.queued||0} queued`;
+  if (etaEl) etaEl.textContent = eta ? '~' + formatETA(eta) : '';
+  if (badge) badge.style.display = '';
+  if (bidEl) bidEl.textContent = data.crawl_id || '';
+}
+
+async function cancelCrawl() {
+  if (!bgCrawlId) return;
+  try {
+    await fetch(`${API}/network/crawl/${bgCrawlId}/cancel`, {method:'POST'});
+    clearInterval(bgPollTimer);
+    bgPollTimer = null;
+    showHint(`Crawl ${bgCrawlId} cancelled`);
   } catch(e) {}
 }
 
-function renderBulkClusters(clusters, total) {
-  const list = document.getElementById('bulkClusterList');
-  const meta = document.getElementById('bulkClusterMeta');
-  if (meta) meta.textContent = `${total.toLocaleString()} processed · ${clusters.length} ASNs`;
-  if (!list) return;
+function updateBgHeader(crawlId, seed) {
+  const hdr = document.getElementById('bgCrawlHeader');
+  if (hdr) hdr.textContent = `Crawl: ${crawlId} · Seed: ${seed}`;
+}
 
-  const maxCount = clusters[0]?.count || 1;
-  list.innerHTML = clusters.slice(0,30).map(cl => {
-    const pct     = Math.round((cl.count / maxCount) * 100);
-    const sus     = isSuspiciousASN(cl.asn, cl.org, cl.country);
-    const barColor = sus ? 'var(--red)' : 'var(--gold)';
-    return `<div style="margin-bottom:6px;cursor:pointer;"
-      onclick="highlightCluster('${esc(cl.asn)}')"
-      title="Click to highlight in graph">
+async function resumeCrawl() {
+  const crawlId = (document.getElementById('bgResumeId')?.value || '').trim();
+  if (!crawlId) return;
+  document.getElementById('bgResumeId').value = '';
+  bgCrawlId  = crawlId;
+  bgLastSeen = 0;
+  updateBgHeader(crawlId, '?');
+  startBgPolling(crawlId);
+  showHint(`Resuming crawl ${crawlId}…`);
+}
+
+async function loadBgClusters(crawlId) {
+  try {
+    const res = await fetch(`${API}/network/crawl/${crawlId}/clusters`);
+    if (!res.ok) return;
+    const data = await res.json();
+    renderBgClusters(data.clusters || [], data.total_processed || 0);
+  } catch(e) {}
+}
+
+function renderBgClusters(clusters, total) {
+  const list = document.getElementById('bgClusterList');
+  const meta = document.getElementById('bgClusterMeta');
+  if (meta) meta.textContent = `${total.toLocaleString()} · ${clusters.length} ASNs`;
+  if (!list) return;
+  const max = clusters[0]?.count || 1;
+  list.innerHTML = clusters.slice(0,25).map(cl => {
+    const pct = Math.round(cl.count/max*100);
+    const sus = isSuspiciousASN(cl.asn, cl.org, cl.country);
+    return `<div style="margin-bottom:5px;cursor:pointer"
+      onclick="highlightBgCluster('${esc(cl.asn)}')" title="Click to highlight">
       <div style="display:flex;justify-content:space-between;margin-bottom:2px;">
-        <span style="font-family:var(--mono);font-size:9px;color:${sus?'var(--red)':'var(--muted)'};
-          overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:180px;"
-          title="${esc(cl.org)}">
-          ${sus?'⚠ ':''}${esc((cl.asn||'').replace(/^AS[0-9]+ ?/,'').slice(0,25)||cl.asn)}
-        </span>
+        <span style="font-family:var(--mono);font-size:9px;
+          color:${sus?'var(--red)':'var(--muted)'};overflow:hidden;
+          text-overflow:ellipsis;white-space:nowrap;max-width:160px;"
+          title="${esc(cl.org)}">${sus?'⚠ ':''}${esc((cl.org||cl.asn).slice(0,25))}</span>
         <span style="font-family:var(--mono);font-size:9px;color:var(--gold2);
-          flex-shrink:0;margin-left:6px;">${cl.count.toLocaleString()}</span>
+          flex-shrink:0;margin-left:4px;">${cl.count.toLocaleString()}</span>
       </div>
       <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;">
-        <div style="height:100%;width:${pct}%;background:${barColor};border-radius:2px;"></div>
+        <div style="height:100%;width:${pct}%;background:${sus?'var(--red)':'var(--gold)'};border-radius:2px;"></div>
       </div>
     </div>`;
   }).join('');
 }
 
-function highlightCluster(asn) {
-  if (!bulkGraph || !bulkSigma) return;
-  bulkGraph.forEachNode((node, attrs) => {
-    const data = bulkNodeData[node] || {};
-    const isMatch = (data.asn === asn);
-    bulkGraph.setNodeAttribute(node, 'color',
-      isMatch ? '#ffffff' : 'rgba(240,236,228,0.15)');
-    bulkGraph.setNodeAttribute(node, 'size',
-      isMatch ? 5 : 1.5);
+function highlightBgCluster(asn) {
+  if (!bgGraph || !bgSigma) return;
+  bgGraph.forEachNode((node, attrs) => {
+    const d = bgNodeData[node] || {};
+    bgGraph.setNodeAttribute(node,'color', d.asn===asn?'#ffffff':'rgba(240,236,228,0.1)');
+    bgGraph.setNodeAttribute(node,'size',  d.asn===asn?6:1);
   });
-  bulkSigma.refresh();
-  // Reset after 3 seconds
-  setTimeout(() => colorBulkGraph(bulkColorMode), 3000);
+  bgSigma.refresh();
+  setTimeout(() => {
+    bgGraph.forEachNode((node) => {
+      const d = bgNodeData[node] || {};
+      bgGraph.setNodeAttribute(node,'color', bgNodeColor(d));
+      bgGraph.setNodeAttribute(node,'size',  isSuspiciousASN(d.asn||'',d.org||'',d.country||'')?5:2);
+    });
+    bgSigma.refresh();
+  }, 3000);
 }
 
-function syncBulkJobList() {
-  const list = document.getElementById('bulkJobList');
-  if (!list) return;
-  const jobs = Object.values(activeJobs);
-  if (!jobs.length) {
-    list.innerHTML = '<div style="font-family:var(--mono);font-size:11px;color:var(--dim);">No jobs yet.</div>';
-    return;
-  }
-  list.innerHTML = jobs.map(job => {
-    const pct = job.pct ?? (job.total ? Math.round(job.done/job.total*100) : 0);
-    return `<div style="background:var(--bg3);border:1px solid var(--border);
-      padding:8px 10px;margin-bottom:6px;">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
-        <span style="font-family:var(--mono);font-size:10px;color:var(--gold2);">${esc(job.id)}</span>
-        <span style="font-family:var(--mono);font-size:9px;color:${job.status==='running'?'var(--green)':'var(--dim)'};">${job.status}</span>
-        <span style="flex:1"></span>
-        ${job.done>0?`<button onclick="loadBulkClusters('${esc(job.id)}')" style="font-family:var(--mono);font-size:8px;text-transform:uppercase;letter-spacing:.08em;background:rgba(200,169,110,.10);color:var(--gold);border:1px solid rgba(200,169,110,.2);padding:2px 6px;cursor:pointer;">Clusters</button>`:''}
-        ${job.status==='running'?`<button onclick="cancelJob('${esc(job.id)}')" style="font-family:var(--mono);font-size:8px;background:transparent;color:var(--red);border:1px solid rgba(192,57,43,.2);padding:2px 6px;cursor:pointer;">✕</button>`:''}
-      </div>
-      <div style="height:3px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;margin-bottom:4px;">
-        <div style="height:100%;width:${pct}%;background:var(--green);border-radius:2px;transition:width .5s;"></div>
-      </div>
-      <div style="font-family:var(--mono);font-size:9px;color:var(--dim);">
-        ${job.done.toLocaleString()} / ${(job.total||0).toLocaleString()} · ${pct}%
-      </div>
-    </div>`;
-  }).join('');
+function changeBgLayout(mode) {
+  if (!bgGraph) return;
+  bgGraph.forEachNode((node) => {
+    const d = bgNodeData[node] || {};
+    const asn = d.asn || 'UNKNOWN';
+    let x, y;
+    if (mode === 'asn') {
+      let hash = 0;
+      for (let i=0;i<asn.length;i++) hash = asn.charCodeAt(i)+((hash<<5)-hash);
+      const angle = (Math.abs(hash)%360)*Math.PI/180;
+      const r = 200+(d._crawl_depth||0)*150+(Math.abs(hash>>8)%100);
+      x = r*Math.cos(angle)+(Math.random()-.5)*60;
+      y = r*Math.sin(angle)+(Math.random()-.5)*60;
+    } else if (mode === 'country') {
+      const CP = {CN:{x:-600,y:-200},RU:{x:-300,y:-400},US:{x:400,y:0},GB:{x:100,y:-400}};
+      const p = CP[d.country]||{x:0,y:0};
+      x = p.x+(Math.random()-.5)*200; y = p.y+(Math.random()-.5)*200;
+    } else {
+      x = (Math.random()-.5)*2000; y = (Math.random()-.5)*2000;
+    }
+    bgGraph.setNodeAttribute(node,'x',x);
+    bgGraph.setNodeAttribute(node,'y',y);
+  });
+  if (bgSigma) bgSigma.refresh();
 }
 
-// ── BULK RECORDING ────────────────────────────────────────────────────────────
-function toggleBulkRecord() {
-  if (bulkIsRecording) stopBulkRecord();
-  else startBulkRecord();
+function colorBgGraph(mode) {
+  bgColorMode = mode;
+  if (!bgGraph) return;
+  bgGraph.forEachNode((node) => {
+    const d = bgNodeData[node] || {};
+    bgGraph.setNodeAttribute(node,'color', bgNodeColor(d));
+  });
+  if (bgSigma) bgSigma.refresh();
+  if (bgCanvas) renderBgCanvas();
 }
 
-function startBulkRecord() {
-  const container = document.getElementById('bulkSigmaContainer');
+function clearBgGraph() {
+  if (bgGraph) { bgGraph.clear(); if (bgSigma) bgSigma.refresh(); }
+  bgNodeData = {}; bgSeen = new Set(); bgLastSeen = 0; bgCanvasNodes = [];
+  if (bgCanvas) renderBgCanvas();
+  updateBgStats();
+  const empty = document.getElementById('bgGraphEmpty');
+  if (empty) empty.style.display = '';
+}
+
+// ── RECORDING ─────────────────────────────────────────────────────────────────
+function toggleBgRecord() {
+  if (bgIsRecording) stopBgRecord(); else startBgRecord();
+}
+function startBgRecord() {
+  const container = document.getElementById('bgSigmaContainer');
   const canvas    = container?.querySelector('canvas');
-  if (!canvas) { showHint('Canvas not ready — add some nodes first'); return; }
+  if (!canvas) { showHint('Canvas not ready'); return; }
   try {
     const stream = canvas.captureStream(30);
     const mime   = MediaRecorder.isTypeSupported('video/webm;codecs=vp9')
                    ? 'video/webm;codecs=vp9' : 'video/webm';
-    bulkRecChunks = [];
-    bulkRecorder  = new MediaRecorder(stream, {mimeType: mime});
-    bulkRecorder.ondataavailable = e => { if (e.data.size > 0) bulkRecChunks.push(e.data); };
-    bulkRecorder.onstop = downloadBulkRecording;
-    bulkRecorder.start(100);
-    bulkIsRecording = true;
-    const btn = document.getElementById('bulkRecBtn');
-    if (btn) { btn.textContent = '⏹ Stop'; btn.style.background = 'var(--red)'; btn.style.color = '#fff'; }
-  } catch(e) { showHint('Recording not supported: ' + e.message); }
+    bgRecChunks  = [];
+    bgRecorder   = new MediaRecorder(stream, {mimeType:mime});
+    bgRecorder.ondataavailable = e => { if (e.data.size>0) bgRecChunks.push(e.data); };
+    bgRecorder.onstop = () => {
+      const blob = new Blob(bgRecChunks,{type:'video/webm'});
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href=url; a.download='inteldesk-crawl-'+new Date().toISOString().slice(0,10)+'.webm';
+      a.click(); URL.revokeObjectURL(url);
+    };
+    bgRecorder.start(100); bgIsRecording = true;
+    const btn = document.getElementById('bgRecBtn');
+    if (btn) { btn.textContent='⏹ Stop'; btn.style.background='var(--red)'; btn.style.color='#fff'; }
+  } catch(e) { showHint('Recording not supported: '+e.message); }
+}
+function stopBgRecord() {
+  if (bgRecorder) bgRecorder.stop();
+  bgIsRecording = false;
+  const btn = document.getElementById('bgRecBtn');
+  if (btn) { btn.textContent='⏺ Record'; btn.style.background='rgba(192,57,43,.12)'; btn.style.color='var(--red)'; }
 }
 
-function stopBulkRecord() {
-  if (bulkRecorder) bulkRecorder.stop();
-  bulkIsRecording = false;
-  const btn = document.getElementById('bulkRecBtn');
-  if (btn) { btn.textContent = '⏺ Record'; btn.style.background = 'rgba(192,57,43,.12)'; btn.style.color = 'var(--red)'; }
-}
-
-function downloadBulkRecording() {
-  if (!bulkRecChunks.length) return;
-  const blob = new Blob(bulkRecChunks, {type:'video/webm'});
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  a.href = url;
-  a.download = 'inteldesk-bulk-' + new Date().toISOString().slice(0,10) + '.webm';
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-// ── BULK GEXF EXPORT ──────────────────────────────────────────────────────────
-function exportBulkGEXF() {
-  if (!bulkGraph || bulkGraph.order === 0) {
-    showHint('No nodes to export. Run a job first.');
-    return;
-  }
-  let ns = '', es = '';
-  bulkGraph.forEachNode((node, attrs) => {
-    const d = bulkNodeData[node] || {};
-    ns += `<node id="${esc(node)}" label="${esc(node)}">
-      <attvalues>
-        <attvalue for="0" value="${esc(d.asn||'')}"/>
-        <attvalue for="1" value="${esc(d.org||'')}"/>
-        <attvalue for="2" value="${esc(d.country||'')}"/>
-        <attvalue for="3" value="${esc(d.ip||'')}"/>
-      </attvalues>
-    </node>\n`;
-  });
-  bulkGraph.forEachEdge((edge, attrs, source, target) => {
-    es += `<edge source="${esc(source)}" target="${esc(target)}"/>\n`;
+// ── GEXF EXPORT ───────────────────────────────────────────────────────────────
+function exportBgGEXF() {
+  if (!bgGraph || bgGraph.order === 0) { showHint('No nodes to export'); return; }
+  let ns='',es='';
+  bgGraph.forEachNode((node,attrs) => {
+    const d = bgNodeData[node]||{};
+    ns += `<node id="${esc(node)}" label="${esc(node)}"><attvalues>
+      <attvalue for="0" value="${esc(d.asn||'')}"/>
+      <attvalue for="1" value="${esc(d.org||'')}"/>
+      <attvalue for="2" value="${esc(d.country||'')}"/>
+      <attvalue for="3" value="${esc(d.ip||'')}"/>
+      <attvalue for="4" value="${esc(String(d._crawl_depth||0))}"/>
+    </attvalues></node>\n`;
   });
   const gexf = `<?xml version="1.0" encoding="UTF-8"?>
-<gexf xmlns="http://gexf.net/1.3" version="1.3">
-  <meta><creator>Intel Desk Bulk Analysis</creator></meta>
-  <graph defaultedgetype="undirected">
-    <attributes class="node">
-      <attribute id="0" title="asn" type="string"/>
-      <attribute id="1" title="org" type="string"/>
-      <attribute id="2" title="country" type="string"/>
-      <attribute id="3" title="ip" type="string"/>
-    </attributes>
-    <nodes>\n${ns}    </nodes>
-    <edges>\n${es}    </edges>
-  </graph>
-</gexf>`;
-  const blob = new Blob([gexf], {type:'application/xml'});
+<gexf xmlns="http://gexf.net/1.3"><meta><creator>Intel Desk</creator></meta>
+<graph defaultedgetype="undirected">
+<attributes class="node">
+  <attribute id="0" title="asn" type="string"/>
+  <attribute id="1" title="org" type="string"/>
+  <attribute id="2" title="country" type="string"/>
+  <attribute id="3" title="ip" type="string"/>
+  <attribute id="4" title="depth" type="integer"/>
+</attributes>
+<nodes>${ns}</nodes><edges>${es}</edges>
+</graph></gexf>`;
+  const blob = new Blob([gexf],{type:'application/xml'});
   const url  = URL.createObjectURL(blob);
   const a    = document.createElement('a');
-  a.href = url;
-  a.download = 'inteldesk-bulk-' + new Date().toISOString().slice(0,10) + '.gexf';
-  a.click();
-  URL.revokeObjectURL(url);
-  showHint(`Exported ${bulkGraph.order.toLocaleString()} nodes to GEXF`);
+  a.href=url; a.download='inteldesk-crawl-'+new Date().toISOString().slice(0,10)+'.gexf';
+  a.click(); URL.revokeObjectURL(url);
+  showHint(`Exported ${bgGraph.order.toLocaleString()} nodes`);
 }
 
-// Keyboard shortcut to exit bulk mode
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape' && document.getElementById('bulkMode')?.style.display !== 'none') {
-    exitBulkMode();
-  }
+  if (e.key==='Escape' && document.getElementById('backgroundMode')?.style.display!=='none')
+    exitBackgroundMode();
 });
 
+</script>>
 
-</script>
-
-<!-- BULK MODE OVERLAY — full screen, separate interface -->
-<div id="bulkMode" style="display:none;position:fixed;inset:0;z-index:9000;
+<!-- BACKGROUND MODE OVERLAY -->
+<div id="backgroundMode" style="display:none;position:fixed;inset:0;z-index:9000;
   background:var(--bg);flex-direction:column;overflow:hidden;">
-
-  <!-- BULK HEADER -->
   <div style="display:flex;align-items:center;gap:12px;padding:10px 18px;
-    background:var(--bg3);border-bottom:2px solid rgba(78,201,148,.3);
-    flex-shrink:0;flex-wrap:wrap;">
-    <button onclick="exitBulkMode()"
+    background:var(--bg3);border-bottom:2px solid rgba(78,201,148,.3);flex-shrink:0;flex-wrap:wrap;">
+    <button onclick="exitBackgroundMode()"
       style="font-family:var(--mono);font-size:10px;text-transform:uppercase;
       letter-spacing:.12em;background:transparent;border:1px solid var(--border);
-      color:var(--muted);padding:6px 12px;cursor:pointer;">
-      ← Back to Investigation
-    </button>
-    <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-      letter-spacing:.20em;color:var(--green);">Bulk Analysis Mode</div>
-    <div style="flex:1;"></div>
-    <!-- Active job badge -->
-    <div id="bulkJobBadge" style="display:none;font-family:var(--mono);font-size:10px;
-      color:var(--green);display:flex;align-items:center;gap:8px;">
-      <span id="bulkJobId" style="border:1px solid rgba(78,201,148,.25);padding:2px 8px;"></span>
-      <span id="bulkJobPct" style="color:var(--gold2);">0%</span>
+      color:var(--muted);padding:6px 12px;cursor:pointer;">← Back</button>
+    <span style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+      letter-spacing:.20em;color:var(--green);">Background Analysis</span>
+    <span id="bgCrawlHeader" style="font-family:var(--mono);font-size:10px;color:var(--dim);"></span>
+    <div style="flex:1"></div>
+    <div id="bgBadge" style="display:none;font-family:var(--mono);font-size:10px;
+      display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+      <span id="bgCrawlId" style="border:1px solid rgba(78,201,148,.25);padding:2px 8px;color:var(--gold2);"></span>
+      <span id="bgPct" style="color:var(--green);">0%</span>
       <div style="width:120px;height:4px;background:rgba(255,255,255,.06);border-radius:2px;overflow:hidden;">
-        <div id="bulkProgressFill" style="height:100%;background:var(--green);width:0%;transition:width .5s;border-radius:2px;"></div>
+        <div id="bgProgressFill" style="height:100%;background:var(--green);width:0%;transition:width .8s;border-radius:2px;"></div>
       </div>
-      <span id="bulkJobEta" style="color:var(--dim);"></span>
+      <span id="bgEta" style="color:var(--dim);"></span>
+      <button onclick="cancelCrawl()" style="font-family:var(--mono);font-size:9px;
+        background:rgba(192,57,43,.12);border:1px solid rgba(192,57,43,.25);
+        color:var(--red);padding:3px 8px;cursor:pointer;">✕ Cancel</button>
     </div>
   </div>
-
-  <!-- BULK BODY — two columns -->
+  <div id="bgStat" style="font-family:var(--mono);font-size:9px;color:var(--dim);
+    padding:5px 18px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;"></div>
   <div style="display:flex;flex:1;overflow:hidden;">
-
-    <!-- LEFT PANEL — controls -->
-    <div style="width:320px;flex-shrink:0;background:var(--bg2);border-right:1px solid var(--border);
-      display:flex;flex-direction:column;overflow-y:auto;">
-
-      <!-- Submit -->
+    <div style="width:300px;flex-shrink:0;background:var(--bg2);
+      border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto;">
       <div style="padding:14px;border-bottom:1px solid var(--border);">
         <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Submit Job</div>
-        <textarea id="bulkDomains" style="width:100%;background:var(--bg3);
-          border:1px solid var(--border);outline:none;font-family:var(--mono);
-          font-size:11px;color:var(--text);padding:10px;resize:vertical;
-          min-height:100px;line-height:1.6;" 
-          placeholder="Paste domains — one per line or comma-separated&#10;&#10;Or drag &amp; drop a .txt / .csv file"></textarea>
-        <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
-          <select id="bulkJobType" style="flex:1;background:var(--bg3);border:1px solid var(--border);
-            font-family:var(--mono);font-size:10px;color:var(--muted);padding:6px;outline:none;">
-            <option value="triage_dns">🚀 DNS-Only — fastest, no rate limits</option>
-            <option value="triage">⚡ Triage — IP + ASN data</option>
-            <option value="analyze">🔬 Full Analysis — targeted use</option>
-          </select>
-          <button onclick="submitBulkJob()" id="bulkSubmitBtn"
-            style="background:var(--green);color:var(--bg);border:none;
-            font-family:var(--mono);font-size:10px;font-weight:600;
-            text-transform:uppercase;letter-spacing:.12em;
-            padding:6px 14px;cursor:pointer;white-space:nowrap;">
-            Submit →
-          </button>
+          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Start Recursive Crawl</div>
+        <div style="font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.8;margin-bottom:10px;">
+          Starts from a seed domain and recursively follows every SSL SAN, shared IP, and
+          nameserver neighbor — up to 500,000 domains. Runs on the server while your laptop sleeps.
         </div>
-        <!-- Resume -->
-        <div style="display:flex;gap:0;margin-top:8px;border:1px solid var(--border);">
-          <input id="bulkResumeId" placeholder="Resume job ID…"
+        <input id="bgSeedInput" placeholder="seed domain (e.g. cgtn.com)"
+          style="width:100%;background:var(--bg3);border:1px solid var(--border);outline:none;
+          font-family:var(--mono);font-size:12px;color:var(--text);padding:9px 12px;margin-bottom:8px;"
+          onkeydown="if(event.key==='Enter')startCrawl()">
+        <div style="display:flex;gap:6px;margin-bottom:8px;">
+          <select id="bgMaxDomains" style="flex:1;background:var(--bg3);border:1px solid var(--border);
+            font-family:var(--mono);font-size:10px;color:var(--muted);padding:6px;outline:none;">
+            <option value="1000">Cap: 1,000</option>
+            <option value="10000">Cap: 10,000</option>
+            <option value="50000">Cap: 50,000</option>
+            <option value="100000">Cap: 100,000</option>
+            <option value="500000" selected>Cap: 500,000</option>
+          </select>
+          <select id="bgMode" style="flex:1;background:var(--bg3);border:1px solid var(--border);
+            font-family:var(--mono);font-size:10px;color:var(--muted);padding:6px;outline:none;">
+            <option value="triage">⚡ Triage (fast)</option>
+            <option value="full">🔬 Full Analysis</option>
+          </select>
+        </div>
+        <button id="bgStartBtn" onclick="startCrawl()"
+          style="width:100%;background:var(--green);color:var(--bg);border:none;
+          font-family:var(--mono);font-size:10px;font-weight:600;text-transform:uppercase;
+          letter-spacing:.14em;padding:9px;cursor:pointer;">▶ Start Crawl</button>
+      </div>
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);">
+        <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+          letter-spacing:.14em;color:var(--dim);margin-bottom:6px;">Resume Crawl</div>
+        <div style="display:flex;gap:0;border:1px solid var(--border);">
+          <input id="bgResumeId" placeholder="Paste crawl ID…"
             style="flex:1;background:var(--bg3);border:none;outline:none;
             font-family:var(--mono);font-size:11px;color:var(--text);padding:7px 10px;"
-            onkeydown="if(event.key==='Enter')resumeBulkJob()">
-          <button onclick="resumeBulkJob()"
-            style="background:rgba(78,201,148,.10);border:none;border-left:1px solid rgba(78,201,148,.2);
-            color:var(--green);font-family:var(--mono);font-size:10px;
-            text-transform:uppercase;letter-spacing:.10em;padding:7px 12px;cursor:pointer;">
-            Resume
-          </button>
+            onkeydown="if(event.key==='Enter')resumeCrawl()">
+          <button onclick="resumeCrawl()" style="background:rgba(78,201,148,.10);border:none;
+            border-left:1px solid rgba(78,201,148,.2);color:var(--green);
+            font-family:var(--mono);font-size:10px;text-transform:uppercase;
+            letter-spacing:.10em;padding:7px 12px;cursor:pointer;">Go</button>
         </div>
       </div>
-
-      <!-- Active jobs list -->
-      <div style="padding:14px;border-bottom:1px solid var(--border);">
+      <div style="padding:12px 14px;flex:1;min-height:0;overflow-y:auto;">
         <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Active Jobs</div>
-        <div id="bulkJobList" style="display:flex;flex-direction:column;gap:6px;">
-          <div style="font-family:var(--mono);font-size:11px;color:var(--dim);">No jobs yet.</div>
+          letter-spacing:.14em;color:var(--dim);margin-bottom:6px;
+          display:flex;justify-content:space-between;">
+          <span>ASN Clusters</span>
+          <span id="bgClusterMeta" style="font-size:8px;color:rgba(200,169,110,.5);
+            text-transform:none;letter-spacing:0;"></span>
         </div>
+        <div id="bgClusterList" style="font-family:var(--mono);font-size:10px;color:var(--dim);">
+          Run a crawl to see clusters.</div>
       </div>
-
-      <!-- ASN Clusters -->
-      <div style="padding:14px;flex:1;">
-        <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-          letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">
-          ASN Clusters
-          <span id="bulkClusterMeta" style="text-transform:none;letter-spacing:0;
-            color:rgba(200,169,110,.5);margin-left:8px;font-size:9px;"></span>
-        </div>
-        <div id="bulkClusterList" style="font-family:var(--mono);font-size:10px;
-          color:var(--dim);">Run a job to see clusters.</div>
-      </div>
-
-      <!-- Graph controls -->
-      <div style="padding:14px;border-top:1px solid var(--border);flex-shrink:0;">
+      <div style="padding:12px 14px;border-top:1px solid var(--border);flex-shrink:0;">
         <div style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
           letter-spacing:.14em;color:var(--dim);margin-bottom:8px;">Graph Controls</div>
-        <div style="display:flex;gap:6px;flex-wrap:wrap;">
-          <select id="bulkLayoutSelect" onchange="changeBulkLayout(this.value)"
-            style="background:var(--bg3);border:1px solid var(--border);
-            font-family:var(--mono);font-size:10px;color:var(--muted);
-            padding:5px 8px;outline:none;flex:1;">
+        <div style="display:flex;gap:6px;margin-bottom:6px;">
+          <select onchange="changeBgLayout(this.value)" style="flex:1;background:var(--bg3);
+            border:1px solid var(--border);font-family:var(--mono);font-size:10px;
+            color:var(--muted);padding:5px;outline:none;">
             <option value="asn">ASN Clusters</option>
             <option value="country">By Country</option>
-            <option value="force">Force-Directed</option>
+            <option value="force">Force</option>
           </select>
-          <select id="bulkColorSelect" onchange="colorBulkGraph(this.value)"
-            style="background:var(--bg3);border:1px solid var(--border);
-            font-family:var(--mono);font-size:10px;color:var(--muted);
-            padding:5px 8px;outline:none;flex:1;">
-            <option value="asn">Color by ASN</option>
-            <option value="country">Color by Country</option>
-            <option value="category">Color by Category</option>
+          <select onchange="colorBgGraph(this.value)" style="flex:1;background:var(--bg3);
+            border:1px solid var(--border);font-family:var(--mono);font-size:10px;
+            color:var(--muted);padding:5px;outline:none;">
+            <option value="asn">Color: ASN</option>
+            <option value="country">Color: Country</option>
           </select>
         </div>
-        <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;">
-          <button onclick="toggleBulkRecord()" id="bulkRecBtn"
-            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-            letter-spacing:.10em;padding:5px 10px;background:rgba(192,57,43,.12);
-            color:var(--red);border:1px solid rgba(192,57,43,.25);cursor:pointer;flex:1;">
-            ⏺ Record
-          </button>
-          <button onclick="exportBulkGEXF()"
-            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-            letter-spacing:.10em;padding:5px 10px;background:transparent;
-            color:var(--dim);border:1px solid var(--border);cursor:pointer;flex:1;">
-            ↓ GEXF
-          </button>
-          <button onclick="clearBulkGraph()"
-            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
-            letter-spacing:.10em;padding:5px 10px;background:transparent;
-            color:var(--dim);border:1px solid var(--border);cursor:pointer;flex:1;">
-            Clear
-          </button>
+        <div style="display:flex;gap:6px;">
+          <button id="bgRecBtn" onclick="toggleBgRecord()"
+            style="flex:1;font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;padding:6px;background:rgba(192,57,43,.12);
+            color:var(--red);border:1px solid rgba(192,57,43,.25);cursor:pointer;">⏺ Record</button>
+          <button onclick="exportBgGEXF()" style="flex:1;font-family:var(--mono);font-size:9px;
+            text-transform:uppercase;letter-spacing:.10em;padding:6px;background:transparent;
+            color:var(--dim);border:1px solid var(--border);cursor:pointer;">↓ GEXF</button>
+          <button onclick="clearBgGraph()" style="flex:1;font-family:var(--mono);font-size:9px;
+            text-transform:uppercase;letter-spacing:.10em;padding:6px;background:transparent;
+            color:var(--dim);border:1px solid var(--border);cursor:pointer;">Clear</button>
         </div>
       </div>
     </div>
-
-    <!-- RIGHT — SIGMA GRAPH CANVAS -->
-    <div style="flex:1;position:relative;overflow:hidden;background:
-      radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.03) 0%,transparent 70%),
-      var(--bg);">
-      <div id="bulkSigmaContainer" style="width:100%;height:100%;"></div>
-      <!-- Graph empty state -->
-      <div id="bulkGraphEmpty" style="position:absolute;inset:0;display:flex;
-        flex-direction:column;align-items:center;justify-content:center;gap:10px;
-        pointer-events:none;">
-        <div style="font-size:40px;opacity:.1;">◎</div>
+    <div style="flex:1;position:relative;overflow:hidden;
+      background:radial-gradient(ellipse 80% 60% at 50% 50%,rgba(200,169,110,.02) 0%,transparent 70%),var(--bg);">
+      <div id="bgSigmaContainer" style="width:100%;height:100%;"></div>
+      <div id="bgGraphEmpty" style="position:absolute;inset:0;display:flex;
+        flex-direction:column;align-items:center;justify-content:center;gap:12px;pointer-events:none;">
+        <div style="font-size:48px;opacity:.06;">◎</div>
         <div style="font-family:var(--mono);font-size:11px;color:var(--dim);
-          text-align:center;line-height:1.9;max-width:320px;">
-          Submit a job to begin.<br>
-          Nodes render here as results arrive.<br>
-          Handles up to 500,000 nodes via WebGL.
+          text-align:center;line-height:2.2;max-width:400px;">
+          Enter a seed domain → <strong style="color:var(--muted)">▶ Start Crawl</strong><br>
+          Follows SSL SANs · Shared IPs · Nameservers — recursively<br>
+          Cap: 500,000 domains · Runs while laptop sleeps<br>
+          <span style="color:rgba(78,201,148,.4)">Nodes appear live as the server crawls</span>
         </div>
       </div>
-      <!-- Node count overlay -->
-      <div style="position:absolute;top:10px;right:10px;
-        font-family:var(--mono);font-size:10px;color:var(--dim);
-        background:rgba(5,5,5,.8);padding:4px 10px;border:1px solid var(--border);">
-        <span id="sigmaNodeCount">0</span> nodes ·
-        <span id="sigmaEdgeCount">0</span> edges
+      <div style="position:absolute;top:10px;right:10px;font-family:var(--mono);font-size:10px;
+        color:var(--dim);background:rgba(5,5,5,.85);padding:5px 12px;border:1px solid var(--border);">
+        <span id="bgNodeCount">0</span> nodes · <span id="bgEdgeCount">0</span> edges
       </div>
-      <!-- Tooltip -->
-      <div id="bulkTooltip" style="display:none;position:absolute;
-        background:var(--bg3);border:1px solid var(--border);
-        padding:8px 12px;font-family:var(--mono);font-size:10px;
+      <div id="bgTooltip" style="display:none;position:absolute;background:var(--bg3);
+        border:1px solid var(--border);padding:8px 12px;font-family:var(--mono);font-size:10px;
         color:var(--muted);pointer-events:none;z-index:100;
-        box-shadow:0 8px 32px rgba(0,0,0,.7);max-width:220px;"></div>
+        box-shadow:0 8px 32px rgba(0,0,0,.7);max-width:240px;line-height:1.8;"></div>
     </div>
   </div>
 </div>
