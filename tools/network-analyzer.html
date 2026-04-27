@@ -4076,14 +4076,18 @@ let bgTableData = []; // [{domain, ip, asn, org, country, depth, ts}]
 function pushToTable(domain, data) {
   bgTableData.push({
     domain,
-    ip:      data.ip      || '',
-    asn:     data.asn     || '',
-    org:     data.org     || '',
-    country: data.country || '',
-    depth:   data._crawl_depth || 0,
-    ts:      Date.now(),
+    ip:         data.ip         || '',
+    asn:        data.asn        || '',
+    org:        data.org        || '',
+    country:    data.country    || '',
+    depth:      data._crawl_depth || 0,
+    via:        data._discovered_via || (data._crawl_depth === 0 ? 'seed' : 'unknown'),
+    confidence: typeof data._discovery_confidence === 'number'
+                  ? data._discovery_confidence
+                  : (data._crawl_depth === 0 ? 1.0 : 0.5),
+    parent:     data._parent_domain || '',
+    ts:         Date.now(),
   });
-  // Always re-render on table view
   if (bgCurrentView === 'table') renderBgTable();
 }
 
