@@ -4240,8 +4240,10 @@ async function pollCrawl(crawlId) {
     updateBgProgress(data);
     updateBgHero(data);
 
-    // Render cluster list periodically
-    if (data.status === 'complete' || (bgLastSeen > 0 && bgLastSeen % 500 === 0)) {
+    // Refresh cluster list every poll — uses in-memory data (fast)
+    renderBgClustersFromMemory();
+    // Periodically refresh from server for org names
+    if (data.status === 'complete' || (bgLastSeen > 0 && bgLastSeen % 100 === 0)) {
       loadBgClusters(crawlId);
     }
 
@@ -4364,12 +4366,39 @@ async function resumeCrawl() {
 }
 
 async function loadBgClusters(crawlId) {
+  // First, immediately render from in-memory data so the panel always shows current state
+  renderBgClustersFromMemory();
+  // Then refresh from server for org names + accurate counts (server has authoritative data)
   try {
     const res = await fetch(`${API}/network/crawl/${crawlId}/clusters`);
     if (!res.ok) return;
     const data = await res.json();
-    renderBgClusters(data.clusters || [], data.total_processed || 0);
+    if (data.clusters && data.clusters.length) {
+      renderBgClusters(data.clusters, data.total_processed || 0);
+    }
   } catch(e) {}
+}
+
+function renderBgClustersFromMemory() {
+  // Build cluster list from bgNodeData (same source as Cytoscape graph)
+  const counts = {};
+  Object.values(bgNodeData).forEach(d => {
+    const asn = d.asn || 'UNKNOWN';
+    if (!counts[asn]) {
+      counts[asn] = {
+        asn,
+        count: 0,
+        org: d.org || '',
+        country: d.country || '',
+      };
+    }
+    counts[asn].count++;
+    // Prefer non-empty org if not yet set
+    if (!counts[asn].org && d.org) counts[asn].org = d.org;
+    if (!counts[asn].country && d.country) counts[asn].country = d.country;
+  });
+  const clusters = Object.values(counts).sort((a,b) => b.count - a.count);
+  renderBgClusters(clusters, Object.keys(bgNodeData).length);
 }
 
 function renderBgClusters(clusters, total) {
