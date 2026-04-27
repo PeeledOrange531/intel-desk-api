@@ -127,13 +127,45 @@ def get_asn_info(ip: str) -> dict:
 
 def get_ssl_sans(domain: str) -> list:
     """
-    Fetch SSL certificate SANs via multiple sources with fallback chain.
-    NEVER return early — always try ALL sources and merge results.
-    External domains often only appear in OTX/URLScan, not crt.sh.
+    Returns list of plain domain strings (subdomains and external SANs from
+    multiple sources). Used for analyzer.
     """
-    sans = set()
+    tagged = get_ssl_sans_tagged(domain)
+    domain_root = '.'.join(domain.split('.')[-2:])
+    external = [t['domain'] for t in tagged if domain_root not in t['domain']]
+    subs     = [t['domain'] for t in tagged if domain_root in t['domain']]
+    seen = set()
+    out = []
+    for d in external + subs:
+        if d not in seen:
+            seen.add(d)
+            out.append(d)
+    return out[:300]
 
-    # Method 1: crt.sh — direct requests, accumulate (no early return)
+
+def get_ssl_sans_tagged(domain: str) -> list:
+    """
+    Returns list of {domain, method, confidence} dicts.
+
+    Confidence tiers:
+      0.95 — Domain found on actual SSL certificate of THIS domain (cert handshake)
+      0.85 — Domain found on a published cert with this domain (crt.sh, certspotter)
+      0.50 — Found via passive DNS / HackerTarget hostsearch (correlation, not proof)
+      0.40 — Found via URLScan co-occurrence (URLs cross-loaded together)
+      0.30 — Found via OTX passive DNS
+      0.20 — DNS brute-force success (just exists, no inferred relationship)
+    """
+    found = {}  # domain -> {domain, method, confidence}
+
+    def _add(d, method, confidence):
+        d = d.strip().lstrip("*.").lower()
+        if not d or "." not in d or d == domain:
+            return
+        existing = found.get(d)
+        if not existing or existing['confidence'] < confidence:
+            found[d] = {'domain': d, 'method': method, 'confidence': confidence}
+
+    # Method 1: crt.sh — high confidence (real cert sharing)
     for attempt in range(2):
         try:
             r = requests.get(
@@ -144,10 +176,8 @@ def get_ssl_sans(domain: str) -> list:
                 certs = r.json()
                 for cert in certs[:60]:
                     for name in cert.get("name_value", "").split("\n"):
-                        name = name.strip().lstrip("*.")
-                        if name and "." in name and name != domain:
-                            sans.add(name)
-                break  # success, no retry
+                        _add(name, 'ssl_cert_crtsh', 0.85)
+                break
             elif r.status_code in (429, 503):
                 time.sleep(2)
                 continue
@@ -155,7 +185,7 @@ def get_ssl_sans(domain: str) -> list:
             logger.debug(f"crt.sh error for {domain}: {e}")
         break
 
-    # Method 2: certspotter
+    # Method 2: certspotter — high confidence
     try:
         r2 = requests.get(
             f"https://api.certspotter.com/v1/issuances?domain={domain}"
@@ -165,13 +195,11 @@ def get_ssl_sans(domain: str) -> list:
         if r2.status_code == 200:
             for cert in r2.json():
                 for name in cert.get("dns_names", []):
-                    name = name.strip().lstrip("*.")
-                    if name and "." in name and name != domain:
-                        sans.add(name)
+                    _add(name, 'ssl_cert_certspotter', 0.85)
     except Exception as e:
         logger.debug(f"certspotter error for {domain}: {e}")
 
-    # Method 3: HackerTarget hostsearch (subdomain enumeration)
+    # Method 3: HackerTarget hostsearch — medium (DNS history)
     try:
         r3 = requests.get(
             f"https://api.hackertarget.com/hostsearch/?q={domain}",
@@ -181,12 +209,11 @@ def get_ssl_sans(domain: str) -> list:
             for line in r3.text.strip().split("\n"):
                 if "," in line:
                     sub = line.split(",")[0].strip()
-                    if sub and sub != domain and "." in sub:
-                        sans.add(sub)
+                    _add(sub, 'hackertarget_hostsearch', 0.50)
     except Exception as e:
         logger.debug(f"hackertarget hostsearch error for {domain}: {e}")
 
-    # Method 4: AlienVault OTX passive DNS — KEY for external network discovery
+    # Method 4: AlienVault OTX — medium-low (passive DNS, very broad)
     try:
         r4 = requests.get(
             f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns",
@@ -196,12 +223,12 @@ def get_ssl_sans(domain: str) -> list:
             data = r4.json()
             for rec in data.get('passive_dns', [])[:300]:
                 h = rec.get('hostname', '').strip().lower()
-                if h and h != domain and '.' in h and not h.startswith('www.'):
-                    sans.add(h)
+                if h and not h.startswith('www.'):
+                    _add(h, 'otx_passive_dns', 0.30)
     except Exception as e:
         logger.debug(f"OTX error for {domain}: {e}")
 
-    # Method 5: URLScan.io — KEY for finding co-referenced external domains
+    # Method 5: URLScan.io — low-medium (cross-load, not infrastructure)
     try:
         r5 = requests.get(
             f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=100",
@@ -212,16 +239,14 @@ def get_ssl_sans(domain: str) -> list:
             for result in data.get('results', [])[:100]:
                 page = result.get('page', {})
                 d = page.get('domain', '').strip().lower()
-                if d and d != domain and '.' in d:
-                    sans.add(d)
+                _add(d, 'urlscan', 0.40)
                 task = result.get('task', {})
                 td = task.get('domain', '').strip().lower()
-                if td and td != domain and '.' in td:
-                    sans.add(td)
+                _add(td, 'urlscan', 0.40)
     except Exception as e:
         logger.debug(f"URLScan error for {domain}: {e}")
 
-    # Method 6: ThreatMiner subdomains
+    # Method 6: ThreatMiner — medium
     try:
         r6 = requests.get(
             f"https://api.threatminer.org/v2/domain.php?q={domain}&rt=5",
@@ -230,13 +255,11 @@ def get_ssl_sans(domain: str) -> list:
         if r6.status_code == 200:
             data = r6.json()
             for sub in data.get('results', [])[:200]:
-                sub = sub.strip().lower()
-                if sub and sub != domain and '.' in sub:
-                    sans.add(sub)
+                _add(sub, 'threatminer', 0.45)
     except Exception as e:
         logger.debug(f"ThreatMiner error for {domain}: {e}")
 
-    # Method 7: Direct SSL handshake — read actual cert SANs
+    # Method 7: Direct SSL handshake — VERY HIGH (we read the actual cert)
     try:
         import ssl as ssl_lib
         ctx = ssl_lib.create_default_context()
@@ -245,14 +268,12 @@ def get_ssl_sans(domain: str) -> list:
                 cert = ssock.getpeercert()
                 for typ, val in cert.get('subjectAltName', []):
                     if typ == 'DNS':
-                        v = val.strip().lstrip('*.').lower()
-                        if v and v != domain and '.' in v:
-                            sans.add(v)
+                        _add(val, 'ssl_cert_direct', 0.95)
     except Exception as e:
         logger.debug(f"SSL handshake error for {domain}: {e}")
 
-    # Method 8: DNS brute-force common subdomains (last resort)
-    if len(sans) < 5:
+    # Method 8: DNS brute-force — VERY LOW confidence (just exists)
+    if len(found) < 5:
         common = [
             "www","en","es","fr","ar","ru","de","pt","it","ja","ko","zh",
             "africa","america","europe","asia","mideast","latin",
@@ -263,23 +284,20 @@ def get_ssl_sans(domain: str) -> list:
         for sub in common:
             try:
                 socket.gethostbyname(f"{sub}.{domain}")
-                sans.add(f"{sub}.{domain}")
+                _add(f"{sub}.{domain}", 'dns_brute', 0.20)
             except Exception:
                 pass
 
-    # Sort: external domains (different root) first, then subdomains
+    results = list(found.values())
+    # Sort: external first, then by confidence
     domain_root = '.'.join(domain.split('.')[-2:])
-    external = []
-    subs = []
-    for s in sans:
-        if domain_root in s:
-            subs.append(s)
-        else:
-            external.append(s)
-    # Return external domains first (more valuable for network expansion), then subs
-    result = sorted(external) + sorted(subs)
-    logger.info(f"get_ssl_sans({domain}): {len(external)} external + {len(subs)} subs = {len(result)} total")
-    return result[:300]
+    results.sort(key=lambda x: (
+        domain_root in x['domain'],
+        -x['confidence'],
+        x['domain']
+    ))
+    logger.info(f"get_ssl_sans_tagged({domain}): {len(results)} neighbors found")
+    return results[:300]
 
 
 
@@ -1922,6 +1940,11 @@ def _run_crawl(crawl_id):
                 result = analyze_domain(domain)
 
             result['_crawl_depth'] = crawl.get('depth_map', {}).get(domain, 0)
+            # Include discovery method and confidence for filtering/scoring
+            disc = crawl.get('discovery_info', {}).get(domain, {})
+            result['_discovered_via'] = disc.get('method', 'seed' if domain == seed else 'unknown')
+            result['_discovery_confidence'] = disc.get('confidence', 1.0 if domain == seed else 0.5)
+            result['_parent_domain'] = disc.get('parent', '')
             _append_crawl_result(crawl_id, result)
 
             with _crawls_lock:
@@ -1942,11 +1965,27 @@ def _run_crawl(crawl_id):
             depth_map = crawl.setdefault('depth_map', {})
             cur_depth = depth_map.get(domain, 0)
 
-            for n in neighbors:
+            for nb in neighbors:
+                # nb may be a dict (new format) or string (legacy)
+                if isinstance(nb, dict):
+                    n = nb['domain']
+                    method = nb.get('method', 'unknown')
+                    confidence = nb.get('confidence', 0.5)
+                else:
+                    n = nb
+                    method = 'unknown'
+                    confidence = 0.5
                 if n not in seen and len(seen) < max_doms:
                     seen.add(n)
                     queue.append(n)
                     depth_map[n] = cur_depth + 1
+                    # Track how this neighbor was discovered
+                    discovery_info = crawl.setdefault('discovery_info', {})
+                    discovery_info[n] = {
+                        'parent': domain,
+                        'method': method,
+                        'confidence': confidence,
+                    }
 
         # Complete
         with _crawls_lock:
@@ -1970,24 +2009,86 @@ def _run_crawl(crawl_id):
         _crawl_threads.discard(crawl_id)
 
 
+
+# Nameservers serving so many domains that finding a co-tenant is meaningless.
+# These are public DNS, big commodity providers, free hosting / parking platforms.
+PROMISCUOUS_NAMESERVERS = {
+    # Public/free DNS
+    'alidns.com', 'dnspod.net', 'cloudflare.com', 'awsdns', 'azure-dns',
+    'googledomains.com', 'google.com', 'azure.com', 'azurewebsites.net',
+    # Big registrars / hosting platforms whose NS are shared by millions
+    'godaddy.com', 'namecheap.com', 'namecheaphosting.com', 'domaincontrol.com',
+    'bluehost.com', 'hostgator.com', 'hostinger.com', 'siteground.com',
+    'wordpress.com', 'wpengine.com', 'wix.com', 'wixdns.net', 'squarespace.com',
+    'shopify.com', 'shopifydns.com', 'webflow.com', 'webflowdns.io',
+    'name-services.com', 'registrar-servers.com',
+    # Russian commodity hosts
+    'reg.ru', 'reg.com', 'beget.com',
+    # Chinese commodity hosts  
+    'ename.com', 'aliyun.com', 'taobao.com', 'tencent.com', 'qcloud.com',
+    'cnnic.cn', 'hichina.com', 'xinnet.com',
+    # Cloudflare
+    'cloudflare-dns.com', 'one.one.one.one',
+}
+
+def is_promiscuous_nameserver(ns):
+    """True if this nameserver is shared by so many unrelated domains that
+    a co-tenant relationship is not meaningful evidence of operational connection."""
+    if not ns: return True
+    ns_low = ns.lower().strip().rstrip('.')
+    for promiscuous in PROMISCUOUS_NAMESERVERS:
+        if promiscuous in ns_low:
+            return True
+    return False
+
+
+def is_cdn_or_shared_ip(ip, asn_org=''):
+    """True if this IP is part of a CDN or major shared-tenancy infrastructure
+    where co-hosted domains are unlikely to indicate real operational connection."""
+    if not ip: return True
+    org_low = (asn_org or '').lower()
+    cdn_orgs = [
+        'cloudflare', 'fastly', 'akamai', 'amazon', 'aws',
+        'microsoft', 'azure', 'google llc', 'google cloud',
+        'digitalocean', 'linode', 'ovh', 'hetzner',
+        'shopify', 'squarespace', 'wix', 'wordpress',
+        'cloudfront', 'leaseweb', 'vercel', 'netlify',
+        'github', 'heroku',
+    ]
+    return any(o in org_low for o in cdn_orgs)
+
+
 def _discover_neighbors(domain, triage_result):
     """
-    Find neighboring domains — runs all lookups in parallel with a hard timeout.
+    Find neighboring domains — returns list of {domain, method, confidence} dicts.
+
+    Confidence is automatically degraded when:
+      - Reverse IP lookup hits CDN/shared infra (Cloudflare, AWS, etc.)
+      - Nameserver lookup uses a promiscuous public/commodity NS
     """
-    ip = triage_result.get('ip')
+    ip      = triage_result.get('ip')
+    asn_org = (triage_result.get('org') or triage_result.get('asn_org') or '')
     neighbors = []
 
-    def _safe_ssl_sans():
+    def _safe_ssl():
         try:
-            return get_ssl_sans(domain)  # no per-source cap; merged below
-        except Exception:
+            return get_ssl_sans_tagged(domain)
+        except Exception as e:
+            logger.debug(f"ssl tagged err: {e}")
             return []
 
     def _safe_reverse_ip():
         if not ip: return []
         try:
-            return get_reverse_ip(ip)[:50]
-        except Exception:
+            raw = get_reverse_ip(ip)[:50]
+            # Determine confidence tier — CDN/shared = low, dedicated = high
+            cdn = is_cdn_or_shared_ip(ip, asn_org)
+            method = 'reverse_ip_shared' if cdn else 'reverse_ip_dedicated'
+            confidence = 0.25 if cdn else 0.80
+            return [{'domain': d, 'method': method, 'confidence': confidence}
+                    for d in raw]
+        except Exception as e:
+            logger.debug(f"reverse ip err: {e}")
             return []
 
     def _safe_nameservers():
@@ -1996,35 +2097,50 @@ def _discover_neighbors(domain, triage_result):
             result = []
             for ns in whois_data.get('nameservers', [])[:2]:
                 try:
-                    result.extend(_hackertarget_nameserver_lookup(ns)[:30])
+                    promiscuous = is_promiscuous_nameserver(ns)
+                    method = 'nameserver_public' if promiscuous else 'nameserver_dedicated'
+                    confidence = 0.15 if promiscuous else 0.65
+                    raw = _hackertarget_nameserver_lookup(ns)[:30]
+                    for d in raw:
+                        result.append({'domain': d, 'method': method, 'confidence': confidence})
                 except Exception:
                     pass
             return result
-        except Exception:
+        except Exception as e:
+            logger.debug(f"nameserver err: {e}")
             return []
 
-    # Run all three in parallel, hard 20-second total timeout
+    # Run all three in parallel
     with ThreadPoolExecutor(max_workers=3) as ex:
-        f_ssl  = ex.submit(_safe_ssl_sans)
+        f_ssl  = ex.submit(_safe_ssl)
         f_rip  = ex.submit(_safe_reverse_ip)
         f_ns   = ex.submit(_safe_nameservers)
-
         for f in [f_ssl, f_rip, f_ns]:
             try:
                 neighbors.extend(f.result(timeout=20))
             except Exception:
                 pass
 
-    # Clean and deduplicate
-    cleaned = []
-    seen_local = set()
+    # Merge — keep highest confidence per domain
+    by_domain = {}
     for n in neighbors:
-        n = clean_domain(n)
-        if n and n != domain and n not in seen_local:
-            seen_local.add(n)
-            cleaned.append(n)
+        d = clean_domain(n.get('domain') or '')
+        if not d or d == domain:
+            continue
+        existing = by_domain.get(d)
+        if not existing or existing['confidence'] < n['confidence']:
+            by_domain[d] = {
+                'domain': d,
+                'method': n['method'],
+                'confidence': n['confidence'],
+            }
 
-    logger.info(f"_discover_neighbors({domain}): found {len(cleaned)} neighbors")
+    cleaned = list(by_domain.values())
+    # Sort: highest confidence first
+    cleaned.sort(key=lambda x: -x['confidence'])
+
+    logger.info(f"_discover_neighbors({domain}): found {len(cleaned)} neighbors "
+                f"(high-confidence: {sum(1 for n in cleaned if n['confidence']>=0.7)})")
     return cleaned[:200]
 
 
