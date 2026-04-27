@@ -128,10 +128,12 @@ def get_asn_info(ip: str) -> dict:
 def get_ssl_sans(domain: str) -> list:
     """
     Fetch SSL certificate SANs via multiple sources with fallback chain.
+    NEVER return early — always try ALL sources and merge results.
+    External domains often only appear in OTX/URLScan, not crt.sh.
     """
     sans = set()
 
-    # Method 1: crt.sh — direct requests to handle non-200 without exception
+    # Method 1: crt.sh — direct requests, accumulate (no early return)
     for attempt in range(2):
         try:
             r = requests.get(
@@ -145,8 +147,139 @@ def get_ssl_sans(domain: str) -> list:
                         name = name.strip().lstrip("*.")
                         if name and "." in name and name != domain:
                             sans.add(name)
-                if sans:
-                    return sorted(sans)[:100]
+                break  # success, no retry
+            elif r.status_code in (429, 503):
+                time.sleep(2)
+                continue
+        except Exception as e:
+            logger.debug(f"crt.sh error for {domain}: {e}")
+        break
+
+    # Method 2: certspotter
+    try:
+        r2 = requests.get(
+            f"https://api.certspotter.com/v1/issuances?domain={domain}"
+            f"&include_subdomains=true&expand=dns_names",
+            headers=HEADERS, timeout=10
+        )
+        if r2.status_code == 200:
+            for cert in r2.json():
+                for name in cert.get("dns_names", []):
+                    name = name.strip().lstrip("*.")
+                    if name and "." in name and name != domain:
+                        sans.add(name)
+    except Exception as e:
+        logger.debug(f"certspotter error for {domain}: {e}")
+
+    # Method 3: HackerTarget hostsearch (subdomain enumeration)
+    try:
+        r3 = requests.get(
+            f"https://api.hackertarget.com/hostsearch/?q={domain}",
+            headers=HEADERS, timeout=8
+        )
+        if r3.status_code == 200 and "error" not in r3.text.lower():
+            for line in r3.text.strip().split("\n"):
+                if "," in line:
+                    sub = line.split(",")[0].strip()
+                    if sub and sub != domain and "." in sub:
+                        sans.add(sub)
+    except Exception as e:
+        logger.debug(f"hackertarget hostsearch error for {domain}: {e}")
+
+    # Method 4: AlienVault OTX passive DNS — KEY for external network discovery
+    try:
+        r4 = requests.get(
+            f"https://otx.alienvault.com/api/v1/indicators/domain/{domain}/passive_dns",
+            headers=HEADERS, timeout=10
+        )
+        if r4.status_code == 200:
+            data = r4.json()
+            for rec in data.get('passive_dns', [])[:300]:
+                h = rec.get('hostname', '').strip().lower()
+                if h and h != domain and '.' in h and not h.startswith('www.'):
+                    sans.add(h)
+    except Exception as e:
+        logger.debug(f"OTX error for {domain}: {e}")
+
+    # Method 5: URLScan.io — KEY for finding co-referenced external domains
+    try:
+        r5 = requests.get(
+            f"https://urlscan.io/api/v1/search/?q=domain:{domain}&size=100",
+            headers=HEADERS, timeout=10
+        )
+        if r5.status_code == 200:
+            data = r5.json()
+            for result in data.get('results', [])[:100]:
+                page = result.get('page', {})
+                d = page.get('domain', '').strip().lower()
+                if d and d != domain and '.' in d:
+                    sans.add(d)
+                task = result.get('task', {})
+                td = task.get('domain', '').strip().lower()
+                if td and td != domain and '.' in td:
+                    sans.add(td)
+    except Exception as e:
+        logger.debug(f"URLScan error for {domain}: {e}")
+
+    # Method 6: ThreatMiner subdomains
+    try:
+        r6 = requests.get(
+            f"https://api.threatminer.org/v2/domain.php?q={domain}&rt=5",
+            headers=HEADERS, timeout=10
+        )
+        if r6.status_code == 200:
+            data = r6.json()
+            for sub in data.get('results', [])[:200]:
+                sub = sub.strip().lower()
+                if sub and sub != domain and '.' in sub:
+                    sans.add(sub)
+    except Exception as e:
+        logger.debug(f"ThreatMiner error for {domain}: {e}")
+
+    # Method 7: Direct SSL handshake — read actual cert SANs
+    try:
+        import ssl as ssl_lib
+        ctx = ssl_lib.create_default_context()
+        with socket.create_connection((domain, 443), timeout=6) as sock:
+            with ctx.wrap_socket(sock, server_hostname=domain) as ssock:
+                cert = ssock.getpeercert()
+                for typ, val in cert.get('subjectAltName', []):
+                    if typ == 'DNS':
+                        v = val.strip().lstrip('*.').lower()
+                        if v and v != domain and '.' in v:
+                            sans.add(v)
+    except Exception as e:
+        logger.debug(f"SSL handshake error for {domain}: {e}")
+
+    # Method 8: DNS brute-force common subdomains (last resort)
+    if len(sans) < 5:
+        common = [
+            "www","en","es","fr","ar","ru","de","pt","it","ja","ko","zh",
+            "africa","america","europe","asia","mideast","latin",
+            "news","live","radio","tv","video","audio","app","mobile","m",
+            "api","cdn","static","media","img","images","files","assets",
+            "mail","ftp","vpn","admin","blog","shop",
+        ]
+        for sub in common:
+            try:
+                socket.gethostbyname(f"{sub}.{domain}")
+                sans.add(f"{sub}.{domain}")
+            except Exception:
+                pass
+
+    # Sort: external domains (different root) first, then subdomains
+    domain_root = '.'.join(domain.split('.')[-2:])
+    external = []
+    subs = []
+    for s in sans:
+        if domain_root in s:
+            subs.append(s)
+        else:
+            external.append(s)
+    # Return external domains first (more valuable for network expansion), then subs
+    result = sorted(external) + sorted(subs)
+    logger.info(f"get_ssl_sans({domain}): {len(external)} external + {len(subs)} subs = {len(result)} total")
+    return result[:300]
             elif r.status_code in (429, 503):
                 time.sleep(2)
                 continue
@@ -1965,14 +2098,14 @@ def _discover_neighbors(domain, triage_result):
 
     def _safe_ssl_sans():
         try:
-            return get_ssl_sans(domain)[:30]
+            return get_ssl_sans(domain)  # no per-source cap; merged below
         except Exception:
             return []
 
     def _safe_reverse_ip():
         if not ip: return []
         try:
-            return get_reverse_ip(ip)[:20]
+            return get_reverse_ip(ip)[:50]
         except Exception:
             return []
 
@@ -1982,7 +2115,7 @@ def _discover_neighbors(domain, triage_result):
             result = []
             for ns in whois_data.get('nameservers', [])[:2]:
                 try:
-                    result.extend(_hackertarget_nameserver_lookup(ns)[:15])
+                    result.extend(_hackertarget_nameserver_lookup(ns)[:30])
                 except Exception:
                     pass
             return result
@@ -2011,7 +2144,7 @@ def _discover_neighbors(domain, triage_result):
             cleaned.append(n)
 
     logger.info(f"_discover_neighbors({domain}): found {len(cleaned)} neighbors")
-    return cleaned[:60]
+    return cleaned[:200]
 
 
 # ── Crawl routes ───────────────────────────────────────────────────────────────
