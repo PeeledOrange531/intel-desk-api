@@ -3507,11 +3507,11 @@ function initBgCy() {
         'opacity': 0.15,
       }},
       { selector: 'edge', style: {
-        'width':                  1,
-        'line-color':             'rgba(255,255,255,0.18)',
-        'opacity':                0.6,
-        'curve-style':            'bezier',
-        'target-arrow-shape':     'none',
+        'width':              'data(width)',
+        'line-color':         'data(edgeColor)',
+        'opacity':            'data(edgeOpacity)',
+        'curve-style':        'bezier',
+        'target-arrow-shape': 'none',
       }},
       { selector: 'edge.highlighted', style: {
         'line-color': '#00d9ff',
@@ -3613,6 +3613,9 @@ function addBgNode(domain, data) {
   const lbl = domain.length > 26 ? domain.slice(0, 23) + '…' : domain;
 
   try {
+    const conf = typeof data._discovery_confidence === 'number'
+                 ? data._discovery_confidence
+                 : (isSeed ? 1.0 : 0.5);
     bgCy.add({
       group: 'nodes',
       data: {
@@ -3622,6 +3625,8 @@ function addBgNode(domain, data) {
         suspicious,
         depth,
         asn: data.asn || 'UNKNOWN',
+        confidence: conf,
+        via: data._discovered_via || 'unknown',
       }
     });
   } catch(e) {
@@ -3644,9 +3649,21 @@ function addBgNode(domain, data) {
     if (!bgEdgeSet.has(edgeId) && bgCy.$id(parentId).length) {
       bgEdgeSet.add(edgeId);
       try {
+        const edgeColor = conf >= 0.85 ? 'rgba(34,197,94,0.7)'
+                       : conf >= 0.7  ? 'rgba(16,185,129,0.55)'
+                       : conf >= 0.4  ? 'rgba(251,191,36,0.4)'
+                       :                'rgba(239,68,68,0.25)';
+        const edgeWidth = conf >= 0.7 ? 1.5 : 1;
         bgCy.add({
           group: 'edges',
-          data: { id: edgeId, source: parentId, target: domain }
+          data: {
+            id: edgeId,
+            source: parentId,
+            target: domain,
+            edgeColor,
+            edgeOpacity: conf >= 0.7 ? 0.85 : 0.45,
+            width: edgeWidth,
+          }
         });
       } catch(e) {}
     }
@@ -4070,16 +4087,73 @@ function pushToTable(domain, data) {
   if (bgCurrentView === 'table') renderBgTable();
 }
 
+let bgConfidenceFilter = 'all';
+const CONF_THRESHOLDS = { all: 0, medium: 0.4, high: 0.7, strong: 0.85 };
+
+function bgSetConfidenceFilter(level) {
+  bgConfidenceFilter = level;
+  ['All','Medium','High','Strong'].forEach(l => {
+    const btn = document.getElementById('bgConf' + l);
+    if (!btn) return;
+    const active = l.toLowerCase() === level;
+    btn.style.background  = active ? 'rgba(200,169,110,0.18)' : 'transparent';
+    btn.style.color       = active ? 'var(--gold)' : 'var(--dim)';
+    btn.style.borderColor = active ? 'rgba(200,169,110,.3)' : 'var(--border)';
+  });
+  renderBgTable();
+}
+
+function bgVialabel(via) {
+  const map = {
+    'ssl_cert_direct':        { lbl:'CERT-LIVE', color:'#22c55e' },
+    'ssl_cert_crtsh':         { lbl:'CERT',      color:'#22c55e' },
+    'ssl_cert_certspotter':   { lbl:'CERT',      color:'#22c55e' },
+    'reverse_ip_dedicated':   { lbl:'IP-DED',    color:'#22c55e' },
+    'reverse_ip_shared':      { lbl:'IP-CDN',    color:'#f97316' },
+    'nameserver_dedicated':   { lbl:'NS-DED',    color:'#22c55e' },
+    'nameserver_public':      { lbl:'NS-PUB',    color:'#f97316' },
+    'hackertarget_hostsearch':{ lbl:'PDNS',      color:'#fbbf24' },
+    'otx_passive_dns':        { lbl:'OTX',       color:'#fbbf24' },
+    'urlscan':                { lbl:'URLSCAN',   color:'#fbbf24' },
+    'threatminer':            { lbl:'TM',        color:'#fbbf24' },
+    'dns_brute':              { lbl:'BRUTE',     color:'#ef4444' },
+    'seed':                   { lbl:'SEED',      color:'#fbbf24' },
+    'unknown':                { lbl:'?',         color:'#888' },
+  };
+  return map[via] || { lbl: (via||'?').slice(0,7).toUpperCase(), color: '#888' };
+}
+
 function renderBgTable() {
   const body   = document.getElementById('bgTableBody');
   const count  = document.getElementById('bgTableCount');
   if (!body) return;
 
   const filter = (document.getElementById('bgTableFilter')?.value || '').toLowerCase().trim();
-  const sort   = document.getElementById('bgTableSort')?.value || 'newest';
+  const sort   = document.getElementById('bgTableSort')?.value || 'confidence';
+  const minConf = CONF_THRESHOLDS[bgConfidenceFilter] ?? 0;
 
-  // Filter
-  let rows = bgTableData;
+  // Confidence stats display
+  let cStrong=0, cHigh=0, cMed=0, cLow=0;
+  bgTableData.forEach(r => {
+    const cfv = r.confidence || 0;
+    if (cfv >= 0.85) cStrong++;
+    else if (cfv >= 0.7) cHigh++;
+    else if (cfv >= 0.4) cMed++;
+    else cLow++;
+  });
+  const stats = document.getElementById('bgConfStats');
+  if (stats) {
+    stats.innerHTML =
+      '<span style="color:#22c55e">●</span> ' + cStrong + ' strong &nbsp; ' +
+      '<span style="color:#10b981">●</span> ' + cHigh   + ' high &nbsp; ' +
+      '<span style="color:#fbbf24">●</span> ' + cMed    + ' med &nbsp; ' +
+      '<span style="color:#ef4444">●</span> ' + cLow    + ' weak';
+  }
+
+  // Confidence filter first
+  let rows = bgTableData.filter(r => (r.confidence || 0) >= minConf);
+
+  // Then text filter
   if (filter) {
     rows = rows.filter(r =>
       (r.domain||'').toLowerCase().includes(filter) ||
@@ -4090,9 +4164,9 @@ function renderBgTable() {
     );
   }
 
-  // Sort — make a copy so we don't mutate the source
   rows = rows.slice();
-  if (sort === 'newest')       rows.sort((a,b) => (b.ts||0) - (a.ts||0));
+  if (sort === 'confidence')   rows.sort((a,b) => (b.confidence||0) - (a.confidence||0));
+  else if (sort === 'newest')  rows.sort((a,b) => (b.ts||0) - (a.ts||0));
   else if (sort === 'oldest')  rows.sort((a,b) => (a.ts||0) - (b.ts||0));
   else if (sort === 'asn')     rows.sort((a,b) => (a.asn||'').localeCompare(b.asn||''));
   else if (sort === 'country') rows.sort((a,b) => (a.country||'').localeCompare(b.country||''));
@@ -4124,21 +4198,39 @@ function renderBgTable() {
     const r = displayed[i];
     const sus = isSuspiciousASN(r.asn||'', r.org||'', r.country||'');
     const bg = sus ? 'background:rgba(192,57,43,.04);' : '';
+    const cf = r.confidence || 0;
+    const cfColor = cf >= 0.85 ? '#22c55e'
+                  : cf >= 0.7  ? '#10b981'
+                  : cf >= 0.4  ? '#fbbf24'
+                  :              '#ef4444';
+    const viaInfo = bgVialabel(r.via || 'unknown');
+    const titleAttr = r.parent
+      ? 'Discovered from ' + r.parent + ' via ' + (r.via || '?')
+      : 'Seed domain';
     html.push(
       '<div onclick="bgTableRowClick(\'' + esc(r.domain) + '\')" ' +
-      'style="display:grid;grid-template-columns:30px 1fr 100px 50px 120px 60px;' +
-      'gap:10px;padding:8px 18px;border-bottom:1px solid rgba(255,255,255,.03);' +
+      'title="' + esc(titleAttr) + '" ' +
+      'style="display:grid;grid-template-columns:30px 1fr 70px 90px 30px 100px 50px;' +
+      'gap:8px;padding:8px 18px;border-bottom:1px solid rgba(255,255,255,.03);' +
       'align-items:center;cursor:pointer;' + bg + '">' +
       '<div style="color:var(--dim);font-size:9px;">' + (i+1) + '</div>' +
-      '<div style="color:' + (sus?'var(--red)':'var(--gold2)') + ';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
+      '<div style="color:' + (sus?'var(--red)':'var(--gold2)') + ';overflow:hidden;' +
+        'text-overflow:ellipsis;white-space:nowrap;">' +
         (sus ? '⚠ ' : '') + esc(r.domain) + '</div>' +
-      '<div style="color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="' + esc(r.org||'') + '">' + esc(r.asn || '—') + '</div>' +
-      '<div style="color:var(--dim);font-size:10px;text-align:center;">' + esc(r.country || '—') + '</div>' +
-      '<div style="color:var(--dim);font-size:10px;">' + esc(r.ip || '—') + '</div>' +
+      '<div style="font-size:10px;display:flex;align-items:center;gap:4px;">' +
+        '<div style="width:6px;height:6px;border-radius:50%;background:' + cfColor + ';"></div>' +
+        '<span style="color:' + cfColor + ';font-weight:bold;">' + cf.toFixed(2) + '</span>' +
+      '</div>' +
+      '<div style="font-size:8.5px;color:' + viaInfo.color + ';font-weight:bold;letter-spacing:.05em;">' +
+        viaInfo.lbl + '</div>' +
       '<div style="color:var(--dim);font-size:10px;text-align:center;">' + (r.depth||0) + '</div>' +
+      '<div style="color:var(--muted);font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" ' +
+        'title="' + esc(r.org||'') + '">' + esc(r.asn || '—') + '</div>' +
+      '<div style="color:var(--dim);font-size:10px;text-align:center;">' + esc(r.country || '—') + '</div>' +
       '</div>'
     );
   }
+
 
   if (rows.length > limit) {
     html.push(
@@ -4716,6 +4808,7 @@ document.addEventListener('keydown', e => {
             style="background:var(--bg3);border:1px solid var(--border);
             font-family:var(--mono);font-size:10px;color:var(--muted);
             padding:6px 10px;outline:none;">
+            <option value="confidence">By Confidence</option>
             <option value="newest">Newest first</option>
             <option value="oldest">Oldest first</option>
             <option value="asn">By ASN</option>
@@ -4725,18 +4818,51 @@ document.addEventListener('keydown', e => {
           <span id="bgTableCount" style="font-family:var(--mono);font-size:10px;
             color:var(--dim);">0 results</span>
         </div>
+        <!-- Confidence filter — analyst-grade filtering -->
+        <div style="padding:8px 18px;border-bottom:1px solid var(--border);
+          background:var(--bg);display:flex;gap:6px;flex-wrap:wrap;align-items:center;">
+          <span style="font-family:var(--mono);font-size:8px;text-transform:uppercase;
+            letter-spacing:.16em;color:var(--dim);margin-right:4px;">Confidence:</span>
+          <button id="bgConfAll" onclick="bgSetConfidenceFilter('all')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;background:rgba(200,169,110,0.18);color:var(--gold);
+            border:1px solid rgba(200,169,110,.3);padding:5px 10px;cursor:pointer;border-radius:2px;">
+            All
+          </button>
+          <button id="bgConfMedium" onclick="bgSetConfidenceFilter('medium')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;background:transparent;color:var(--dim);
+            border:1px solid var(--border);padding:5px 10px;cursor:pointer;border-radius:2px;">
+            ≥ Medium (0.4)
+          </button>
+          <button id="bgConfHigh" onclick="bgSetConfidenceFilter('high')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;background:transparent;color:var(--dim);
+            border:1px solid var(--border);padding:5px 10px;cursor:pointer;border-radius:2px;">
+            ≥ High (0.7)
+          </button>
+          <button id="bgConfStrong" onclick="bgSetConfidenceFilter('strong')"
+            style="font-family:var(--mono);font-size:9px;text-transform:uppercase;
+            letter-spacing:.10em;background:transparent;color:var(--dim);
+            border:1px solid var(--border);padding:5px 10px;cursor:pointer;border-radius:2px;">
+            ≥ Strong (0.85)
+          </button>
+          <span style="flex:1;text-align:right;font-family:var(--mono);font-size:9px;
+            color:var(--dim);" id="bgConfStats"></span>
+        </div>
         <!-- Table header -->
-        <div style="display:grid;grid-template-columns:30px 1fr 100px 50px 120px 60px;
-          gap:10px;padding:8px 18px;background:var(--bg3);
+        <div style="display:grid;grid-template-columns:30px 1fr 70px 90px 30px 100px 50px;
+          gap:8px;padding:8px 18px;background:var(--bg3);
           border-bottom:1px solid var(--border);font-family:var(--mono);font-size:8px;
           text-transform:uppercase;letter-spacing:.14em;color:var(--dim);
           flex-shrink:0;align-items:center;">
           <div>#</div>
           <div>Domain</div>
+          <div title="Confidence score">Conf.</div>
+          <div title="How this domain was discovered">Via</div>
+          <div title="Recursion depth from seed">D</div>
           <div>ASN</div>
           <div>CC</div>
-          <div>IP</div>
-          <div>Depth</div>
         </div>
         <!-- Scrollable table body -->
         <div id="bgTableBody" style="flex:1;overflow-y:auto;font-family:var(--mono);
