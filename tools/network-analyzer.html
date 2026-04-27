@@ -3440,140 +3440,279 @@ function exitBackgroundMode() {
   document.body.style.overflow = '';
 }
 
-// ── SELF-CONTAINED CANVAS GRAPH RENDERER ─────────────────────────────────────
-// No external CDN dependencies — pure Canvas2D
-let bgCanvas = null, bgCtx = null, bgCanvasNodes = [];
-let bgCamera = {x:0, y:0, zoom:1};
-let bgDragState = null;
+// ── CYTOSCAPE-POWERED BACKGROUND GRAPH ────────────────────────────────────────
+// Matches the main investigation tool's graph experience.
+let bgCy        = null;     // Cytoscape instance
+let bgEdgeSet   = new Set();// edge IDs already added (dedup)
+let bgPendingLayoutTimer = null;
+let bgPendingFitTimer    = null;
 
-function initBgSigma() {
-  if (bgCanvas) return;
+function initBgSigma() { initBgCy(); }  // alias for backward compat
+
+function initBgCy() {
+  if (bgCy) return;
   const container = document.getElementById('bgSigmaContainer');
-  if (!container) return;
-  initBgCanvas(container);
+  if (!container || !container.offsetWidth) {
+    setTimeout(initBgCy, 200);
+    return;
+  }
+  bgCy = cytoscape({
+    container,
+    elements: [],
+    style: [
+      { selector: 'node', style: {
+        'background-color': 'data(color)',
+        'border-width':     'data(bw)',
+        'border-color':     'data(bc)',
+        'width':            'data(size)',
+        'height':           'data(size)',
+        'label':            'data(lbl)',
+        'shape':            'ellipse',
+        'font-family':      'DM Mono, monospace',
+        'font-size':        9,
+        'color':            'rgba(240,236,228,0.85)',
+        'text-valign':      'bottom',
+        'text-margin-y':    6,
+        'text-wrap':        'none',
+        'text-outline-color':'#050505',
+        'text-outline-width':2,
+        'text-outline-opacity':1,
+        'background-opacity':1,
+      }},
+      { selector: 'node[?seed]', style: {
+        'background-color': '#fbbf24',
+        'border-color':     '#fbbf24',
+        'border-width':     3,
+        'width':            36,
+        'height':           36,
+        'font-size':        12,
+        'font-weight':      'bold',
+        'color':            '#fbbf24',
+        'text-outline-width':3,
+      }},
+      { selector: 'node[?suspicious]', style: {
+        'border-color': '#ef4444',
+        'border-width': 2,
+      }},
+      { selector: 'node:selected', style: {
+        'border-color': '#00d9ff',
+        'border-width': 3,
+      }},
+      { selector: 'node.highlighted', style: {
+        'border-color': '#00d9ff',
+        'border-width': 3,
+        'background-color': '#00d9ff',
+      }},
+      { selector: 'node.faded', style: {
+        'opacity': 0.15,
+      }},
+      { selector: 'edge', style: {
+        'width':                  1,
+        'line-color':             'rgba(255,255,255,0.18)',
+        'opacity':                0.6,
+        'curve-style':            'bezier',
+        'target-arrow-shape':     'none',
+      }},
+      { selector: 'edge.highlighted', style: {
+        'line-color': '#00d9ff',
+        'width':      2,
+        'opacity':    1,
+      }},
+      { selector: 'edge.faded', style: {
+        'opacity': 0.05,
+      }},
+    ],
+    layout: { name: 'preset' },
+    userZoomingEnabled: true,
+    userPanningEnabled: true,
+    boxSelectionEnabled: false,
+    minZoom: 0.05,
+    maxZoom: 8,
+    wheelSensitivity: 0.25,
+  });
+
+  // Hover tooltip
+  const tooltip = document.getElementById('bgTooltip');
+  bgCy.on('mouseover', 'node', evt => {
+    const d = evt.target.data();
+    if (!tooltip) return;
+    const meta = bgNodeData[d.id] || {};
+    tooltip.style.display = 'block';
+    tooltip.innerHTML =
+      '<strong style="color:#fbbf24">' + esc(d.id) + '</strong><br>' +
+      (meta.asn ? '<span style="color:var(--dim)">' + esc(meta.asn) + '</span><br>' : '') +
+      (meta.org ? esc(String(meta.org).slice(0,40)) + '<br>' : '') +
+      (meta.country ? esc(meta.country) + '<br>' : '') +
+      (meta.ip ? '<span style="color:var(--dim)">' + esc(meta.ip) + '</span><br>' : '') +
+      '<span style="color:var(--dim);font-size:9px">Click → investigate</span>';
+    // Highlight neighbors
+    const neighborhood = evt.target.closedNeighborhood();
+    bgCy.elements().not(neighborhood).addClass('faded');
+    neighborhood.addClass('highlighted');
+  });
+  bgCy.on('mousemove', e => {
+    if (!tooltip) return;
+    tooltip.style.left = (e.originalEvent.clientX + 14) + 'px';
+    tooltip.style.top  = (e.originalEvent.clientY + 14) + 'px';
+  });
+  bgCy.on('mouseout', 'node', () => {
+    if (tooltip) tooltip.style.display = 'none';
+    bgCy.elements().removeClass('faded highlighted');
+  });
+  bgCy.on('tap', 'node', evt => {
+    const id = evt.target.data('id');
+    exitBackgroundMode();
+    document.getElementById('seedInput').value = id;
+    showHint(id + ' loaded — click Analyze to investigate');
+  });
 }
 
-function initBgCanvas(container) {
-  bgCanvas = document.createElement('canvas');
-  bgCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;cursor:grab;';
-  container.appendChild(bgCanvas);
-  bgCtx = bgCanvas.getContext('2d');
 
-  function resize() {
-    bgCanvas.width  = container.offsetWidth  || window.innerWidth  - 300;
-    bgCanvas.height = container.offsetHeight || window.innerHeight  - 120;
-    renderBgCanvas();
+function bgGetNodeColor(data) {
+  const asn = data.asn || 'UNKNOWN';
+  const isSus = isSuspiciousASN(asn, data.org||'', data.country||'');
+  if (!ASN_COLORS[asn]) {
+    let hash = 0;
+    for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash<<5)-hash);
+    if (isSus) {
+      ASN_COLORS[asn] = `hsl(${Math.abs(hash) % 30}, 90%, 60%)`;
+    } else {
+      ASN_COLORS[asn] = VIBRANT_PALETTE[Math.abs(hash) % VIBRANT_PALETTE.length];
+    }
   }
-  new ResizeObserver(resize).observe(container);
-  resize();
+  return ASN_COLORS[asn];
+}
 
-  // Mouse interactions — pan and click
-  bgCanvas.addEventListener('mousedown', e => {
-    bgDragState = {startX: e.clientX, startY: e.clientY,
-                   camX: bgCamera.x, camY: bgCamera.y};
-    bgCanvas.style.cursor = 'grabbing';
-  });
-  bgCanvas.addEventListener('mousemove', e => {
-    if (bgDragState) {
-      bgCamera.x = bgDragState.camX + (e.clientX - bgDragState.startX) / bgCamera.zoom;
-      bgCamera.y = bgDragState.camY + (e.clientY - bgDragState.startY) / bgCamera.zoom;
-      renderBgCanvas();
-    }
-    // Hover tooltip + node highlight
-    const hit = hitTest(e.offsetX, e.offsetY);
-    if (hit !== bgHoverNode) {
-      bgHoverNode = hit;
-      renderBgCanvas();
-    }
-    const tip = document.getElementById('bgTooltip');
-    if (hit && tip) {
-      const d = bgNodeData[hit] || {};
-      tip.style.display = 'block';
-      tip.style.left = (e.clientX + 14) + 'px';
-      tip.style.top  = (e.clientY + 14) + 'px';
-      tip.innerHTML  = `<strong style="color:var(--gold2)">${esc(hit)}</strong><br>
-        ${d.asn ? esc(d.asn)+'<br>' : ''}
-        ${d.org ? esc((d.org||'').slice(0,40))+'<br>' : ''}
-        ${d.country ? esc(d.country)+'<br>' : ''}
-        <span style="color:var(--dim);font-size:9px">Click → investigate</span>`;
-    } else if (tip) {
-      tip.style.display = 'none';
-    }
-  });
-  bgCanvas.addEventListener('mouseup', e => {
-    if (bgDragState) {
-      const dx = Math.abs(e.clientX - bgDragState.startX);
-      const dy = Math.abs(e.clientY - bgDragState.startY);
-      if (dx < 4 && dy < 4) {
-        // Click — find hit node
-        const hit = hitTest(e.offsetX, e.offsetY);
-        if (hit) {
-          exitBackgroundMode();
-          document.getElementById('seedInput').value = hit;
-          showHint(hit + ' loaded — click Analyze to investigate');
-        }
+function addBgNode(domain, data) {
+  if (bgSeen.has(domain)) return;
+  bgSeen.add(domain);
+  bgNodeData[domain] = data;
+
+  if (!bgCy) initBgCy();
+  if (!bgCy) return; // still no container
+
+  const isSeed     = (domain === bgSeedDomain);
+  const suspicious = isSuspiciousASN(data.asn||'', data.org||'', data.country||'');
+  const color      = bgGetNodeColor(data);
+  const depth      = data._crawl_depth || 0;
+
+  // Size by importance: seed largest, then by depth
+  let size;
+  if (isSeed)           size = 36;
+  else if (depth === 0) size = 22;
+  else if (depth === 1) size = 16;
+  else if (depth === 2) size = 12;
+  else                  size = 10;
+  if (suspicious && !isSeed) size += 2;
+
+  // Border
+  const bw = isSeed ? 3 : (suspicious ? 2 : 1);
+  const bc = isSeed ? '#fbbf24' : (suspicious ? '#ef4444' : 'rgba(0,0,0,0.4)');
+
+  // Truncated label
+  const lbl = domain.length > 26 ? domain.slice(0, 23) + '…' : domain;
+
+  try {
+    bgCy.add({
+      group: 'nodes',
+      data: {
+        id: domain,
+        lbl, color, size, bw, bc,
+        seed: isSeed,
+        suspicious,
+        depth,
+        asn: data.asn || 'UNKNOWN',
       }
-    }
-    bgDragState = null;
-    bgCanvas.style.cursor = 'grab';
-  });
-  bgCanvas.addEventListener('wheel', e => {
-    e.preventDefault();
-    const factor = e.deltaY > 0 ? 0.85 : 1.18;
-    // Zoom toward mouse position
-    const rect = bgCanvas.getBoundingClientRect();
-    const mx = (e.clientX - rect.left - bgCanvas.width/2)  / bgCamera.zoom;
-    const my = (e.clientY - rect.top  - bgCanvas.height/2) / bgCamera.zoom;
-    bgCamera.zoom = Math.max(0.01, Math.min(50, bgCamera.zoom * factor));
-    bgCamera.x -= mx * (1 - 1/factor);
-    bgCamera.y -= my * (1 - 1/factor);
-    renderBgCanvas();
-  }, {passive: false});
-}
-
-function hitTest(mx, my) {
-  if (!bgCanvas || !bgCanvasNodes.length) return null;
-  const W = bgCanvas.width, H = bgCanvas.height;
-  const cx = W/2 + bgCamera.x * bgCamera.zoom;
-  const cy = H/2 + bgCamera.y * bgCamera.zoom;
-  for (let i = bgCanvasNodes.length-1; i >= 0; i--) {
-    const n  = bgCanvasNodes[i];
-    const px = cx + n.x * bgCamera.zoom;
-    const py = cy + n.y * bgCamera.zoom;
-    const r  = Math.max(4, (n.size||2) * bgCamera.zoom);
-    if ((mx-px)*(mx-px) + (my-py)*(my-py) < r*r) return n.id;
+    });
+  } catch(e) {
+    console.warn('addBgNode error:', e.message, domain);
+    return;
   }
-  return null;
+
+  // Add edge to discovery source
+  if (!isSeed && bgSeedDomain) {
+    let parentId = bgSeedDomain;
+    if (depth >= 2) {
+      // Find a depth-(N-1) node in same ASN to link
+      const parent = bgCy.nodes().filter(n => {
+        const nd = n.data();
+        return nd.depth === depth - 1 && nd.asn === (data.asn || 'UNKNOWN');
+      }).first();
+      if (parent.length) parentId = parent.id();
+    }
+    const edgeId = parentId + '__' + domain;
+    if (!bgEdgeSet.has(edgeId) && bgCy.$id(parentId).length) {
+      bgEdgeSet.add(edgeId);
+      try {
+        bgCy.add({
+          group: 'edges',
+          data: { id: edgeId, source: parentId, target: domain }
+        });
+      } catch(e) {}
+    }
+  }
+
+  // Hide empty overlay
+  const empty = document.getElementById('bgGraphEmpty');
+  if (empty) empty.style.display = 'none';
+
+  // Schedule layout — debounced so it doesn't run on every node
+  scheduleBgLayout();
 }
 
-let bgEdges = [];        // [{from: domain, to: domain}]
-let bgAsnPositions = {}; // asn -> {centerX, centerY, count}
-let bgSeedDomain = null;
-let bgLayoutMode = 'network'; // 'network' (with edges) or 'cluster' (no edges)
-let bgHoverNode  = null;
-let bgSearchHighlight = null;
+function scheduleBgLayout() {
+  if (bgPendingLayoutTimer) clearTimeout(bgPendingLayoutTimer);
+  bgPendingLayoutTimer = setTimeout(runBgLayout, 350);
+}
 
-// ── ZOOM CONTROLS ──────────────────────────────────────────────────────────
+function runBgLayout() {
+  if (!bgCy || !bgCy.nodes().length) return;
+  const nodeCount = bgCy.nodes().length;
+  // Pick layout based on size
+  const layoutOpts = nodeCount < 80
+    ? { name: 'cose', idealEdgeLength: 80, nodeRepulsion: () => 400000,
+        gravity: 70, numIter: 400, animate: false, fit: true, padding: 50 }
+    : { name: 'cose', idealEdgeLength: 60, nodeRepulsion: () => 200000,
+        gravity: 90, numIter: 250, animate: false, fit: true, padding: 50 };
+  bgCy.layout(layoutOpts).run();
+  renderBgLegend();
+}
+
+function fitBgCamera() {
+  if (bgCy && bgCy.nodes().length) bgCy.fit(40);
+}
+
+function updateBgStats() {
+  const n = bgCy ? bgCy.nodes().length : 0;
+  const e = bgCy ? bgCy.edges().length : 0;
+  const nc = document.getElementById('bgNodeCount');
+  const ec = document.getElementById('bgEdgeCount');
+  if (nc) nc.textContent = n.toLocaleString();
+  if (ec) ec.textContent = e.toLocaleString();
+  const empty = document.getElementById('bgGraphEmpty');
+  if (empty) empty.style.display = n > 0 ? 'none' : '';
+}
+
+// ── ZOOM CONTROLS ────────────────────────────────────────────────────────────
 function bgZoomIn() {
-  bgCamera.zoom = Math.min(50, bgCamera.zoom * 1.4);
-  renderBgCanvas();
+  if (!bgCy) return;
+  bgCy.zoom({ level: bgCy.zoom() * 1.4, renderedPosition: { x: bgCy.width()/2, y: bgCy.height()/2 } });
 }
 function bgZoomOut() {
-  bgCamera.zoom = Math.max(0.05, bgCamera.zoom / 1.4);
-  renderBgCanvas();
+  if (!bgCy) return;
+  bgCy.zoom({ level: bgCy.zoom() * 0.7, renderedPosition: { x: bgCy.width()/2, y: bgCy.height()/2 } });
 }
 function bgZoomFit() {
-  fitBgCamera();
+  if (bgCy) bgCy.fit(40);
 }
 function bgResetView() {
-  bgCamera = {x:0, y:0, zoom:1};
-  fitBgCamera();
+  if (bgCy) bgCy.fit(40);
 }
 
-// ── LAYOUT TOGGLE ──────────────────────────────────────────────────────────
+// ── LAYOUT TOGGLE ────────────────────────────────────────────────────────────
+let bgLayoutMode = 'network';  // 'network' = cose, 'cluster' = concentric by ASN
 function bgSetLayout(mode) {
   bgLayoutMode = mode;
-  // Update button states
   const netBtn = document.getElementById('bgLayoutNetwork');
   const clusBtn = document.getElementById('bgLayoutCluster');
   if (netBtn && clusBtn) {
@@ -3589,424 +3728,68 @@ function bgSetLayout(mode) {
       netBtn.style.color = 'var(--dim)';
     }
   }
-  // In cluster mode, tighten the layout — pack ASN clusters closer
+  if (!bgCy || !bgCy.nodes().length) return;
+
   if (mode === 'cluster') {
-    repositionForCluster();
+    // Concentric layout by ASN — nodes from same ASN packed together
+    bgCy.layout({
+      name: 'concentric',
+      concentric: node => {
+        // Center the seed, then by ASN cluster size
+        if (node.data('seed')) return 1000;
+        const asn = node.data('asn');
+        return bgCy.nodes(`[asn = "${asn}"]`).length;
+      },
+      levelWidth: () => 1,
+      minNodeSpacing: 18,
+      animate: true,
+      animationDuration: 600,
+      fit: true,
+      padding: 50,
+    }).run();
   } else {
-    repositionForNetwork();
+    runBgLayout();
   }
-  renderBgCanvas();
 }
 
-function repositionForCluster() {
-  // Build cluster info: which ASN each node belongs to + cluster sizes
-  const clusters = {};
-  bgCanvasNodes.forEach(n => {
-    if (n.id === bgSeedDomain) return;
-    const d = bgNodeData[n.id] || {};
-    const asn = d.asn || 'UNKNOWN';
-    if (!clusters[asn]) clusters[asn] = { asn, nodes: [], color: n.color };
-    clusters[asn].nodes.push(n);
-  });
-
-  // Compute cluster sizes (radius needed to contain its nodes)
-  const clusterArr = Object.values(clusters);
-  clusterArr.forEach(cl => {
-    const count = cl.nodes.length;
-    // Hex-packed inside cluster: radius scales with sqrt(count)
-    cl.size = 40 + Math.sqrt(count) * 18;
-  });
-
-  // Sort clusters largest first for better packing
-  clusterArr.sort((a, b) => b.size - a.size);
-
-  // Pack clusters in a spiral arrangement (no overlaps)
-  // First cluster goes at origin (or near seed), then spiral outward
-  const placed = [];
-  clusterArr.forEach((cl, i) => {
-    if (i === 0) {
-      cl.cx = cl.size + 80; cl.cy = 0; // off to one side from seed
-    } else {
-      // Try angles around the existing placed cluster centroid
-      let bestX = 0, bestY = 0, bestDist = Infinity;
-      // Spiral search for non-overlapping spot
-      for (let r = 100; r < 4000; r += 30) {
-        for (let theta = 0; theta < Math.PI * 2; theta += Math.PI / 18) {
-          const tx = r * Math.cos(theta);
-          const ty = r * Math.sin(theta);
-          // Check distance from seed
-          const distFromSeed = Math.hypot(tx, ty);
-          if (distFromSeed < cl.size + 60) continue;
-          // Check no overlap with placed clusters
-          let ok = true;
-          for (const p of placed) {
-            const dist = Math.hypot(tx - p.cx, ty - p.cy);
-            if (dist < cl.size + p.size + 30) { ok = false; break; }
-          }
-          if (ok && distFromSeed < bestDist) {
-            bestX = tx; bestY = ty; bestDist = distFromSeed;
-          }
-        }
-        if (bestDist !== Infinity) break;
-      }
-      cl.cx = bestX; cl.cy = bestY;
-    }
-    placed.push(cl);
-  });
-
-  // Position nodes within each cluster using hex-packed grid
-  clusterArr.forEach(cl => {
-    const count = cl.nodes.length;
-    cl.nodes.forEach((n, idx) => {
-      if (count === 1) {
-        n.x = cl.cx; n.y = cl.cy;
-      } else {
-        // Sunflower / Vogel spiral — packs evenly in disk
-        const golden = Math.PI * (3 - Math.sqrt(5));
-        const r = (cl.size - 18) * Math.sqrt((idx + 0.5) / count);
-        const a = idx * golden;
-        n.x = cl.cx + r * Math.cos(a);
-        n.y = cl.cy + r * Math.sin(a);
-      }
-    });
-    // Update bgAsnPositions for cluster labels
-    if (bgAsnPositions[cl.asn]) {
-      bgAsnPositions[cl.asn].centerX = cl.cx;
-      bgAsnPositions[cl.asn].centerY = cl.cy;
-    }
-  });
-
-  // Place seed at origin
-  bgCanvasNodes.forEach(n => {
-    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; }
-  });
-
-  setTimeout(() => fitBgCamera(), 50);
-}
-
-function repositionForNetwork() {
-  // Group nodes by ASN, give each ASN a stable angular sector around the seed
-  const asnGroups = {};
-  bgCanvasNodes.forEach(n => {
-    if (n.id === bgSeedDomain) return;
-    const d = bgNodeData[n.id] || {};
-    const asn = d.asn || 'UNKNOWN';
-    if (!asnGroups[asn]) asnGroups[asn] = [];
-    asnGroups[asn].push(n);
-  });
-
-  const asnList = Object.keys(asnGroups);
-  // Distribute ASN sectors evenly around the circle, sorted by size
-  asnList.sort((a, b) => asnGroups[b].length - asnGroups[a].length);
-  const sectorAngle = (2 * Math.PI) / asnList.length;
-
-  asnList.forEach((asn, asnIdx) => {
-    const group = asnGroups[asn];
-    const baseAngle = asnIdx * sectorAngle;
-    const sectorSpread = sectorAngle * 0.85; // leave gap between sectors
-    // Each group placed in a sector at varying depth
-    group.forEach((n, i) => {
-      const d = bgNodeData[n.id] || {};
-      const depth = d._crawl_depth || 1;
-      // Spread within sector
-      const offset = group.length === 1 ? 0 : (i / (group.length - 1) - 0.5) * sectorSpread;
-      const angle = baseAngle + offset;
-      const radius = 240 + depth * 130 + (i % 5) * 22;
-      n.x = radius * Math.cos(angle);
-      n.y = radius * Math.sin(angle);
-    });
-  });
-
-  // Seed at origin
-  bgCanvasNodes.forEach(n => {
-    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; }
-  });
-
-  setTimeout(() => fitBgCamera(), 50);
-}
-
-// ── GRAPH SEARCH ───────────────────────────────────────────────────────────
+// ── GRAPH SEARCH ─────────────────────────────────────────────────────────────
 function bgGraphSearch(query) {
   query = (query || '').toLowerCase().trim();
-  if (!query) {
-    bgSearchHighlight = null;
-    renderBgCanvas();
-    return;
-  }
-  // Find first matching node
-  const match = bgCanvasNodes.find(n => n.id.toLowerCase().includes(query));
-  if (match) {
-    bgSearchHighlight = match.id;
-    // Fly camera to node
-    bgCamera.x = -match.x;
-    bgCamera.y = -match.y;
-    bgCamera.zoom = Math.max(2, bgCamera.zoom);
-    renderBgCanvas();
-  } else {
-    bgSearchHighlight = null;
-    renderBgCanvas();
+  if (!bgCy) return;
+  bgCy.elements().removeClass('faded highlighted');
+  if (!query) return;
+  const match = bgCy.nodes().filter(n => n.id().toLowerCase().includes(query)).first();
+  if (match.length) {
+    bgCy.elements().addClass('faded');
+    match.removeClass('faded').addClass('highlighted');
+    bgCy.animate({
+      center: { eles: match },
+      zoom: Math.max(2, bgCy.zoom()),
+      duration: 500,
+    });
   }
 }
 
-// ── MINIMAP ────────────────────────────────────────────────────────────────
-function renderBgMinimap() {
-  const mini = document.getElementById('bgMinimap');
-  if (!mini || !bgCanvasNodes.length) return;
-  const ctx = mini.getContext('2d');
-  const MW = mini.width, MH = mini.height;
-  ctx.fillStyle = 'rgba(5,5,8,0.95)';
-  ctx.fillRect(0, 0, MW, MH);
-
-  // Find bounds of all nodes
-  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-  bgCanvasNodes.forEach(n => {
-    if (n.x<minX) minX=n.x; if (n.x>maxX) maxX=n.x;
-    if (n.y<minY) minY=n.y; if (n.y>maxY) maxY=n.y;
-  });
-  const rX = (maxX-minX) || 200;
-  const rY = (maxY-minY) || 200;
-  const pad = 4;
-  const sx = (MW - pad*2) / rX;
-  const sy = (MH - pad*2) / rY;
-  const s  = Math.min(sx, sy);
-
-  // Draw all nodes as tiny dots
-  bgCanvasNodes.forEach(n => {
-    const px = pad + (n.x - minX) * s;
-    const py = pad + (n.y - minY) * s;
-    ctx.fillStyle = n.color || '#10b981';
-    ctx.fillRect(px-1, py-1, 2, 2);
-  });
-
-  // Draw current viewport rectangle
-  if (bgCanvas) {
-    const W = bgCanvas.width, H = bgCanvas.height;
-    const z = bgCamera.zoom;
-    const viewMinX = -bgCamera.x - W/(2*z);
-    const viewMaxX = -bgCamera.x + W/(2*z);
-    const viewMinY = -bgCamera.y - H/(2*z);
-    const viewMaxY = -bgCamera.y + H/(2*z);
-    const rx = pad + (viewMinX - minX) * s;
-    const ry = pad + (viewMinY - minY) * s;
-    const rw = (viewMaxX - viewMinX) * s;
-    const rh = (viewMaxY - viewMinY) * s;
-    ctx.strokeStyle = 'rgba(0,217,255,0.85)';
-    ctx.lineWidth = 1.5;
-    ctx.strokeRect(rx, ry, rw, rh);
-  }
-}
-
-function renderBgCanvas() {
-  if (!bgCtx || !bgCanvas) return;
-  const W = bgCanvas.width, H = bgCanvas.height;
-  if (!W || !H) return;
-
-  // Deep dark background with subtle radial gradient
-  const grad = bgCtx.createRadialGradient(W/2, H/2, 0, W/2, H/2, Math.max(W,H)*0.7);
-  grad.addColorStop(0, '#0e0e12');
-  grad.addColorStop(0.5, '#070709');
-  grad.addColorStop(1, '#030305');
-  bgCtx.fillStyle = grad;
-  bgCtx.fillRect(0, 0, W, H);
-
-  if (!bgCanvasNodes.length) return;
-
-  const cx = W/2 + bgCamera.x * bgCamera.zoom;
-  const cy = H/2 + bgCamera.y * bgCamera.zoom;
-  const z  = bgCamera.zoom;
-
-  // Concentric depth rings (very faint, only in network mode)
-  if (bgLayoutMode === 'network') {
-    bgCtx.strokeStyle = 'rgba(78,201,148,0.05)';
-    bgCtx.lineWidth = 1;
-    for (let depth = 1; depth <= 4; depth++) {
-      const ringR = (200 + depth * 150) * z;
-      bgCtx.beginPath();
-      bgCtx.arc(cx, cy, ringR, 0, Math.PI*2);
-      bgCtx.stroke();
-    }
-  }
-
-  // Build node lookup
-  const nodeMap = {};
-  bgCanvasNodes.forEach(n => { nodeMap[n.id] = n; });
-
-  // Determine highlighted set (hover or search)
-  let highlightSet = null;
-  if (bgHoverNode) {
-    highlightSet = new Set([bgHoverNode]);
-    bgEdges.forEach(e => {
-      if (e.from === bgHoverNode) highlightSet.add(e.to);
-      if (e.to   === bgHoverNode) highlightSet.add(e.from);
-    });
-  }
-  if (bgSearchHighlight) {
-    highlightSet = new Set([bgSearchHighlight]);
-  }
-
-  // Edges: only in network mode, dimmed when hovering
-  if (bgLayoutMode === 'network') {
-    bgEdges.forEach(e => {
-      const a = nodeMap[e.from];
-      const b = nodeMap[e.to];
-      if (!a || !b) return;
-      const ax = cx + a.x * z;
-      const ay = cy + a.y * z;
-      const bx = cx + b.x * z;
-      const by = cy + b.y * z;
-      if ((ax<0&&bx<0)||(ax>W&&bx>W)||(ay<0&&by<0)||(ay>H&&by>H)) return;
-
-      const isHl = highlightSet && (highlightSet.has(e.from) && highlightSet.has(e.to));
-      bgCtx.strokeStyle = isHl
-        ? 'rgba(0,217,255,0.85)'
-        : highlightSet
-          ? 'rgba(255,255,255,0.04)'
-          : 'rgba(255,255,255,0.18)';
-      bgCtx.lineWidth = isHl ? 1.6 : 0.7;
-      bgCtx.beginPath();
-      bgCtx.moveTo(ax, ay);
-      bgCtx.lineTo(bx, by);
-      bgCtx.stroke();
-    });
-  }
-
-  // ASN cluster labels (cluster mode only) — show ASN name at cluster center
-  if (bgLayoutMode === 'cluster' && z > 0.4) {
-    Object.entries(bgAsnPositions).forEach(([asn, pos]) => {
-      if (pos.count < 2) return;
-      const labelX = cx + pos.centerX * z;
-      const labelY = cy + pos.centerY * z - 60 * z;
-      if (labelX < 0 || labelX > W) return;
-      bgCtx.fillStyle = 'rgba(255,255,255,0.65)';
-      bgCtx.font = 'bold 11px monospace';
-      bgCtx.textAlign = 'center';
-      bgCtx.fillText(asn, labelX, labelY);
-      bgCtx.fillStyle = 'rgba(255,255,255,0.35)';
-      bgCtx.font = '9px monospace';
-      bgCtx.fillText(`${pos.count} domains`, labelX, labelY + 14);
-      bgCtx.textAlign = 'left';
-    });
-  }
-
-  // Nodes — sorted so seed and suspicious draw last (on top)
-  const drawOrder = bgCanvasNodes.slice().sort((a, b) => {
-    const aPri = (a.id === bgSeedDomain ? 100 : 0) + (a.suspicious ? 10 : 0);
-    const bPri = (b.id === bgSeedDomain ? 100 : 0) + (b.suspicious ? 10 : 0);
-    return aPri - bPri;
-  });
-
-  drawOrder.forEach(n => {
-    const px = cx + n.x * z;
-    const py = cy + n.y * z;
-    if (px < -50 || px > W+50 || py < -50 || py > H+50) return;
-
-    const isSeed   = (n.id === bgSeedDomain);
-    const isHover  = (n.id === bgHoverNode);
-    const isSearch = (n.id === bgSearchHighlight);
-    const isHl     = highlightSet ? highlightSet.has(n.id) : true;
-    const baseR    = n.size || 3;
-    const r        = Math.max(2.5, baseR * Math.min(z, 2.5));
-    const opacity  = isHl ? 1 : 0.18;
-
-    // Outer glow — bigger and more vivid
-    if (isSeed || isHover || isSearch || n.suspicious) {
-      const glowR = r * 3.5;
-      const glowGrad = bgCtx.createRadialGradient(px, py, r*0.3, px, py, glowR);
-      let glowColor;
-      if (isSeed)        glowColor = 'rgba(251,191,36,0.55)';
-      else if (isSearch) glowColor = 'rgba(0,217,255,0.65)';
-      else if (isHover)  glowColor = 'rgba(255,255,255,0.45)';
-      else               glowColor = 'rgba(255,94,87,0.50)';
-      glowGrad.addColorStop(0, glowColor);
-      glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-      bgCtx.fillStyle = glowGrad;
-      bgCtx.beginPath();
-      bgCtx.arc(px, py, glowR, 0, Math.PI*2);
-      bgCtx.fill();
-    }
-
-    // Node body
-    bgCtx.globalAlpha = opacity;
-    bgCtx.beginPath();
-    bgCtx.arc(px, py, r, 0, Math.PI*2);
-    bgCtx.fillStyle = n.color || '#10b981';
-    bgCtx.fill();
-
-    // Inner highlight (gives 3D pop)
-    const innerGrad = bgCtx.createRadialGradient(px - r*0.3, py - r*0.3, 0, px, py, r);
-    innerGrad.addColorStop(0, 'rgba(255,255,255,0.4)');
-    innerGrad.addColorStop(1, 'rgba(255,255,255,0)');
-    bgCtx.fillStyle = innerGrad;
-    bgCtx.fill();
-
-    // Border
-    bgCtx.strokeStyle = isSeed
-      ? 'rgba(251,191,36,1)'
-      : isHover
-        ? 'rgba(255,255,255,0.95)'
-        : 'rgba(0,0,0,0.7)';
-    bgCtx.lineWidth = isSeed || isHover ? 2 : 0.8;
-    bgCtx.stroke();
-    bgCtx.globalAlpha = 1;
-
-    // ALWAYS-ON labels under each node
-    // Adapt visibility by zoom: at z<0.4 only seed+suspicious shown, at z>=0.6 all visible
-    const showLabel = isSeed || isHover || isSearch ||
-                      (z >= 0.6) ||
-                      (z >= 0.35 && n.suspicious);
-    if (showLabel) {
-      const label = n.id.length > 30 ? n.id.slice(0,27)+'...' : n.id;
-      const fontSize = isSeed ? 13 : isHover || isSearch ? 12 : 10;
-      bgCtx.font = isSeed
-        ? `bold ${fontSize}px monospace`
-        : `${fontSize}px monospace`;
-      bgCtx.textAlign = 'center';
-      bgCtx.textBaseline = 'top';
-
-      // Text background pill for readability
-      const textW = bgCtx.measureText(label).width;
-      const padX = 4, padY = 2;
-      const labelY = py + r + 6;
-      bgCtx.fillStyle = isSeed
-        ? 'rgba(251,191,36,0.18)'
-        : isHover
-          ? 'rgba(0,217,255,0.20)'
-          : 'rgba(0,0,0,0.65)';
-      bgCtx.fillRect(px - textW/2 - padX, labelY - padY,
-                     textW + padX*2, fontSize + padY*2);
-
-      bgCtx.fillStyle = isSeed
-        ? '#fbbf24'
-        : isHover || isSearch
-          ? '#00d9ff'
-          : 'rgba(255,255,255,0.92)';
-      bgCtx.fillText(label, px, labelY);
-      bgCtx.textAlign = 'left';
-      bgCtx.textBaseline = 'alphabetic';
-    }
-  });
-
-  // Render legend overlay
-  renderBgLegend();
-  // Render minimap
-  renderBgMinimap();
-}
-
+// ── ASN LEGEND ───────────────────────────────────────────────────────────────
 function renderBgLegend() {
   const legend = document.getElementById('bgLegend');
-  if (!legend) return;
-  // Count nodes per ASN
+  if (!legend || !bgCy) return;
   const asnCounts = {};
-  bgCanvasNodes.forEach(n => {
-    const d = bgNodeData[n.id] || {};
+  bgCy.nodes().forEach(n => {
+    const d = n.data();
+    if (d.seed) return;
     const asn = d.asn || 'UNKNOWN';
-    if (!asnCounts[asn]) asnCounts[asn] = { count: 0, color: n.color, country: d.country, suspicious: n.suspicious };
+    if (!asnCounts[asn]) {
+      asnCounts[asn] = {
+        count: 0,
+        color: d.color,
+        suspicious: d.suspicious,
+        country: (bgNodeData[d.id]||{}).country,
+      };
+    }
     asnCounts[asn].count++;
   });
-  // Top 8 by count
-  const sorted = Object.entries(asnCounts)
-    .sort((a,b) => b[1].count - a[1].count)
-    .slice(0, 8);
+  const sorted = Object.entries(asnCounts).sort((a,b) => b[1].count - a[1].count).slice(0, 8);
   if (!sorted.length) {
     legend.style.display = 'none';
     return;
@@ -4015,11 +3798,10 @@ function renderBgLegend() {
   const html = ['<div style="font-size:8px;text-transform:uppercase;letter-spacing:.16em;color:var(--dim);margin-bottom:8px;">Top ASN clusters</div>'];
   sorted.forEach(([asn, info]) => {
     html.push(
-      '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:10px;font-family:var(--mono);' +
-      'cursor:pointer;" onclick="highlightBgCluster(\''+esc(asn)+'\')">' +
-      '<div style="width:10px;height:10px;border-radius:50%;background:'+info.color+
-      ';border:1px solid rgba(0,0,0,.5);flex-shrink:0;"></div>' +
-      '<div style="color:'+(info.suspicious?'var(--red)':'var(--muted)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+
+      '<div style="display:flex;align-items:center;gap:8px;padding:3px 0;font-size:10px;font-family:var(--mono);cursor:pointer;" ' +
+      'onclick="highlightBgCluster(\''+esc(asn)+'\')">' +
+      '<div style="width:10px;height:10px;border-radius:50%;background:'+info.color+';border:1px solid rgba(0,0,0,.5);flex-shrink:0;"></div>' +
+      '<div style="color:'+(info.suspicious?'#ef4444':'var(--muted)')+';overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' +
       (info.suspicious?'⚠ ':'')+esc(asn)+(info.country?' · '+info.country:'')+'</div>' +
       '<div style="color:var(--dim);font-size:9px;margin-left:auto;">'+info.count+'</div>' +
       '</div>'
@@ -4028,134 +3810,44 @@ function renderBgLegend() {
   legend.innerHTML = html.join('');
 }
 
-function fitBgCamera() {
-  if (!bgCanvasNodes.length || !bgCanvas) return;
-  let minX=Infinity, maxX=-Infinity, minY=Infinity, maxY=-Infinity;
-  bgCanvasNodes.forEach(n => {
-    if (n.x<minX) minX=n.x; if (n.x>maxX) maxX=n.x;
-    if (n.y<minY) minY=n.y; if (n.y>maxY) maxY=n.y;
-  });
-  const rangeX = (maxX-minX)||200, rangeY = (maxY-minY)||200;
-  const pad = 60;
-  bgCamera.zoom = Math.min(
-    (bgCanvas.width  - pad*2) / rangeX,
-    (bgCanvas.height - pad*2) / rangeY,
-    10
-  );
-  bgCamera.x = -((minX+maxX)/2);
-  bgCamera.y = -((minY+maxY)/2);
-  renderBgCanvas();
+function highlightBgCluster(asn) {
+  if (!bgCy) return;
+  const matches = bgCy.nodes(`[asn = "${asn}"]`);
+  if (!matches.length) return;
+  bgCy.elements().addClass('faded');
+  matches.removeClass('faded').addClass('highlighted');
+  bgCy.animate({ fit: { eles: matches, padding: 60 }, duration: 500 });
+  setTimeout(() => bgCy.elements().removeClass('faded highlighted'), 3500);
 }
 
-function addBgNode(domain, data) {
-  if (bgSeen.has(domain)) return;
-  bgSeen.add(domain);
-  bgNodeData[domain] = data;
-
-  // Ensure canvas is initialized
-  if (!bgCanvas || !bgCtx) {
-    const container = document.getElementById('bgSigmaContainer');
-    if (container) initBgCanvas(container);
-  }
-
-  const depth      = data._crawl_depth || 0;
-  const isSeed     = (depth === 0 && !bgSeedDomain) || domain === bgSeedDomain;
-  const suspicious = isSuspiciousASN(data.asn||'', data.org||'', data.country||'');
-  const color      = bgNodeColor(data);
-
-  // Track seed domain
-  if (isSeed && !bgSeedDomain) bgSeedDomain = domain;
-
-  // Size: seed largest, then by depth (closer = larger), suspicious bumped
-  let size;
-  if (isSeed)            size = 8;
-  else if (depth === 0)  size = 5;
-  else if (depth === 1)  size = 4;
-  else if (depth === 2)  size = 3;
-  else                   size = 2.5;
-  if (suspicious && !isSeed) size += 1;
-
-  // Position: seed at origin, others by ASN cluster
-  let x, y;
-  if (isSeed) {
-    x = 0; y = 0;
-  } else {
-    const asn = data.asn || 'UNKNOWN';
-    // Compute or fetch cluster center for this ASN
-    if (!bgAsnPositions[asn]) {
-      // Place ASN cluster around the unit circle, evenly distributed
-      const asnIndex = Object.keys(bgAsnPositions).length;
-      const totalAsns = asnIndex + 1;
-      // Spread ASN clusters out — depth 1 clusters at radius 350
-      let hash = 0;
-      for (let i = 0; i < asn.length; i++) hash = asn.charCodeAt(i) + ((hash<<5)-hash);
-      // Use hash for stable angle, slightly nudged by index
-      const angle = ((Math.abs(hash) % 360) + asnIndex * 17) * Math.PI / 180;
-      const radius = 380;
-      bgAsnPositions[asn] = {
-        centerX: radius * Math.cos(angle),
-        centerY: radius * Math.sin(angle),
-        count: 0,
-      };
-    }
-    const cluster = bgAsnPositions[asn];
-    cluster.count++;
-    // Node within cluster: spiral around cluster center
-    const localAngle = cluster.count * 0.6;
-    const localRadius = 20 + Math.sqrt(cluster.count) * 14 + depth * 15;
-    x = cluster.centerX + localRadius * Math.cos(localAngle);
-    y = cluster.centerY + localRadius * Math.sin(localAngle);
-  }
-
-  bgCanvasNodes.push({
-    id: domain, color, size, x, y,
-    suspicious, depth, asn: data.asn || 'UNKNOWN',
-  });
-
-  // Track edge: connect this domain to its discovery source if known
-  // For depth 1+, parent should be the seed or a previously-found node
-  // Without explicit parent info, link depth-N to a depth-(N-1) node in the same ASN cluster (best guess)
-  if (!isSeed && bgSeedDomain) {
-    if (depth === 1) {
-      bgEdges.push({ from: bgSeedDomain, to: domain });
-    } else {
-      // Find a node at depth-1 in the same ASN to link to
-      const parent = bgCanvasNodes.find(n =>
-        n.id !== domain &&
-        n.depth === depth - 1 &&
-        (bgNodeData[n.id]||{}).asn === data.asn
-      );
-      if (parent) {
-        bgEdges.push({ from: parent.id, to: domain });
-      } else {
-        // Fall back to seed
-        bgEdges.push({ from: bgSeedDomain, to: domain });
-      }
-    }
-  }
-
-  // For first 30 nodes always auto-fit; after that only re-render
-  if (bgCanvasNodes.length <= 30) {
-    fitBgCamera();
-  } else {
-    renderBgCanvas();
-  }
-
-  // Hide empty overlay
+function clearBgGraph() {
+  if (bgCy) bgCy.elements().remove();
+  bgSeen = new Set(); bgLastSeen = 0; bgEdgeSet = new Set();
+  bgNodeData = {}; bgEdges = []; bgAsnPositions = {}; bgSeedDomain = null;
+  bgTableData = []; bgRecentDomains = []; bgRateHistory = []; bgLastDoneCount = 0;
+  updateBgStats();
+  renderBgTable();
+  const ticker = document.getElementById('bgTicker');
+  if (ticker) ticker.textContent = '—';
   const empty = document.getElementById('bgGraphEmpty');
-  if (empty) empty.style.display = 'none';
+  if (empty) empty.style.display = '';
+  const legend = document.getElementById('bgLegend');
+  if (legend) legend.style.display = 'none';
 }
 
-function updateBgStats() {
-  const n = bgCanvasNodes.length;
-  const e = 0;
-  const nc = document.getElementById('bgNodeCount');
-  const ec = document.getElementById('bgEdgeCount');
-  if (nc) nc.textContent = n.toLocaleString();
-  if (ec) ec.textContent = e.toLocaleString();
-  const empty = document.getElementById('bgGraphEmpty');
-  if (empty) empty.style.display = n > 0 ? 'none' : '';
+// Backward-compat: layout/color funcs that other code may call
+function changeBgLayout(mode) { bgSetLayout(mode === 'asn' ? 'network' : mode); }
+function colorBgGraph(mode) {
+  bgColorMode = mode;
+  if (!bgCy) return;
+  bgCy.nodes().forEach(n => {
+    const d = bgNodeData[n.id()] || {};
+    n.data('color', bgGetNodeColor(d));
+  });
 }
+function renderBgCanvas() { /* no-op — Cytoscape handles its own rendering */ }
+function renderBgMinimap() { /* no-op for Cytoscape — has built-in nav */ }
+
 
 // ── START CRAWL ───────────────────────────────────────────────────────────────
 async function startCrawl() {
@@ -4504,7 +4196,7 @@ function switchBgView(view) {
       if (bgCanvas) {
         bgCanvas.width  = bgCanvas.parentElement.offsetWidth;
         bgCanvas.height = bgCanvas.parentElement.offsetHeight;
-        if (bgCanvasNodes.length > 0) fitBgCamera();
+        if (bgCy && bgCy.nodes().length > 0) fitBgCamera();
       }
     }, 50);
   }
@@ -4605,7 +4297,7 @@ function updateBgProgress(data) {
   const statMsg = `${done.toLocaleString()} analyzed · ${seen.toLocaleString()} discovered · ${queued.toLocaleString()} queued`;
   if (statEl) statEl.textContent = statMsg;
 
-  const nodeCount = bgCanvasNodes.length;
+  const nodeCount = bgCy ? bgCy.nodes().length : 0;
 
   // Keep ring visible while crawl is active — even if graph has nodes
   if (ring) {
@@ -4706,70 +4398,9 @@ function renderBgClusters(clusters, total) {
   }).join('');
 }
 
-function highlightBgCluster(asn) {
-  bgCanvasNodes.forEach(n => {
-    const d = bgNodeData[n.id] || {};
-    n.color = d.asn===asn ? '#ffffff' : 'rgba(240,236,228,0.08)';
-    n.size  = d.asn===asn ? 6 : 1;
-  });
-  renderBgCanvas();
-  setTimeout(() => {
-    bgCanvasNodes.forEach(n => {
-      const d = bgNodeData[n.id] || {};
-      n.color = bgNodeColor(d);
-      n.size  = isSuspiciousASN(d.asn||'',d.org||'',d.country||'') ? 5 : 2;
-    });
-    renderBgCanvas();
-  }, 3000);
-}
 
-function changeBgLayout(mode) {
-  bgCanvasNodes.forEach(n => {
-    const d = bgNodeData[n.id] || {};
-    const asn = d.asn || 'UNKNOWN';
-    let hash = 0;
-    for (let i=0;i<asn.length;i++) hash = asn.charCodeAt(i)+((hash<<5)-hash);
-    if (mode === 'asn') {
-      const angle = (Math.abs(hash)%360)*Math.PI/180;
-      const r = 200+(d._crawl_depth||0)*150+(Math.abs(hash>>8)%100);
-      n.x = r*Math.cos(angle)+(Math.random()-.5)*60;
-      n.y = r*Math.sin(angle)+(Math.random()-.5)*60;
-    } else if (mode === 'country') {
-      const CP = {CN:{x:-600,y:-200},RU:{x:-300,y:-400},US:{x:400,y:0},GB:{x:100,y:-400}};
-      const p = CP[d.country]||{x:0,y:0};
-      n.x = p.x+(Math.random()-.5)*200;
-      n.y = p.y+(Math.random()-.5)*200;
-    } else {
-      n.x = (Math.random()-.5)*2000;
-      n.y = (Math.random()-.5)*2000;
-    }
-  });
-  fitBgCamera();
-}
 
-function colorBgGraph(mode) {
-  bgColorMode = mode;
-  bgCanvasNodes.forEach(n => {
-    n.color = bgNodeColor(bgNodeData[n.id] || {});
-  });
-  renderBgCanvas();
-}
 
-function clearBgGraph() {
-  bgCanvasNodes = []; bgNodeData = {}; bgSeen = new Set(); bgLastSeen = 0;
-  bgCamera = {x:0, y:0, zoom:1};
-  bgTableData = []; bgRecentDomains = []; bgRateHistory = []; bgLastDoneCount = 0;
-  bgEdges = []; bgAsnPositions = {}; bgSeedDomain = null;
-  if (bgCanvas) renderBgCanvas();
-  updateBgStats();
-  renderBgTable();
-  const ticker = document.getElementById('bgTicker');
-  if (ticker) ticker.textContent = '—';
-  const empty = document.getElementById('bgGraphEmpty');
-  if (empty) empty.style.display = '';
-  const legend = document.getElementById('bgLegend');
-  if (legend) legend.style.display = 'none';
-}
 
 // ── RECORDING ─────────────────────────────────────────────────────────────────
 function toggleBgRecord() {
@@ -4807,9 +4438,9 @@ function stopBgRecord() {
 
 // ── GEXF EXPORT ───────────────────────────────────────────────────────────────
 function exportBgGEXF() {
-  if (!bgCanvasNodes.length) { showHint('No nodes to export'); return; }
+  if (!bgCy || !bgCy.nodes().length) { showHint('No nodes to export'); return; }
   let ns='',es='';
-  bgCanvasNodes.forEach(n => { const node = n.id; const attrs = n;
+  bgCy.nodes().forEach(cyNode => { const node = cyNode.id(); const attrs = cyNode.data();
     const d = bgNodeData[node]||{};
     ns += `<node id="${esc(node)}" label="${esc(node)}"><attvalues>
       <attvalue for="0" value="${esc(d.asn||'')}"/>
@@ -4836,7 +4467,7 @@ function exportBgGEXF() {
   const a    = document.createElement('a');
   a.href=url; a.download='inteldesk-crawl-'+new Date().toISOString().slice(0,10)+'.gexf';
   a.click(); URL.revokeObjectURL(url);
-  showHint(`Exported ${bgCanvasNodes.length.toLocaleString()} nodes`);
+  showHint(`Exported ${bgCy.nodes().length.toLocaleString()} nodes`);
 }
 
 document.addEventListener('keydown', e => {
