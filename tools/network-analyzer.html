@@ -3599,52 +3599,129 @@ function bgSetLayout(mode) {
 }
 
 function repositionForCluster() {
-  // Tighter ASN cluster grid layout — no edges, pack neighborhoods together
-  const asnList = Object.keys(bgAsnPositions);
-  const cols = Math.ceil(Math.sqrt(asnList.length));
-  const spacing = 280;
-  asnList.forEach((asn, i) => {
-    const col = i % cols;
-    const row = Math.floor(i / cols);
-    const cX = (col - cols/2) * spacing + spacing/2;
-    const cY = (row - cols/2) * spacing + spacing/2;
-    bgAsnPositions[asn].clusterX = cX;
-    bgAsnPositions[asn].clusterY = cY;
-  });
-  // Re-place every node within its new cluster center
+  // Build cluster info: which ASN each node belongs to + cluster sizes
+  const clusters = {};
   bgCanvasNodes.forEach(n => {
-    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; return; }
+    if (n.id === bgSeedDomain) return;
     const d = bgNodeData[n.id] || {};
     const asn = d.asn || 'UNKNOWN';
-    const pos = bgAsnPositions[asn];
-    if (!pos) return;
-    // Stable sub-position via hash
-    let hash = 0;
-    for (let i=0; i<n.id.length; i++) hash = n.id.charCodeAt(i) + ((hash<<5)-hash);
-    const angle = Math.abs(hash) % 360 * Math.PI / 180;
-    const r = 30 + (Math.abs(hash>>4) % 60);
-    n.x = pos.clusterX + r * Math.cos(angle);
-    n.y = pos.clusterY + r * Math.sin(angle);
+    if (!clusters[asn]) clusters[asn] = { asn, nodes: [], color: n.color };
+    clusters[asn].nodes.push(n);
   });
+
+  // Compute cluster sizes (radius needed to contain its nodes)
+  const clusterArr = Object.values(clusters);
+  clusterArr.forEach(cl => {
+    const count = cl.nodes.length;
+    // Hex-packed inside cluster: radius scales with sqrt(count)
+    cl.size = 40 + Math.sqrt(count) * 18;
+  });
+
+  // Sort clusters largest first for better packing
+  clusterArr.sort((a, b) => b.size - a.size);
+
+  // Pack clusters in a spiral arrangement (no overlaps)
+  // First cluster goes at origin (or near seed), then spiral outward
+  const placed = [];
+  clusterArr.forEach((cl, i) => {
+    if (i === 0) {
+      cl.cx = cl.size + 80; cl.cy = 0; // off to one side from seed
+    } else {
+      // Try angles around the existing placed cluster centroid
+      let bestX = 0, bestY = 0, bestDist = Infinity;
+      // Spiral search for non-overlapping spot
+      for (let r = 100; r < 4000; r += 30) {
+        for (let theta = 0; theta < Math.PI * 2; theta += Math.PI / 18) {
+          const tx = r * Math.cos(theta);
+          const ty = r * Math.sin(theta);
+          // Check distance from seed
+          const distFromSeed = Math.hypot(tx, ty);
+          if (distFromSeed < cl.size + 60) continue;
+          // Check no overlap with placed clusters
+          let ok = true;
+          for (const p of placed) {
+            const dist = Math.hypot(tx - p.cx, ty - p.cy);
+            if (dist < cl.size + p.size + 30) { ok = false; break; }
+          }
+          if (ok && distFromSeed < bestDist) {
+            bestX = tx; bestY = ty; bestDist = distFromSeed;
+          }
+        }
+        if (bestDist !== Infinity) break;
+      }
+      cl.cx = bestX; cl.cy = bestY;
+    }
+    placed.push(cl);
+  });
+
+  // Position nodes within each cluster using hex-packed grid
+  clusterArr.forEach(cl => {
+    const count = cl.nodes.length;
+    cl.nodes.forEach((n, idx) => {
+      if (count === 1) {
+        n.x = cl.cx; n.y = cl.cy;
+      } else {
+        // Sunflower / Vogel spiral — packs evenly in disk
+        const golden = Math.PI * (3 - Math.sqrt(5));
+        const r = (cl.size - 18) * Math.sqrt((idx + 0.5) / count);
+        const a = idx * golden;
+        n.x = cl.cx + r * Math.cos(a);
+        n.y = cl.cy + r * Math.sin(a);
+      }
+    });
+    // Update bgAsnPositions for cluster labels
+    if (bgAsnPositions[cl.asn]) {
+      bgAsnPositions[cl.asn].centerX = cl.cx;
+      bgAsnPositions[cl.asn].centerY = cl.cy;
+    }
+  });
+
+  // Place seed at origin
+  bgCanvasNodes.forEach(n => {
+    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; }
+  });
+
   setTimeout(() => fitBgCamera(), 50);
 }
 
 function repositionForNetwork() {
-  // Restore original radial layout
+  // Group nodes by ASN, give each ASN a stable angular sector around the seed
+  const asnGroups = {};
   bgCanvasNodes.forEach(n => {
-    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; return; }
+    if (n.id === bgSeedDomain) return;
     const d = bgNodeData[n.id] || {};
     const asn = d.asn || 'UNKNOWN';
-    const depth = d._crawl_depth || 1;
-    const pos = bgAsnPositions[asn];
-    if (!pos) return;
-    let hash = 0;
-    for (let i=0; i<n.id.length; i++) hash = n.id.charCodeAt(i) + ((hash<<5)-hash);
-    const localAngle = (Math.abs(hash) % 100) * 0.06;
-    const localRadius = 20 + Math.sqrt(Math.abs(hash) % 100) * 14 + depth * 15;
-    n.x = pos.centerX + localRadius * Math.cos(localAngle);
-    n.y = pos.centerY + localRadius * Math.sin(localAngle);
+    if (!asnGroups[asn]) asnGroups[asn] = [];
+    asnGroups[asn].push(n);
   });
+
+  const asnList = Object.keys(asnGroups);
+  // Distribute ASN sectors evenly around the circle, sorted by size
+  asnList.sort((a, b) => asnGroups[b].length - asnGroups[a].length);
+  const sectorAngle = (2 * Math.PI) / asnList.length;
+
+  asnList.forEach((asn, asnIdx) => {
+    const group = asnGroups[asn];
+    const baseAngle = asnIdx * sectorAngle;
+    const sectorSpread = sectorAngle * 0.85; // leave gap between sectors
+    // Each group placed in a sector at varying depth
+    group.forEach((n, i) => {
+      const d = bgNodeData[n.id] || {};
+      const depth = d._crawl_depth || 1;
+      // Spread within sector
+      const offset = group.length === 1 ? 0 : (i / (group.length - 1) - 0.5) * sectorSpread;
+      const angle = baseAngle + offset;
+      const radius = 240 + depth * 130 + (i % 5) * 22;
+      n.x = radius * Math.cos(angle);
+      n.y = radius * Math.sin(angle);
+    });
+  });
+
+  // Seed at origin
+  bgCanvasNodes.forEach(n => {
+    if (n.id === bgSeedDomain) { n.x = 0; n.y = 0; }
+  });
+
   setTimeout(() => fitBgCamera(), 50);
 }
 
