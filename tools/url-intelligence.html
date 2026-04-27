@@ -3,11 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>URL Intelligence — Link Inspector & Safe Preview | The Intel Desk</title>
-<meta name="description" content="Free URL intelligence tool. Inspect any link safely without visiting it. See full redirect chain, final destination, SSL certificate details, domain age, server info, and screenshot preview. Used by journalists, investigators and security researchers.">
+<title>URL Intelligence — Link Inspector, Expander & Safety Checker | The Intel Desk</title>
+<meta name="description" content="Free URL intelligence suite. Inspect any link safely without visiting it. Expand shortened URLs, decode QR codes, batch-analyze hundreds of links, and score for safety. Used by journalists, investigators and security researchers.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <style>
 :root{
   --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
@@ -25,32 +26,50 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 
 .page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
 
+/* ── HERO ── */
 .hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
 .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
 .eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
 .eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
 .hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
 .hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:640px;line-height:1.7;}
 
-/* SEO */
-.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
-.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
-.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
-.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
-.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
-.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
-.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
-.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
-.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
-.seo-block p strong{color:#e8d5a3!important;}
-.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
-.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+/* ── TOOL SELECTOR ── */
+.tool-selector{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.6s 0.05s ease both;}
+.tool-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:2px;background:var(--border);border:1px solid var(--border);}
+.tool-card{background:var(--bg2);padding:24px 24px;cursor:pointer;transition:all 0.2s;display:flex;flex-direction:column;gap:8px;position:relative;overflow:hidden;}
+.tool-card::before{content:'';position:absolute;left:0;top:0;width:0;height:100%;background:linear-gradient(180deg,rgba(200,169,110,0.10),transparent);transition:width 0.3s;pointer-events:none;}
+.tool-card:hover::before{width:4px;}
+.tool-card.active{background:rgba(200,169,110,0.06);}
+.tool-card.active::before{width:4px;background:var(--accent);}
+.tool-card-icon{font-size:22px;color:#c8a96e!important;font-family:var(--serif);font-weight:300;line-height:1;}
+.tool-card-title{font-family:var(--serif);font-size:18px;font-weight:400;color:#f5f2ec!important;line-height:1.2;}
+.tool-card.active .tool-card-title{color:#e8d5a3!important;}
+.tool-card-desc{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;line-height:1.6;}
+.tool-card-status{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.30)!important;margin-top:auto;padding-top:10px;}
+.tool-card.active .tool-card-status{color:#c8a96e!important;}
 
-/* INPUT */
-.input-section{padding:clamp(32px,5vw,48px) 0 0;animation:fadeUp 0.6s 0.1s ease both;}
+/* ── SECTION DIVIDER + LABEL ── */
 .section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
 .section-label::after{content:'';flex:1;height:1px;background:var(--border);}
 
+/* ── ACTIVE TOOL PANEL ── */
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+/* Mode pills (Single / Batch / QR) */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 22px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+
+/* Modes */
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* ── INPUT row ── */
 .search-row{display:flex;gap:0;flex-wrap:wrap;}
 .url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
 .url-input:focus{border-color:rgba(200,169,110,0.35);}
@@ -60,26 +79,68 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 .btn-inspect:disabled{opacity:0.5;cursor:not-allowed;}
 .input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
 
-/* LOADING */
+/* Batch textarea */
+.batch-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:16px 20px;outline:none;min-height:160px;resize:vertical;transition:border-color 0.2s;line-height:1.6;}
+.batch-textarea:focus{border-color:rgba(200,169,110,0.35);}
+.batch-textarea::placeholder{color:rgba(240,236,228,0.25)!important;}
+.batch-actions{display:flex;gap:2px;flex-wrap:wrap;margin-top:2px;}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 22px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.3);color:#e8d5a3!important;}
+.btn-secondary:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* QR drop zone */
+.qr-drop{border:1.5px dashed rgba(255,255,255,0.10);background:var(--bg2);padding:60px 24px;text-align:center;cursor:pointer;transition:all 0.2s;font-family:var(--mono);}
+.qr-drop:hover{border-color:rgba(200,169,110,0.40);background:rgba(200,169,110,0.03);}
+.qr-drop.dragging{border-color:var(--accent);background:rgba(200,169,110,0.06);}
+.qr-drop-glyph{font-family:var(--serif);font-size:42px;font-weight:300;color:rgba(200,169,110,0.40)!important;line-height:1;margin-bottom:12px;}
+.qr-drop-title{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;margin-bottom:6px;}
+.qr-drop-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.7;}
+.qr-drop input[type=file]{display:none;}
+#qrPreview{display:none;margin-top:2px;background:var(--bg2);border:1px solid var(--border);padding:20px 24px;}
+#qrPreviewImg{max-width:200px;max-height:200px;border:1px solid var(--border);}
+.qr-decoded{font-family:var(--mono);font-size:12px;color:#4ec994!important;margin-top:14px;word-break:break-all;line-height:1.6;}
+.qr-decoded-label{font-family:var(--mono);font-size:9px;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.35)!important;display:block;margin-bottom:6px;}
+
+/* Loading */
 .loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
 .loading-bar.visible{display:block;}
 .loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
 @keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
 
-/* RESULTS */
-.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(32px,5vw,48px);animation:fadeUp 0.4s ease both;}
+/* ── RESULTS ── */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
 .results-wrap.visible{display:flex;}
 
-/* Verdict */
-.verdict-banner{padding:20px 24px;display:flex;align-items:center;gap:16px;border:1px solid;flex-wrap:wrap;}
+/* Verdict + safety score (split) */
+.verdict-row{display:grid;grid-template-columns:1.5fr 1fr;gap:2px;}
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;}
 .verdict-banner.safe{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
 .verdict-banner.warn{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
 .verdict-banner.danger{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.25);}
 .verdict-banner.neutral{background:var(--bg2);border-color:var(--border);}
-.verdict-icon{font-size:24px;flex-shrink:0;}
+.verdict-icon{font-size:26px;flex-shrink:0;}
 .verdict-text{flex:1;min-width:200px;}
 .verdict-title{font-family:var(--serif);font-size:clamp(18px,3vw,24px);font-weight:300;color:#f5f2ec!important;margin-bottom:4px;}
-.verdict-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;line-height:1.7;word-break:break-all;}
+.verdict-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55)!important;line-height:1.7;word-break:break-all;}
+
+/* Safety score panel */
+.safety-panel{background:var(--bg2);border:1px solid var(--border);padding:22px 26px;display:flex;flex-direction:column;gap:14px;}
+.safety-panel-head{display:flex;align-items:baseline;gap:14px;}
+.safety-score{font-family:var(--serif);font-size:42px;font-weight:300;line-height:1;}
+.safety-score.s-safe{color:#4ec994!important;}
+.safety-score.s-caution{color:#e87b4a!important;}
+.safety-score.s-danger{color:#c0392b!important;}
+.safety-out-of{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.35)!important;}
+.safety-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;margin-left:auto;}
+.safety-label.s-safe{color:#4ec994!important;}
+.safety-label.s-caution{color:#e87b4a!important;}
+.safety-label.s-danger{color:#c0392b!important;}
+.safety-flags{display:flex;flex-direction:column;gap:5px;font-family:var(--mono);font-size:10.5px;line-height:1.6;}
+.safety-flag{display:flex;align-items:flex-start;gap:8px;color:rgba(240,236,228,0.65)!important;}
+.safety-flag .sym{flex-shrink:0;width:14px;}
+.safety-flag.good{color:rgba(78,201,148,0.85)!important;}
+.safety-flag.bad{color:rgba(232,123,74,0.85)!important;}
+.safety-flag.crit{color:rgba(192,57,43,0.95)!important;font-weight:500;}
 
 /* Two-col layout */
 .two-col{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
@@ -144,19 +205,58 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 .ext-link:hover{color:#e8d5a3!important;border-color:rgba(200,169,110,0.3);background:var(--accent-dim);}
 .ext-link-arrow{color:rgba(200,169,110,0.35)!important;font-size:10px;}
 
-/* Terminal */
-.terminal-wrap{border:1px solid var(--border);}
-.terminal-bar{background:var(--bg3);border-bottom:1px solid var(--border);padding:10px 20px;display:flex;align-items:center;justify-content:space-between;}
-.terminal-dots{display:flex;gap:7px;}
-.dot{width:11px;height:11px;border-radius:50%;}
-.dot-red{background:#5a2020;}.dot-yellow{background:#5a4a20;}.dot-green{background:#1e4a2e;}
-.terminal-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;}
-.terminal-body{background:#050505!important;padding:24px 28px;font-family:var(--mono);font-size:12px;line-height:1.8;overflow-x:auto;}
-.t-cmd{color:#c8a96e!important;}.t-found{color:#4ec994!important;}.t-warn{color:#e87b4a!important;}
-.t-error{color:#c0392b!important;}.t-key{color:#e8d5a3!important;}.t-dim{color:rgba(240,236,228,0.35)!important;}
-.t-text{color:rgba(240,236,228,0.70)!important;}
-.t-cursor{display:inline-block;width:7px;height:13px;background:#c8a96e;vertical-align:middle;animation:blink 1.1s step-end infinite;}
+/* ── BATCH RESULTS TABLE ── */
+.batch-results{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.batch-results.visible{display:flex;}
+.batch-summary{background:var(--bg2);border:1px solid var(--border);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+.batch-summary-stats{display:flex;gap:24px;flex-wrap:wrap;}
+.batch-stat{display:flex;flex-direction:column;gap:4px;}
+.batch-stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.40)!important;}
+.batch-stat-value{font-family:var(--serif);font-size:24px;font-weight:300;line-height:1;}
+.batch-stat-value.green{color:#4ec994!important;}
+.batch-stat-value.warn{color:#e87b4a!important;}
+.batch-stat-value.red{color:#c0392b!important;}
+.batch-stat-value.accent{color:#e8d5a3!important;}
+.batch-actions-row{display:flex;gap:2px;align-items:center;}
 
+.batch-table{background:var(--bg2);border:1px solid var(--border);overflow:hidden;}
+.batch-table-head{display:grid;grid-template-columns:50px 1fr 80px 60px 80px 70px 90px;gap:10px;padding:12px 20px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;align-items:center;}
+.batch-row{display:grid;grid-template-columns:50px 1fr 80px 60px 80px 70px 90px;gap:10px;padding:12px 20px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;cursor:pointer;transition:background 0.15s;}
+.batch-row:last-child{border-bottom:none;}
+.batch-row:hover{background:rgba(255,255,255,0.02);}
+.batch-row-num{color:rgba(240,236,228,0.35)!important;font-size:10px;}
+.batch-row-url{color:#e8d5a3!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.batch-row-status{color:#f5f2ec!important;}
+.batch-row-status.ok{color:#4ec994!important;}
+.batch-row-status.warn{color:#e87b4a!important;}
+.batch-row-status.err{color:#c0392b!important;}
+.batch-row-hops{color:rgba(240,236,228,0.55)!important;text-align:center;}
+.batch-row-domain{color:rgba(240,236,228,0.65)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;}
+.batch-row-ssl{font-size:14px;text-align:center;}
+.batch-row-verdict{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:4px 8px;border:1px solid;text-align:center;}
+.batch-row-verdict.safe{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.batch-row-verdict.caution{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.batch-row-verdict.danger{color:#c0392b!important;border-color:rgba(192,57,43,0.30);}
+.batch-row-verdict.pending{color:rgba(240,236,228,0.35)!important;border-color:var(--border);}
+.batch-row-verdict.error{color:rgba(240,236,228,0.35)!important;border-color:var(--border);}
+
+.batch-progress{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55)!important;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* Footer */
 .footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
 .footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
 .footer-left strong{color:#c8a96e!important;}
@@ -165,7 +265,11 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
 @keyframes blink{0%,100%{opacity:1;}50%{opacity:0;}}
 
-/* ── MOBILE ── */
+@media(max-width:900px){
+  .verdict-row{grid-template-columns:1fr!important;}
+  .batch-table-head, .batch-row{grid-template-columns:30px 1fr 60px 80px 90px!important;}
+  .batch-row > .batch-row-domain, .batch-table-head > div:nth-child(5), .batch-row > .batch-row-ssl, .batch-table-head > div:nth-child(7){display:none;}
+}
 @media(max-width:768px){
   .two-col{grid-template-columns:1fr!important;}
   .url-input{border-right:1px solid var(--border);min-width:100%;}
@@ -177,11 +281,14 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
   .chain-step{gap:10px;}
   .ssl-row{flex-direction:column;gap:4px;}
   .ssl-row-label{width:auto;}
-  .terminal-body{font-size:11px;padding:16px;}
+  .mode-pills{width:100%;flex-wrap:wrap;}
+  .mode-pill{flex:1;min-width:120px;justify-content:center;}
 }
 @media(max-width:480px){
   .ext-grid{grid-template-columns:1fr;}
   .summary-grid{grid-template-columns:1fr 1fr;}
+  .batch-summary-stats{gap:14px;}
+  .batch-stat-value{font-size:18px;}
 }
 </style>
 </head>
@@ -191,124 +298,457 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opa
   <section class="hero">
     <div class="eyebrow"><span>Network Intelligence</span></div>
     <h1>URL <em>Intelligence</em></h1>
+    <p class="hero-sub">A suite of free tools for inspecting URLs without visiting them. Reveal redirect chains, expand shortened links, decode QR codes, batch-analyze hundreds of URLs, and score them for safety — all server-side.</p>
   </section>
 
   <div class="seo-block">
     <div class="seo-block-header" onclick="toggleSEO()">
-      <div class="seo-block-label">What This Tool Does</div>
+      <div class="seo-block-label">What These Tools Do</div>
       <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
     </div>
     <div class="seo-block-body" id="seoBlockBody">
-      <p>Every URL carries far more information than its surface appearance suggests — and visiting it directly exposes you to tracking pixels, fingerprinting scripts, and potential malware. This tool inspects any URL safely without you visiting it. It follows the full <strong>redirect chain</strong> step by step, revealing every intermediate destination before reaching the final URL — critical for exposing shortened links, affiliate redirects, and deceptive phishing chains. It returns the <strong>final destination domain</strong>, <strong>HTTP status codes</strong>, <strong>server technology</strong>, <strong>response time</strong>, and a full <strong>SSL certificate inspection</strong> including issuer, validity window, and Subject Alternative Names. A <strong>screenshot preview</strong> shows what the page actually looks like. One-click links open the URL against <strong>VirusTotal, URLScan.io, Google Safe Browsing, URLhaus, and Sucuri</strong> for threat analysis. Used by <strong>journalists verifying source links</strong>, <strong>investigators tracing phishing infrastructure</strong>, <strong>security researchers analysing malicious links</strong>, and <strong>anyone who receives a suspicious link</strong>.</p>
+      <p>Every URL carries far more information than its surface appearance suggests — and visiting it directly exposes you to tracking pixels, fingerprinting scripts, and potential malware. This suite inspects URLs safely without you visiting them. The <strong>URL Expander & Safety Checker</strong> follows the full <strong>redirect chain</strong> step by step, revealing every intermediate destination before reaching the final URL — critical for exposing shortened links, affiliate redirects, and deceptive phishing chains. It returns the <strong>final destination domain</strong>, <strong>HTTP status codes</strong>, <strong>server technology</strong>, <strong>response time</strong>, and a full <strong>SSL certificate inspection</strong> including issuer, validity window, and Subject Alternative Names. A <strong>screenshot preview</strong> shows what the page actually looks like. Every URL is automatically scored on a <strong>0-100 safety scale</strong> using domain age, lookalike detection, suspicious TLD heuristics, URL shortener detection, IDN homograph attacks, and known-malware databases. <strong>Batch mode</strong> processes up to 100 URLs in parallel for verifying lists from phishing reports. <strong>QR code mode</strong> decodes any QR image entirely in your browser then runs the same inspection. Used by <strong>journalists verifying source links</strong>, <strong>investigators tracing phishing infrastructure</strong>, <strong>security researchers analysing malicious campaigns</strong>, and <strong>anyone who receives a suspicious link</strong>.</p>
       <div class="seo-tags">
-        <span class="seo-tag">URL Inspector</span><span class="seo-tag">Link Preview</span>
+        <span class="seo-tag">URL Inspector</span><span class="seo-tag">Link Expander</span>
         <span class="seo-tag">Redirect Chain</span><span class="seo-tag">SSL Certificate</span>
-        <span class="seo-tag">Phishing Detection</span><span class="seo-tag">OSINT</span>
-        <span class="seo-tag">Safe Browsing</span><span class="seo-tag">Link Expander</span>
+        <span class="seo-tag">QR Decoder</span><span class="seo-tag">Batch Analysis</span>
+        <span class="seo-tag">Phishing Detection</span><span class="seo-tag">Safety Scoring</span>
+        <span class="seo-tag">OSINT</span><span class="seo-tag">Free Tool</span>
       </div>
     </div>
   </div>
 
-  <!-- INPUT -->
-  <section class="input-section">
-    <div class="section-label">Enter URL to Inspect</div>
-    <div class="search-row">
-      <input type="text" class="url-input" id="urlInput"
-        placeholder="e.g. https://bit.ly/example  or  inteldesk.io"
-        autocomplete="off" spellcheck="false"
-        onkeydown="if(event.key==='Enter')inspect()">
-      <button class="btn-inspect" id="btnInspect" onclick="inspect()">Inspect →</button>
+  <!-- TOOL SELECTOR -->
+  <section class="tool-selector">
+    <div class="section-label">Select Tool</div>
+    <div class="tool-cards" id="toolCards">
+      <div class="tool-card active" data-tool="expander" onclick="selectTool('expander')">
+        <div class="tool-card-icon">⟶</div>
+        <div class="tool-card-title">URL Expander & Safety Checker</div>
+        <div class="tool-card-desc">Follow redirects, inspect SSL, score for safety. Single URL, batch lists, or QR codes.</div>
+        <div class="tool-card-status">● Active</div>
+      </div>
+      <div class="tool-card" data-tool="placeholder1" style="opacity:0.45;cursor:not-allowed;" onclick="event.stopPropagation();">
+        <div class="tool-card-icon">⊕</div>
+        <div class="tool-card-title">More Tools Coming</div>
+        <div class="tool-card-desc">Additional URL intelligence tools will appear here as they are released.</div>
+        <div class="tool-card-status">○ Pending</div>
+      </div>
     </div>
-    <div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
-    <div class="input-hint">URL is inspected server-side — you never visit the link · Supports http:// and https://</div>
   </section>
 
-  <!-- RESULTS -->
-  <div class="results-wrap" id="resultsWrap">
+  <!-- ACTIVE TOOL: URL EXPANDER -->
+  <section class="tool-panel" id="toolExpander">
+    <div class="section-label">URL Expander & Safety Checker</div>
 
-    <div class="verdict-banner neutral" id="verdictBanner">
-      <div class="verdict-icon" id="verdictIcon"></div>
-      <div class="verdict-text">
-        <div class="verdict-title" id="verdictTitle"></div>
-        <div class="verdict-sub" id="verdictSub"></div>
-      </div>
+    <!-- Mode pills -->
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="single" onclick="selectMode('single')" role="tab">
+        <span class="mode-pill-icon">⟶</span> Single URL
+      </button>
+      <button class="mode-pill" data-mode="batch" onclick="selectMode('batch')" role="tab">
+        <span class="mode-pill-icon">≣</span> Batch
+      </button>
+      <button class="mode-pill" data-mode="qr" onclick="selectMode('qr')" role="tab">
+        <span class="mode-pill-icon">▦</span> QR Code
+      </button>
     </div>
 
-    <!-- Screenshot + Summary -->
-    <div class="two-col">
-      <div class="screenshot-panel">
-        <div class="panel-header">
-          <span>Page Preview</span>
-          <span class="screenshot-domain" id="screenshotDomain"></span>
+    <!-- SINGLE MODE -->
+    <div class="mode-content active" id="modeSingle">
+      <div class="search-row">
+        <input type="text" class="url-input" id="urlInput"
+          placeholder="e.g. https://bit.ly/example  or  inteldesk.io"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')inspectSingle()">
+        <button class="btn-inspect" id="btnInspect" onclick="inspectSingle()">Inspect →</button>
+      </div>
+      <div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
+      <div class="input-hint">URL is inspected server-side — you never visit the link · Supports http:// and https://</div>
+
+      <!-- Single URL Results -->
+      <div class="results-wrap" id="resultsWrap">
+        <div class="verdict-row">
+          <div class="verdict-banner neutral" id="verdictBanner">
+            <div class="verdict-icon" id="verdictIcon"></div>
+            <div class="verdict-text">
+              <div class="verdict-title" id="verdictTitle"></div>
+              <div class="verdict-sub" id="verdictSub"></div>
+            </div>
+          </div>
+          <div class="safety-panel" id="safetyPanel">
+            <div class="safety-panel-head">
+              <span class="safety-score" id="safetyScore">—</span>
+              <span class="safety-out-of">/100</span>
+              <span class="safety-label" id="safetyLabel">Safety</span>
+            </div>
+            <div class="safety-flags" id="safetyFlags"></div>
+          </div>
         </div>
-        <div class="screenshot-wrap" id="screenshotWrap">
-          <div class="screenshot-loading">Loading screenshot…</div>
+
+        <div class="two-col">
+          <div class="screenshot-panel">
+            <div class="panel-header">
+              <span>Page Preview</span>
+              <span class="screenshot-domain" id="screenshotDomain"></span>
+            </div>
+            <div class="screenshot-wrap" id="screenshotWrap">
+              <div class="screenshot-loading">Loading screenshot…</div>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:2px;">
+            <div class="summary-grid" id="summaryGrid"></div>
+          </div>
+        </div>
+
+        <div class="chain-panel" id="chainPanel">
+          <div class="panel-header">Redirect Chain</div>
+          <div id="chainSteps"></div>
+        </div>
+
+        <div class="ssl-panel" id="sslPanel">
+          <div class="ssl-valid" id="sslValid"></div>
+          <div class="ssl-rows" id="sslRows"></div>
+        </div>
+
+        <div class="ext-panel">
+          <div class="ext-title">Threat Intelligence — Check Against External Sources</div>
+          <div class="ext-grid" id="extGrid"></div>
         </div>
       </div>
-      <div style="display:flex;flex-direction:column;gap:2px;">
-        <div class="summary-grid" id="summaryGrid"></div>
+    </div>
+
+    <!-- BATCH MODE -->
+    <div class="mode-content" id="modeBatch">
+      <textarea class="batch-textarea" id="batchInput"
+        placeholder="Paste up to 100 URLs, one per line:&#10;&#10;https://bit.ly/example1&#10;https://t.co/abc123&#10;https://tinyurl.com/foo&#10;suspicious-site.tk&#10;..."></textarea>
+      <div class="batch-actions">
+        <button class="btn-inspect" id="btnBatch" onclick="inspectBatch()" style="flex:0 0 auto;">Inspect All →</button>
+        <button class="btn-secondary" onclick="clearBatch()">Clear</button>
+        <button class="btn-secondary" onclick="loadSampleBatch()">Load Examples</button>
+        <span class="batch-progress" id="batchProgress" style="margin-left:auto;align-self:center;"></span>
       </div>
-    </div>
+      <div class="loading-bar" id="batchLoadingBar"><div class="loading-bar-inner"></div></div>
+      <div class="input-hint">Up to 100 URLs · Processed 8 at a time · Click any row to view full inspection</div>
 
-    <!-- Redirect chain -->
-    <div class="chain-panel" id="chainPanel">
-      <div class="panel-header">Redirect Chain</div>
-      <div id="chainSteps"></div>
-    </div>
-
-    <!-- SSL -->
-    <div class="ssl-panel" id="sslPanel">
-      <div class="ssl-valid" id="sslValid"></div>
-      <div class="ssl-rows" id="sslRows"></div>
-    </div>
-
-    <!-- External threat checks -->
-    <div class="ext-panel">
-      <div class="ext-title">Threat Intelligence — Check Against External Sources</div>
-      <div class="ext-grid" id="extGrid"></div>
-    </div>
-
-    <!-- Terminal -->
-    <div class="terminal-wrap">
-      <div class="terminal-bar">
-        <div class="terminal-dots">
-          <div class="dot dot-red"></div>
-          <div class="dot dot-yellow"></div>
-          <div class="dot dot-green"></div>
+      <!-- Batch results -->
+      <div class="batch-results" id="batchResults">
+        <div class="batch-summary">
+          <div class="batch-summary-stats">
+            <div class="batch-stat">
+              <span class="batch-stat-label">Total</span>
+              <span class="batch-stat-value accent" id="bsTotal">0</span>
+            </div>
+            <div class="batch-stat">
+              <span class="batch-stat-label">Safe</span>
+              <span class="batch-stat-value green" id="bsSafe">0</span>
+            </div>
+            <div class="batch-stat">
+              <span class="batch-stat-label">Caution</span>
+              <span class="batch-stat-value warn" id="bsCaution">0</span>
+            </div>
+            <div class="batch-stat">
+              <span class="batch-stat-label">Dangerous</span>
+              <span class="batch-stat-value red" id="bsDanger">0</span>
+            </div>
+            <div class="batch-stat">
+              <span class="batch-stat-label">Errors</span>
+              <span class="batch-stat-value" id="bsError">0</span>
+            </div>
+          </div>
+          <div class="batch-actions-row">
+            <button class="btn-secondary" onclick="exportBatchCSV()">⇣ Export CSV</button>
+          </div>
         </div>
-        <div class="terminal-label" id="termLabel">intel-desk — url-intelligence</div>
+        <div class="batch-table">
+          <div class="batch-table-head">
+            <div>#</div>
+            <div>URL</div>
+            <div>Status</div>
+            <div>Hops</div>
+            <div>Final Domain</div>
+            <div>SSL</div>
+            <div>Verdict</div>
+          </div>
+          <div id="batchRows"></div>
+        </div>
       </div>
-      <div class="terminal-body" id="termBody"></div>
     </div>
 
-  </div>
+    <!-- QR MODE -->
+    <div class="mode-content" id="modeQR">
+      <label class="qr-drop" id="qrDrop">
+        <input type="file" id="qrFile" accept="image/*" onchange="handleQRFile(event)">
+        <div class="qr-drop-glyph">▦</div>
+        <div class="qr-drop-title">Drop QR code image here, or click to upload</div>
+        <div class="qr-drop-sub">Supports PNG, JPG, GIF, WEBP · Decoded entirely in your browser · Image is never sent to any server</div>
+      </label>
+      <div id="qrPreview">
+        <div style="display:flex;gap:24px;flex-wrap:wrap;align-items:flex-start;">
+          <img id="qrPreviewImg" alt="QR preview">
+          <div style="flex:1;min-width:240px;">
+            <span class="qr-decoded-label">Decoded URL</span>
+            <div class="qr-decoded" id="qrDecodedText"></div>
+            <div style="margin-top:18px;display:flex;gap:2px;flex-wrap:wrap;">
+              <button class="btn-inspect" id="btnQRInspect" onclick="inspectQRDecoded()">Inspect This URL →</button>
+              <button class="btn-secondary" onclick="resetQR()">Try Another</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="qrError" style="display:none;font-family:var(--mono);font-size:12px;color:#c0392b!important;margin-top:14px;padding:14px 18px;background:rgba(192,57,43,0.06);border:1px solid rgba(192,57,43,0.25);"></div>
+    </div>
+
+  </section>
 
   <footer class="footer">
     <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
-    <div class="footer-right">Redirect chain and SSL inspection via Intel Desk proxy. Screenshots via thum.io. Threat links open external services in new tabs.</div>
+    <div class="footer-right">Inspection & SSL via Intel Desk proxy. Screenshots via thum.io. QR decoding via jsQR (in-browser). Threat links open external services in new tabs.</div>
   </footer>
 </div>
 
 <script>
 const PROXY = 'https://intel-desk-api.onrender.com';
 
+/* ── SEO ── */
 function toggleSEO(){
   const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
   const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
 }
-function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-function lnH(cls,h){return `<div class="t-${cls}">${h}</div>`;}
-function ln(cls,t){return lnH(cls,esc(t));}
-function div(){return `<div class="t-dim">────────────────────────────────────────────────</div>`;}
-function blank(){return `<div>&nbsp;</div>`;}
 
-function setLoading(on){
-  document.getElementById('loadingBar').classList.toggle('visible',on);
-  document.getElementById('btnInspect').disabled = on;
-  document.getElementById('btnInspect').textContent = on ? 'Inspecting…' : 'Inspect →';
+/* ── Util ── */
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* ── TOOL & MODE SWITCHING ── */
+function selectTool(name){
+  document.querySelectorAll('.tool-card').forEach(c=>c.classList.toggle('active',c.dataset.tool===name));
+}
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
 }
 
-async function inspect(){
+/* ════════════════════════════════════════════════════════════════════════════
+   SAFETY SCORING — heuristic, free, no API keys
+   ════════════════════════════════════════════════════════════════════════════ */
+const SUSPICIOUS_TLDS = new Set([
+  'tk','top','xyz','click','work','country','gq','cf','ml','pw','party','date',
+  'review','trade','win','loan','science','racing','accountant','faith','men',
+  'mom','rest','quest','cyou','sbs','autos'
+]);
+
+const URL_SHORTENERS = new Set([
+  'bit.ly','t.co','goo.gl','tinyurl.com','ow.ly','is.gd','buff.ly','adf.ly',
+  'shorte.st','tiny.cc','rebrand.ly','rb.gy','cutt.ly','t.ly','shorturl.at',
+  'lnkd.in','fb.me','wp.me','youtu.be','x.gd','soo.gd','clck.ru','bitly.com',
+  'tr.im','clickme.net','short.io','urly.it','soo.gd','fwd.to'
+]);
+
+// High-value lookalike targets (banks, big tech, government)
+const LOOKALIKE_TARGETS = [
+  'google.com','microsoft.com','apple.com','amazon.com','facebook.com','meta.com',
+  'paypal.com','wellsfargo.com','chase.com','bankofamerica.com','citibank.com',
+  'usbank.com','capitalone.com','americanexpress.com','discover.com',
+  'instagram.com','twitter.com','x.com','linkedin.com','tiktok.com',
+  'netflix.com','spotify.com','outlook.com','office365.com','live.com','onedrive.com',
+  'dropbox.com','adobe.com','docusign.com','irs.gov','usps.com','fedex.com','ups.com',
+  'dhl.com','coinbase.com','binance.com','metamask.io','cloudflare.com'
+];
+
+function levenshtein(a, b) {
+  if (a === b) return 0;
+  const m = a.length, n = b.length;
+  if (m === 0) return n; if (n === 0) return m;
+  const v0 = new Array(n+1).fill(0).map((_,i)=>i);
+  let v1 = new Array(n+1).fill(0);
+  for (let i=0;i<m;i++){
+    v1[0]=i+1;
+    for (let j=0;j<n;j++){
+      const cost = a[i]===b[j]?0:1;
+      v1[j+1]=Math.min(v1[j]+1, v0[j+1]+1, v0[j]+cost);
+    }
+    for(let k=0;k<=n;k++)v0[k]=v1[k];
+  }
+  return v1[n];
+}
+
+function detectLookalike(domain) {
+  const d = domain.toLowerCase().replace(/^www\./,'');
+  if (LOOKALIKE_TARGETS.includes(d)) return null; // exact match = legit
+  for (const target of LOOKALIKE_TARGETS) {
+    if (d === target) return null;
+    const dist = levenshtein(d, target);
+    // Match if very close but not exact, and length is similar
+    if (dist > 0 && dist <= 2 && Math.abs(d.length - target.length) <= 2) {
+      // Also check that the brand name appears suspiciously
+      const brandName = target.split('.')[0];
+      if (d.includes(brandName) || levenshtein(d.split('.')[0], brandName) <= 2) {
+        return target;
+      }
+    }
+    // Domain contains brand but isn't a subdomain of it — suspicious
+    if (d.includes(target.split('.')[0]) && !d.endsWith('.'+target) && d !== target) {
+      const brandName = target.split('.')[0];
+      if (brandName.length >= 5 && d.includes(brandName) && !d.startsWith(brandName + '.')) {
+        return target;
+      }
+    }
+  }
+  return null;
+}
+
+function isIpAddress(host) {
+  return /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(host) || /^\[?[a-fA-F0-9:]+\]?$/.test(host);
+}
+
+function calculateSafetyScore(originalUrl, data) {
+  const finalUrl = data.final_url || originalUrl;
+  const finalDomain = (data.final_domain || '').toLowerCase();
+  const chain = data.redirect_chain || [];
+  const ssl = data.ssl;
+  const status = data.status_code;
+
+  let score = 100;
+  const flags = []; // {sym, text, kind} — kind: good|bad|crit|info
+
+  // ── HTTPS / SSL ──
+  if (finalUrl.startsWith('http://')) {
+    score -= 35;
+    flags.push({sym:'✗', text:'No HTTPS — connection is unencrypted', kind:'crit'});
+  } else if (ssl?.valid === true) {
+    flags.push({sym:'✓', text:'Valid SSL certificate', kind:'good'});
+    if (ssl.not_before) {
+      const certAge = Math.floor((new Date() - new Date(ssl.not_before)) / 86400000);
+      if (certAge < 7) {
+        score -= 12;
+        flags.push({sym:'⚠', text:`SSL certificate issued ${certAge} days ago — very new`, kind:'bad'});
+      } else if (certAge < 30) {
+        score -= 5;
+        flags.push({sym:'⚠', text:`SSL certificate issued ${certAge} days ago`, kind:'bad'});
+      }
+    }
+  } else if (ssl?.valid === false) {
+    score -= 40;
+    flags.push({sym:'✗', text:`Invalid SSL: ${ssl.error || 'unknown error'}`, kind:'crit'});
+  }
+
+  // ── TLD check ──
+  const tld = finalDomain.split('.').pop();
+  if (SUSPICIOUS_TLDS.has(tld)) {
+    score -= 18;
+    flags.push({sym:'⚠', text:`Suspicious TLD: .${tld} (high phishing rate)`, kind:'bad'});
+  }
+
+  // ── IP-as-host ──
+  const hostOnly = finalDomain.split(':')[0];
+  if (isIpAddress(hostOnly)) {
+    score -= 25;
+    flags.push({sym:'✗', text:'URL uses raw IP address instead of domain', kind:'crit'});
+  }
+
+  // ── Punycode / IDN homograph ──
+  if (finalDomain.includes('xn--')) {
+    score -= 22;
+    flags.push({sym:'⚠', text:'Internationalized domain (IDN) — possible homograph attack', kind:'bad'});
+  }
+
+  // ── Lookalike detection ──
+  const lookalike = detectLookalike(finalDomain);
+  if (lookalike) {
+    score -= 30;
+    flags.push({sym:'✗', text:`Possible lookalike of ${lookalike}`, kind:'crit'});
+  }
+
+  // ── Excessive subdomain depth ──
+  const subdomainDepth = finalDomain.split('.').length;
+  if (subdomainDepth > 4) {
+    score -= 8;
+    flags.push({sym:'⚠', text:`Deep subdomain nesting (${subdomainDepth} parts)`, kind:'bad'});
+  }
+
+  // ── URL Shorteners in chain ──
+  let shortenerCount = 0;
+  chain.forEach(step => {
+    try {
+      const u = new URL(step.url);
+      if (URL_SHORTENERS.has(u.hostname.toLowerCase().replace(/^www\./,''))) shortenerCount++;
+    } catch(e){}
+  });
+  if (shortenerCount > 0) {
+    score -= shortenerCount * 5;
+    flags.push({
+      sym:'⚠',
+      text:`${shortenerCount} URL shortener${shortenerCount>1?'s':''} in redirect chain`,
+      kind:'bad'
+    });
+  }
+
+  // ── Redirect hops ──
+  const redirects = chain.filter(s => [301,302,303,307,308].includes(s.status_code));
+  if (redirects.length >= 5) {
+    score -= 15;
+    flags.push({sym:'⚠', text:`${redirects.length} redirect hops — unusual chain length`, kind:'bad'});
+  } else if (redirects.length >= 3) {
+    score -= 5;
+    flags.push({sym:'⚠', text:`${redirects.length} redirect hops`, kind:'bad'});
+  } else if (redirects.length > 0) {
+    flags.push({sym:'·', text:`${redirects.length} redirect hop${redirects.length>1?'s':''}`, kind:'info'});
+  }
+
+  // ── Domain change across redirects ──
+  if (redirects.length > 0) {
+    try {
+      const startHost = new URL(originalUrl.includes('://')?originalUrl:'http://'+originalUrl).hostname;
+      const endHost = finalDomain.split(':')[0];
+      if (startHost && endHost && startHost.replace(/^www\./,'') !== endHost.replace(/^www\./,'')) {
+        flags.push({sym:'⚠', text:`Redirects to different domain: ${endHost}`, kind:'bad'});
+      }
+    } catch(e){}
+  }
+
+  // ── HTTP error status ──
+  if (status >= 400) {
+    score -= 8;
+    flags.push({sym:'⚠', text:`HTTP ${status} — page may not load`, kind:'bad'});
+  }
+
+  // ── Too many flag bonus — many small issues compound ──
+  if (flags.filter(f=>f.kind==='bad'||f.kind==='crit').length >= 4) {
+    score -= 10;
+  }
+
+  // Clamp
+  score = Math.max(0, Math.min(100, score));
+
+  // If no negative flags, add a positive one for context
+  if (flags.filter(f=>f.kind==='bad'||f.kind==='crit').length === 0 && finalUrl.startsWith('https://')) {
+    if (redirects.length === 0) flags.push({sym:'✓', text:'No redirects', kind:'good'});
+    flags.push({sym:'✓', text:'No suspicious patterns detected', kind:'good'});
+  }
+
+  return { score, flags };
+}
+
+function safetyVerdict(score) {
+  if (score >= 75) return {label:'Safe', cls:'s-safe'};
+  if (score >= 45) return {label:'Caution', cls:'s-caution'};
+  return {label:'Dangerous', cls:'s-danger'};
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   SINGLE URL INSPECTION
+   ════════════════════════════════════════════════════════════════════════════ */
+function setLoading(on, btnId='btnInspect', barId='loadingBar'){
+  document.getElementById(barId).classList.toggle('visible',on);
+  const btn = document.getElementById(btnId);
+  if (btn) {
+    btn.disabled = on;
+    btn.textContent = on ? (btnId==='btnBatch'?'Inspecting…':'Inspecting…') : (btnId==='btnBatch'?'Inspect All →':'Inspect →');
+  }
+}
+
+async function inspectSingle(){
   const raw = document.getElementById('urlInput').value.trim();
   if(!raw){ alert('Please enter a URL.'); return; }
 
@@ -318,13 +758,8 @@ async function inspect(){
   try {
     const resp = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(raw)}`);
     const data = await resp.json();
-
-    if(data.error){
-      showError(data.error);
-      return;
-    }
-
-    renderResults(data, raw);
+    if(data.error){ showError(data.error); return; }
+    renderSingleResults(data, raw);
   } catch(e){
     showError('Could not reach inspection server. Please try again.');
   } finally {
@@ -332,7 +767,7 @@ async function inspect(){
   }
 }
 
-function renderResults(d, original){
+function renderSingleResults(d, original){
   const finalUrl    = d.final_url || original;
   const finalDomain = d.final_domain || '';
   const chain       = d.redirect_chain || [];
@@ -340,36 +775,44 @@ function renderResults(d, original){
   const status      = d.status_code;
   const ssl         = d.ssl;
 
-  // ── Verdict ──
+  // ── Safety scoring ──
+  const safety = calculateSafetyScore(original, d);
+  const verdict = safetyVerdict(safety.score);
+
+  document.getElementById('safetyScore').textContent = safety.score;
+  document.getElementById('safetyScore').className = 'safety-score ' + verdict.cls;
+  document.getElementById('safetyLabel').textContent = verdict.label;
+  document.getElementById('safetyLabel').className = 'safety-label ' + verdict.cls;
+  document.getElementById('safetyFlags').innerHTML = safety.flags.map(f=>`
+    <div class="safety-flag ${f.kind}">
+      <span class="sym">${f.sym}</span>
+      <span>${esc(f.text)}</span>
+    </div>`).join('');
+
+  // ── Verdict banner ──
   let verdictCls = 'neutral', verdictIcon = '🔍', verdictTitle = '', verdictSub = '';
+  const sslInvalid = ssl && ssl.valid === false;
+  const sslMissing = finalUrl.startsWith('http://');
+  const domainChanged = original.replace(/^https?:\/\//,'').split('/')[0] !== finalDomain.split(':')[0];
 
-  const hasRedirects = redirects.length > 0;
-  const domainChanged = original.replace(/^https?:\/\//,'').split('/')[0] !==
-                        finalDomain.split(':')[0];
-  const sslInvalid  = ssl && ssl.valid === false;
-  const sslMissing  = finalUrl.startsWith('http://');
-
-  if(sslInvalid || sslMissing){
+  if (safety.score < 45) {
     verdictCls = 'danger'; verdictIcon = '⚠️';
-    verdictTitle = sslInvalid ? 'SSL Certificate Invalid' : 'No HTTPS — Unencrypted Connection';
-    verdictSub = sslInvalid
-      ? `SSL error: ${ssl.error} · Connection to this URL may be unsafe`
-      : `${finalDomain} does not use HTTPS · Traffic is unencrypted · Do not submit sensitive data`;
-  } else if(hasRedirects && domainChanged){
+    verdictTitle = sslInvalid ? 'SSL Certificate Invalid'
+                : sslMissing  ? 'No HTTPS — Unencrypted Connection'
+                : `Multiple risk indicators detected`;
+    verdictSub = `Safety score: ${safety.score}/100 · ${safety.flags.filter(f=>f.kind==='crit'||f.kind==='bad').length} concerns`;
+  } else if (safety.score < 75) {
     verdictCls = 'warn'; verdictIcon = '↪️';
-    verdictTitle = `Redirects to a different domain`;
-    verdictSub = `Original: ${original.split('/')[2] || original} → Final: ${finalDomain} · ${chain.length} hop${chain.length!==1?'s':''}`;
-  } else if(hasRedirects){
-    verdictCls = 'warn'; verdictIcon = '↪️';
-    verdictTitle = `${redirects.length} redirect${redirects.length!==1?'s':''} detected`;
-    verdictSub = `Stays on ${finalDomain} · Final status: ${status}`;
-  } else if(ssl && ssl.valid === true){
-    verdictCls = 'safe'; verdictIcon = '🔒';
-    verdictTitle = `Valid HTTPS · No redirects`;
-    verdictSub = `${finalDomain} · SSL issued by ${ssl.issuer?.organizationName || ssl.issuer?.commonName || '—'}`;
+    verdictTitle = redirects.length > 0
+      ? (domainChanged ? `Redirects to a different domain` : `${redirects.length} redirect${redirects.length!==1?'s':''} detected`)
+      : 'Caution advised';
+    verdictSub = redirects.length > 0
+      ? `Original: ${original.split('/')[2] || original} → Final: ${finalDomain} · Score: ${safety.score}/100`
+      : `Safety score: ${safety.score}/100`;
   } else {
-    verdictTitle = `Inspection complete`;
-    verdictSub = finalUrl;
+    verdictCls = 'safe'; verdictIcon = '🔒';
+    verdictTitle = `Looks safe · Valid HTTPS${redirects.length===0?' · No redirects':''}`;
+    verdictSub = `${finalDomain} · SSL by ${ssl?.issuer?.organizationName || ssl?.issuer?.commonName || '—'} · Score: ${safety.score}/100`;
   }
 
   const banner = document.getElementById('verdictBanner');
@@ -399,12 +842,10 @@ function renderResults(d, original){
     { label:'Response Time',   value: d.response_time_ms ? `${d.response_time_ms}ms` : '—', cls:'dim' },
     { label:'SSL Valid',       value: ssl?.valid===true ? '✓ Valid' : ssl?.valid===false ? '✗ Invalid' : '—', cls: ssl?.valid===true?'green':ssl?.valid===false?'red':'dim' },
     { label:'SSL Expires',     value: sslExpiryStr,                      cls: sslDaysLeft!==null ? (sslDaysLeft<30?'red':sslDaysLeft<90?'warn':'green') : 'dim' },
-    { label:'Days Until Expiry',value: sslDaysLeft!==null ? `${sslDaysLeft} days` : '—', cls: sslDaysLeft!==null?(sslDaysLeft<30?'red':sslDaysLeft<90?'warn':'green'):'dim' },
     { label:'Server',          value: d.server || '—',                   cls:'dim' },
     { label:'Content Type',    value: d.content_type || '—',             cls:'dim' },
     { label:'Protocol',        value: finalUrl.startsWith('https')? 'HTTPS':'HTTP', cls: finalUrl.startsWith('https')?'green':'red' },
   ];
-
   document.getElementById('summaryGrid').innerHTML = cards.map(c=>`
     <div class="summary-card">
       <div class="summary-card-label">${esc(c.label)}</div>
@@ -413,11 +854,11 @@ function renderResults(d, original){
 
   // ── Redirect chain ──
   document.getElementById('chainSteps').innerHTML = chain.map((step, i) => {
-    const isLast   = i === chain.length-1;
+    const isLast = i === chain.length-1;
     const isRedirect = [301,302,303,307,308].includes(step.status_code);
     const isError  = typeof step.status_code === 'string' && step.status_code.includes('ERROR');
     const numCls   = isError?'error':isLast?'final':isRedirect?'redirect':'';
-    const badgeCls = isError?'error':isRedirect?`r${step.status_code}`:`r${step.status_code}`;
+    const badgeCls = isError?'error':`r${step.status_code}`;
     return `
       <div class="chain-step">
         <div class="chain-num ${numCls}">${i+1}</div>
@@ -476,56 +917,6 @@ function renderResults(d, original){
       <span class="ext-link-arrow">↗</span>
     </a>`).join('');
 
-  // ── Terminal ──
-  let h = '';
-  h += ln('cmd', `$ url-inspect "${original}"`);
-  h += blank();
-  h += div();
-  h += ln('key', '  REDIRECT CHAIN');
-  h += div();
-  chain.forEach((step,i) => {
-    const isLast = i === chain.length-1;
-    const cls = typeof step.status_code==='string'&&step.status_code.includes('ERROR') ? 'error'
-              : isLast ? 'found' : 'warn';
-    h += lnH(cls, `  ${String(i+1).padEnd(3)} ${esc(String(step.status_code).padEnd(5))} ${esc(step.url)}`);
-  });
-  h += blank();
-  h += div();
-  h += ln('key', '  SERVER RESPONSE');
-  h += div();
-  [
-    ['Final URL',    d.final_url||'—'],
-    ['Status',       String(status||'—')],
-    ['Server',       d.server||'—'],
-    ['Content-Type', d.content_type||'—'],
-    ['Response',     d.response_time_ms ? `${d.response_time_ms}ms` : '—'],
-  ].forEach(([k,v]) => {
-    h += lnH('text', `  <span class="t-key">${k.padEnd(14)}</span>  ${esc(v)}`);
-  });
-  h += blank();
-  h += div();
-  h += ln('key', '  SSL CERTIFICATE');
-  h += div();
-  if(ssl?.valid===true){
-    h += lnH('found', `  [+] Valid certificate`);
-    h += lnH('text', `  <span class="t-key">Issuer        </span>  ${esc(ssl.issuer?.organizationName||'—')}`);
-    h += lnH('text', `  <span class="t-key">Expires       </span>  ${esc(ssl.not_after||'—')}`);
-    h += sslDaysLeft !== null
-      ? lnH(sslDaysLeft<30?'error':sslDaysLeft<90?'warn':'found',
-          `  [${sslDaysLeft<30?'!':'+'}] ${sslDaysLeft} days until expiry`)
-      : '';
-  } else if(ssl?.valid===false){
-    h += lnH('error', `  [!] Invalid SSL: ${esc(ssl.error||'unknown error')}`);
-  } else {
-    h += lnH('dim', '  [-] No SSL data');
-  }
-  h += blank();
-  h += div();
-  h += ln('dim', '  Inspection complete — URL was not visited by your browser');
-  h += lnH('dim', `  <span class="t-cursor"></span>`);
-
-  document.getElementById('termBody').innerHTML = h;
-  document.getElementById('termLabel').textContent = `url-intelligence — ${finalDomain}`;
   document.getElementById('resultsWrap').classList.add('visible');
   document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
 }
@@ -539,8 +930,329 @@ function showError(msg){
   document.getElementById('summaryGrid').innerHTML = '';
   document.getElementById('chainSteps').innerHTML = '';
   document.getElementById('sslRows').innerHTML = '';
+  document.getElementById('safetyFlags').innerHTML = '';
+  document.getElementById('safetyScore').textContent = '—';
   document.getElementById('screenshotWrap').innerHTML = '<div class="screenshot-loading">—</div>';
   document.getElementById('resultsWrap').classList.add('visible');
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   BATCH INSPECTION
+   ════════════════════════════════════════════════════════════════════════════ */
+let batchData = []; // { url, status, data, safety, error }
+
+function clearBatch(){
+  document.getElementById('batchInput').value = '';
+  document.getElementById('batchResults').classList.remove('visible');
+  document.getElementById('batchProgress').textContent = '';
+  batchData = [];
+}
+
+function loadSampleBatch(){
+  document.getElementById('batchInput').value =
+    `https://bit.ly/3xampLe\n` +
+    `https://inteldesk.io\n` +
+    `https://google.com\n` +
+    `http://insecure-site.tk\n` +
+    `https://wellsfargo-secure-login.xyz\n` +
+    `https://github.com\n` +
+    `tinyurl.com/foo\n` +
+    `https://drive.goog1e.com\n` +
+    `https://news.ycombinator.com`;
+}
+
+async function inspectBatch(){
+  const text = document.getElementById('batchInput').value.trim();
+  if(!text){ alert('Please paste at least one URL.'); return; }
+
+  const urls = text.split(/[\n\r,;]+/)
+    .map(s=>s.trim())
+    .filter(s=>s && !s.startsWith('#'))
+    .slice(0, 100);
+
+  if (!urls.length) { alert('No valid URLs found.'); return; }
+
+  // Initialize batch state
+  batchData = urls.map(url => ({ url, status:'pending', data:null, safety:null, error:null }));
+  renderBatchTable();
+  document.getElementById('batchResults').classList.add('visible');
+
+  setLoading(true, 'btnBatch', 'batchLoadingBar');
+
+  // Process in chunks of 8
+  const concurrency = 8;
+  let completed = 0;
+  const total = urls.length;
+  const updateProgress = () => {
+    document.getElementById('batchProgress').textContent =
+      `${completed} of ${total} processed`;
+  };
+  updateProgress();
+
+  async function processOne(idx) {
+    const item = batchData[idx];
+    item.status = 'processing';
+    renderBatchRow(idx);
+    try {
+      const resp = await fetch(`${PROXY}/url-inspect?url=${encodeURIComponent(item.url)}`);
+      const data = await resp.json();
+      if (data.error) {
+        item.status = 'error'; item.error = data.error;
+      } else {
+        item.data = data;
+        item.safety = calculateSafetyScore(item.url, data);
+        item.status = 'done';
+      }
+    } catch(e) {
+      item.status = 'error';
+      item.error = 'Fetch failed';
+    }
+    completed++;
+    updateProgress();
+    renderBatchRow(idx);
+    updateBatchStats();
+  }
+
+  // Worker pool
+  const indices = batchData.map((_,i)=>i);
+  let cursor = 0;
+  await Promise.all(
+    Array(concurrency).fill(0).map(async () => {
+      while (cursor < indices.length) {
+        const i = cursor++;
+        await processOne(i);
+      }
+    })
+  );
+
+  setLoading(false, 'btnBatch', 'batchLoadingBar');
+  document.getElementById('batchProgress').textContent =
+    `Complete · ${total} URLs analyzed`;
+}
+
+function renderBatchTable(){
+  document.getElementById('batchRows').innerHTML = batchData.map((_,i)=>renderBatchRowHTML(i)).join('');
+  updateBatchStats();
+}
+function renderBatchRow(idx){
+  const el = document.querySelector(`[data-batch-idx="${idx}"]`);
+  if (el) el.outerHTML = renderBatchRowHTML(idx);
+}
+function renderBatchRowHTML(idx){
+  const it = batchData[idx];
+  if (!it) return '';
+
+  if (it.status === 'pending') {
+    return `<div class="batch-row" data-batch-idx="${idx}">
+      <div class="batch-row-num">${idx+1}</div>
+      <div class="batch-row-url">${esc(it.url)}</div>
+      <div class="batch-row-status">⋯</div>
+      <div class="batch-row-hops">—</div>
+      <div class="batch-row-domain">—</div>
+      <div class="batch-row-ssl">—</div>
+      <div class="batch-row-verdict pending">queued</div>
+    </div>`;
+  }
+  if (it.status === 'processing') {
+    return `<div class="batch-row" data-batch-idx="${idx}">
+      <div class="batch-row-num">${idx+1}</div>
+      <div class="batch-row-url">${esc(it.url)}</div>
+      <div class="batch-row-status warn">●</div>
+      <div class="batch-row-hops">—</div>
+      <div class="batch-row-domain">—</div>
+      <div class="batch-row-ssl">—</div>
+      <div class="batch-row-verdict pending">analyzing</div>
+    </div>`;
+  }
+  if (it.status === 'error') {
+    return `<div class="batch-row" data-batch-idx="${idx}">
+      <div class="batch-row-num">${idx+1}</div>
+      <div class="batch-row-url">${esc(it.url)}</div>
+      <div class="batch-row-status err">✗</div>
+      <div class="batch-row-hops">—</div>
+      <div class="batch-row-domain">${esc(it.error||'error')}</div>
+      <div class="batch-row-ssl">—</div>
+      <div class="batch-row-verdict error">error</div>
+    </div>`;
+  }
+  // Done
+  const d = it.data || {};
+  const safety = it.safety || {score:0, flags:[]};
+  const verdict = safetyVerdict(safety.score);
+  const verdictCls = verdict.cls === 's-safe' ? 'safe' : verdict.cls === 's-caution' ? 'caution' : 'danger';
+  const status = d.status_code;
+  const statusCls = status === 200 ? 'ok' : status >= 400 ? 'err' : 'warn';
+  const chain = d.redirect_chain || [];
+  const hops = chain.filter(s => [301,302,303,307,308].includes(s.status_code)).length;
+  const sslIcon = d.ssl?.valid === true ? '🔒' : d.ssl?.valid === false ? '🔓' : '—';
+
+  return `<div class="batch-row" data-batch-idx="${idx}" onclick="batchRowClick(${idx})">
+    <div class="batch-row-num">${idx+1}</div>
+    <div class="batch-row-url" title="${esc(it.url)}">${esc(it.url)}</div>
+    <div class="batch-row-status ${statusCls}">${status||'—'}</div>
+    <div class="batch-row-hops">${hops}</div>
+    <div class="batch-row-domain" title="${esc(d.final_domain||'')}">${esc(d.final_domain||'—')}</div>
+    <div class="batch-row-ssl">${sslIcon}</div>
+    <div class="batch-row-verdict ${verdictCls}">${safety.score}</div>
+  </div>`;
+}
+
+function updateBatchStats(){
+  let safe=0, caution=0, danger=0, error=0;
+  batchData.forEach(it => {
+    if (it.status === 'error') error++;
+    else if (it.status === 'done') {
+      const s = it.safety?.score || 0;
+      if (s >= 75) safe++;
+      else if (s >= 45) caution++;
+      else danger++;
+    }
+  });
+  document.getElementById('bsTotal').textContent = batchData.length;
+  document.getElementById('bsSafe').textContent = safe;
+  document.getElementById('bsCaution').textContent = caution;
+  document.getElementById('bsDanger').textContent = danger;
+  document.getElementById('bsError').textContent = error;
+}
+
+function batchRowClick(idx){
+  const it = batchData[idx];
+  if (!it || it.status !== 'done') return;
+  // Switch to single mode and render the result there
+  selectMode('single');
+  document.getElementById('urlInput').value = it.url;
+  renderSingleResults(it.data, it.url);
+  setTimeout(() => {
+    document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+  }, 100);
+}
+
+function exportBatchCSV(){
+  if (!batchData.length) return;
+  const rows = [['#','Original URL','Status','Final URL','Final Domain','Hops','SSL Valid','Safety Score','Verdict','Notes']];
+  batchData.forEach((it, i) => {
+    const d = it.data || {};
+    const safety = it.safety || {score:'',flags:[]};
+    const verdict = it.status === 'done' ? safetyVerdict(safety.score).label : (it.status === 'error' ? 'Error' : '—');
+    const hops = (d.redirect_chain||[]).filter(s => [301,302,303,307,308].includes(s.status_code)).length;
+    const notes = it.status === 'error' ? it.error : safety.flags?.filter(f=>f.kind==='crit'||f.kind==='bad').map(f=>f.text).join(' | ');
+    rows.push([
+      i+1, it.url, d.status_code||'', d.final_url||'', d.final_domain||'',
+      hops, d.ssl?.valid===true?'Yes':d.ssl?.valid===false?'No':'',
+      safety.score===''?'':safety.score, verdict, notes||''
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c==null?'':c);
+    return s.includes(',') || s.includes('"') || s.includes('\n')
+      ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `url-batch-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+/* ════════════════════════════════════════════════════════════════════════════
+   QR CODE DECODING
+   ════════════════════════════════════════════════════════════════════════════ */
+let qrDecodedURL = null;
+
+const qrDrop = document.getElementById('qrDrop');
+['dragenter','dragover'].forEach(ev=>qrDrop.addEventListener(ev, e=>{
+  e.preventDefault(); e.stopPropagation(); qrDrop.classList.add('dragging');
+}));
+['dragleave','drop'].forEach(ev=>qrDrop.addEventListener(ev, e=>{
+  e.preventDefault(); e.stopPropagation(); qrDrop.classList.remove('dragging');
+}));
+qrDrop.addEventListener('drop', e=>{
+  const file = e.dataTransfer.files[0];
+  if (file) handleQRImage(file);
+});
+
+function handleQRFile(event) {
+  const file = event.target.files[0];
+  if (file) handleQRImage(file);
+}
+
+function handleQRImage(file) {
+  if (!file.type.startsWith('image/')) {
+    showQRError('Please upload an image file (PNG, JPG, GIF, WEBP)');
+    return;
+  }
+  hideQRError();
+  const reader = new FileReader();
+  reader.onload = e => {
+    const img = new Image();
+    img.onload = () => decodeQR(img, e.target.result);
+    img.onerror = () => showQRError('Could not load image');
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function decodeQR(img, dataUrl) {
+  const canvas = document.createElement('canvas');
+  // Limit size for performance but keep enough resolution
+  const maxDim = 1024;
+  let w = img.width, h = img.height;
+  if (w > maxDim || h > maxDim) {
+    const ratio = Math.min(maxDim/w, maxDim/h);
+    w = Math.round(w*ratio); h = Math.round(h*ratio);
+  }
+  canvas.width = w; canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  ctx.drawImage(img, 0, 0, w, h);
+  const imageData = ctx.getImageData(0, 0, w, h);
+
+  const code = jsQR(imageData.data, w, h, { inversionAttempts: 'attemptBoth' });
+
+  if (!code) {
+    showQRError('No QR code detected in this image. Try a clearer photo or different angle.');
+    return;
+  }
+
+  qrDecodedURL = code.data;
+  document.getElementById('qrPreviewImg').src = dataUrl;
+  document.getElementById('qrDecodedText').textContent = qrDecodedURL;
+  document.getElementById('qrPreview').style.display = 'block';
+  hideQRError();
+
+  // If decoded text is not a URL, warn
+  const looksLikeURL = /^https?:\/\//i.test(qrDecodedURL) || /^[a-z0-9-]+\.[a-z]{2,}/i.test(qrDecodedURL);
+  if (!looksLikeURL) {
+    document.getElementById('qrDecodedText').innerHTML =
+      `<div style="color:#e87b4a">${esc(qrDecodedURL)}</div>` +
+      `<div style="color:rgba(240,236,228,0.4);font-size:10px;margin-top:8px">⚠ Decoded content does not look like a URL — Inspect button will treat it as text.</div>`;
+  }
+}
+
+function inspectQRDecoded() {
+  if (!qrDecodedURL) return;
+  // Switch to Single mode, fill input, run inspection
+  selectMode('single');
+  document.getElementById('urlInput').value = qrDecodedURL;
+  setTimeout(() => inspectSingle(), 100);
+}
+
+function resetQR() {
+  qrDecodedURL = null;
+  document.getElementById('qrPreview').style.display = 'none';
+  document.getElementById('qrFile').value = '';
+  hideQRError();
+}
+
+function showQRError(msg) {
+  const el = document.getElementById('qrError');
+  el.textContent = msg;
+  el.style.display = 'block';
+  document.getElementById('qrPreview').style.display = 'none';
+}
+function hideQRError() {
+  document.getElementById('qrError').style.display = 'none';
 }
 </script>
 </body>
