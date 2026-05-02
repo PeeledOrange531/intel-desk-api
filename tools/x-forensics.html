@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>X Account Forensics — Twitter Account Age, Deletion & Rename Tracker | The Intel Desk</title>
+<meta name="description" content="Free X (Twitter) account forensics. Track account age via archive history, detect suspended/deleted accounts, recover deleted tweets via Wayback Machine, find renamed accounts, compare handles for sock puppet patterns. No API key required.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:660px;line-height:1.7;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+/* Mode pills */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);flex-wrap:wrap;max-width:100%;}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 20px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* Search row */
+.search-row{display:flex;gap:0;flex-wrap:wrap;}
+.handle-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.handle-input:focus{border-color:rgba(200,169,110,0.35);}
+.handle-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-go{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-go:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-go:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+.fingerprint-row{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.fingerprint-row .handle-input{border-right:1px solid var(--border);}
+
+.batch-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:16px 20px;outline:none;min-height:160px;resize:vertical;line-height:1.6;}
+.batch-textarea:focus{border-color:rgba(200,169,110,0.35);}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 22px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+
+/* Privacy + processing notices */
+.privacy-notice{margin-top:14px;padding:12px 18px;background:rgba(78,201,148,0.04);border:1px solid rgba(78,201,148,0.20);font-family:var(--mono);font-size:10.5px;color:rgba(78,201,148,0.85)!important;line-height:1.7;}
+.processing-warning{margin-top:14px;padding:12px 18px;background:rgba(232,123,74,0.05);border:1px solid rgba(232,123,74,0.22);font-family:var(--mono);font-size:10.5px;color:rgba(232,123,74,0.85)!important;line-height:1.7;}
+.honesty-notice{margin-top:14px;padding:14px 20px;background:rgba(126,184,228,0.05);border:1px solid rgba(126,184,228,0.22);font-family:var(--mono);font-size:11px;color:rgba(126,184,228,0.85)!important;line-height:1.8;}
+.honesty-notice strong{color:#7eb8e4!important;}
+
+/* Dynamic processing overlay */
+.processing-overlay{display:none;flex-direction:column;gap:16px;padding:36px 32px;background:var(--bg2);border:1px solid var(--border);margin-top:16px;animation:fadeUp 0.3s ease both;}
+.processing-overlay.visible{display:flex;}
+.processing-head{display:flex;align-items:center;gap:14px;}
+.processing-spinner{width:24px;height:24px;border:2px solid rgba(200,169,110,0.20);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.processing-title{font-family:var(--serif);font-size:18px;font-weight:300;color:#e8d5a3!important;}
+.processing-time{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.65)!important;}
+.processing-eta{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.6;}
+.processing-step-list{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px;}
+.processing-step{display:flex;align-items:center;gap:10px;padding:6px 0;color:rgba(240,236,228,0.35)!important;transition:color 0.3s;}
+.processing-step.active{color:#c8a96e!important;}
+.processing-step.done{color:#4ec994!important;}
+.processing-step .step-icon{flex-shrink:0;width:18px;text-align:center;}
+.processing-step.active .step-icon{animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.processing-bar{height:3px;background:var(--bg3);overflow:hidden;}
+.processing-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* Results */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;}
+.verdict-banner.alive{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
+.verdict-banner.suspended{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
+.verdict-banner.deleted{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.25);}
+.verdict-banner.not_found{background:rgba(192,57,43,0.05);border-color:rgba(192,57,43,0.20);}
+.verdict-banner.unknown,.verdict-banner.deleted_or_unknown{background:var(--bg2);border-color:var(--border);}
+.verdict-icon{font-size:30px;flex-shrink:0;font-family:var(--serif);}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,26px);font-weight:300;color:#f5f2ec!important;margin-bottom:6px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+.verdict-handle{color:#e8d5a3!important;}
+.verdict-status{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:4px 10px;border:1px solid;}
+.verdict-status.alive{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.verdict-status.suspended{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.verdict-status.deleted,.verdict-status.deleted_or_unknown,.verdict-status.not_found{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.verdict-status.unknown{color:rgba(240,236,228,0.40)!important;border-color:var(--border);}
+.verdict-sub{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.card-head:hover{background:rgba(255,255,255,0.02);}
+.card-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;display:flex;align-items:center;gap:10px;}
+.card-count{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;}
+.card-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.card.expanded .card-toggle{transform:rotate(45deg);}
+.card-body{display:none;}
+.card.expanded .card-body{display:block;animation:fadeUp 0.2s ease;}
+.card-body.always-on{display:block!important;}
+
+/* KV list */
+.kv-list{padding:0;}
+.kv-row{display:flex;gap:14px;padding:10px 24px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.40)!important;width:200px;flex-shrink:0;padding-top:1px;}
+.kv-val{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.80)!important;flex:1;line-height:1.6;word-break:break-word;}
+.kv-val.accent{color:#e8d5a3!important;}
+.kv-val.green{color:#4ec994!important;}
+.kv-val.warn{color:#e87b4a!important;}
+.kv-val.red{color:#c0392b!important;}
+.kv-val.dim{color:rgba(240,236,228,0.45)!important;}
+
+/* Pattern flags */
+.pattern-card{padding:14px 24px;border-bottom:1px solid var(--border);}
+.pattern-card:last-child{border-bottom:none;}
+.pattern-card.severity-high{border-left:3px solid var(--orange);background:rgba(232,123,74,0.04);}
+.pattern-card.severity-medium{border-left:3px solid var(--blue);}
+.pattern-card.severity-low{border-left:3px solid rgba(255,255,255,0.10);}
+.pattern-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.pattern-kind{font-family:var(--mono);font-size:11px;color:#e8d5a3!important;font-weight:500;letter-spacing:0.04em;}
+.pattern-sev{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:3px 8px;border:1px solid;}
+.pattern-sev.high{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.pattern-sev.medium{color:#7eb8e4!important;border-color:rgba(126,184,228,0.30);}
+.pattern-desc{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.75)!important;line-height:1.7;}
+.pattern-details{font-family:var(--mono);font-size:10.5px;color:rgba(240,236,228,0.55)!important;margin-top:10px;padding:10px 14px;background:rgba(0,0,0,0.20);border:1px solid var(--border);}
+
+/* Handle history */
+.history-card{padding:12px 24px;border-bottom:1px solid var(--border);display:flex;flex-wrap:wrap;align-items:center;gap:14px;}
+.history-card:last-child{border-bottom:none;}
+.history-handle{font-family:var(--mono);font-size:13px;color:#e8d5a3!important;font-weight:500;}
+.history-dates{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.45)!important;}
+
+/* Timeline visualization */
+.timeline-wrap{padding:18px 24px;}
+.timeline-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px;}
+.timeline-month{background:var(--bg3);border:1px solid var(--border);padding:10px 12px;font-family:var(--mono);font-size:10px;cursor:pointer;transition:all 0.15s;}
+.timeline-month:hover{border-color:rgba(200,169,110,0.30);background:rgba(200,169,110,0.05);}
+.timeline-month-label{color:rgba(240,236,228,0.55)!important;letter-spacing:0.06em;}
+.timeline-month-count{color:#c8a96e!important;font-size:14px;font-weight:500;margin-top:4px;}
+.timeline-month.high-activity .timeline-month-count{color:#e8d5a3!important;}
+
+/* Snapshot list */
+.snap-list{padding:0;max-height:340px;overflow-y:auto;}
+.snap-list::-webkit-scrollbar{width:8px;}
+.snap-list::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.20);border-radius:4px;}
+.snap-row{display:grid;grid-template-columns:130px 1fr 80px;gap:14px;padding:10px 24px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;}
+.snap-row:last-child{border-bottom:none;}
+.snap-date{color:#c8a96e!important;font-size:11px;}
+.snap-url{color:rgba(240,236,228,0.55)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;}
+.snap-link{color:rgba(200,169,110,0.65)!important;text-decoration:none;font-size:10px;text-align:right;}
+.snap-link:hover{color:#e8d5a3!important;}
+
+/* Bulk table */
+.bulk-summary{background:var(--bg2);border:1px solid var(--border);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+.bulk-stats{display:flex;gap:24px;flex-wrap:wrap;}
+.bulk-stat{display:flex;flex-direction:column;gap:4px;}
+.bulk-stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.40)!important;}
+.bulk-stat-value{font-family:var(--serif);font-size:24px;font-weight:300;line-height:1;}
+.bulk-stat-value.green{color:#4ec994!important;}
+.bulk-stat-value.warn{color:#e87b4a!important;}
+.bulk-stat-value.red{color:#c0392b!important;}
+.bulk-stat-value.accent{color:#e8d5a3!important;}
+.bulk-table{background:var(--bg2);border:1px solid var(--border);}
+.bulk-head{display:grid;grid-template-columns:50px 1fr 100px 90px 110px;gap:10px;padding:12px 22px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;align-items:center;}
+.bulk-row{display:grid;grid-template-columns:50px 1fr 100px 90px 110px;gap:10px;padding:11px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;}
+.bulk-row:last-child{border-bottom:none;}
+.bulk-cell-num{color:rgba(240,236,228,0.35)!important;font-size:10px;}
+.bulk-cell-handle{color:#e8d5a3!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bulk-cell-snaps{color:rgba(240,236,228,0.55)!important;font-size:10px;text-align:center;}
+.bulk-cell-since{color:rgba(240,236,228,0.55)!important;font-size:10px;}
+.bulk-status-tag{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:4px 8px;border:1px solid;text-align:center;}
+.bulk-status-tag.alive{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.bulk-status-tag.suspended{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.bulk-status-tag.deleted,.bulk-status-tag.not_found{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.bulk-status-tag.unknown{color:rgba(240,236,228,0.40)!important;border-color:var(--border);}
+.bulk-status-tag.error{color:rgba(240,236,228,0.40)!important;border-color:var(--border);}
+
+/* Empty */
+.empty{padding:18px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+/* Action row */
+.action-row{padding:18px 24px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
+.btn-primary{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.35);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 26px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-block;}
+.btn-primary:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:540px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:900px){
+  .fingerprint-row{grid-template-columns:1fr;}
+  .fingerprint-row .handle-input{border-right:1px solid var(--border);}
+  .bulk-head, .bulk-row{grid-template-columns:30px 1fr 90px 110px!important;}
+  .bulk-head > div:nth-child(4), .bulk-row > .bulk-cell-since{display:none;}
+}
+@media(max-width:768px){
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;}
+  .mode-pill{flex:1 0 33%;justify-content:center;font-size:10px;padding:10px 12px;}
+  .handle-input{border-right:1px solid var(--border);min-width:100%;}
+  .btn-go{width:100%;margin-top:2px;}
+  .kv-row{flex-direction:column;gap:4px;}
+  .kv-key{width:auto;}
+  .snap-row{grid-template-columns:100px 1fr 60px;gap:8px;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Social Forensics</span></div>
+    <h1>X Account <em>Forensics</em></h1>
+    <p class="hero-sub">Track account age via archive history, detect suspended or deleted accounts, recover deleted tweets, find renamed accounts, and compare handles for sock-puppet patterns. No API key required.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does (and What It Cannot Do)</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Free <strong>X (Twitter) account forensics</strong> tool that operates entirely on public archive sources — no X API key required. The tool checks the <strong>Wayback Machine CDX API</strong> for every archived snapshot of a profile (often back to 2008), queries <strong>memory.lol</strong> for the account's full <strong>handle rename history</strong> (catches identity-laundering — when accounts change handles to deflect attention from past activity), and runs a <strong>live HTTP probe</strong> against both x.com and twitter.com to detect whether an account is currently <strong>alive, suspended, deleted, or has never existed</strong>. The tool provides a <strong>defensible lower-bound date</strong> for account age based on archived evidence — not the actual creation date (which is only available via paid X API), but a date by which the account is provably known to have existed. <strong>Tweet recovery</strong> mode takes any tweet URL or status ID and finds Wayback snapshots that captured it before deletion. <strong>Bulk mode</strong> processes up to 50 handles in parallel for tracking lists of accounts, watchlists, or research targets. <strong>Fingerprint comparison</strong> mode analyzes two handles for sock-puppet patterns including shared rename history, mutually exclusive activity periods, and overlapping archive timelines. <strong>Suspicious-pattern detection</strong> automatically flags accounts with no archive history (suspicious if alive — may indicate scrubbing or very new accounts), frequent renames (identity laundering), and dormancy followed by reactivation. Used by <strong>journalists tracking sources and disinformation networks</strong>, <strong>OSINT researchers verifying account claims</strong>, <strong>investigators recovering deleted public statements</strong>, and <strong>analysts monitoring extremist or coordinated inauthentic behavior</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Twitter Forensics</span><span class="seo-tag">X Account Tracker</span>
+        <span class="seo-tag">Account Age</span><span class="seo-tag">Deleted Tweets</span>
+        <span class="seo-tag">Wayback Machine</span><span class="seo-tag">Handle History</span>
+        <span class="seo-tag">memory.lol</span><span class="seo-tag">Suspended Accounts</span>
+        <span class="seo-tag">Sock Puppet Analysis</span><span class="seo-tag">Identity Laundering</span>
+        <span class="seo-tag">OSINT</span><span class="seo-tag">Free Tool</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="tool-panel">
+    <div class="section-label">X Account Forensics</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="status" onclick="selectMode('status')" role="tab">
+        <span class="mode-pill-icon">⊕</span> Status Check
+      </button>
+      <button class="mode-pill" data-mode="timeline" onclick="selectMode('timeline')" role="tab">
+        <span class="mode-pill-icon">↻</span> Timeline
+      </button>
+      <button class="mode-pill" data-mode="tweet" onclick="selectMode('tweet')" role="tab">
+        <span class="mode-pill-icon">⌖</span> Tweet Recovery
+      </button>
+      <button class="mode-pill" data-mode="bulk" onclick="selectMode('bulk')" role="tab">
+        <span class="mode-pill-icon">≣</span> Bulk Check
+      </button>
+      <button class="mode-pill" data-mode="fingerprint" onclick="selectMode('fingerprint')" role="tab">
+        <span class="mode-pill-icon">⇆</span> Fingerprint
+      </button>
+    </div>
+
+    <!-- STATUS MODE -->
+    <div class="mode-content active" id="modeStatus">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="statusInput" placeholder="@handle, x.com/handle, or twitter.com/handle"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doStatus()">
+        <button class="btn-go" id="btnStatus" onclick="doStatus()">Check →</button>
+      </div>
+      <div class="input-hint">Queries Wayback Machine, memory.lol, and live x.com/twitter.com simultaneously</div>
+      <div class="honesty-notice">
+        <strong>Honesty note:</strong> This tool reports a <strong>defensible lower-bound date</strong> for account age based on archived evidence — not the actual creation date. The real date is only available through X's paid API. We tell you exactly what we found and where.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 5–20 seconds. Wayback CDX queries and memory.lol calls run in parallel.
+      </div>
+    </div>
+
+    <!-- TIMELINE MODE -->
+    <div class="mode-content" id="modeTimeline">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="timelineInput" placeholder="@handle"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doTimeline()">
+        <button class="btn-go" id="btnTimeline" onclick="doTimeline()">Build Timeline →</button>
+      </div>
+      <div class="input-hint">Returns full Wayback snapshot history grouped by month — click any month to open archived versions</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 5–25 seconds depending on archive depth.
+      </div>
+    </div>
+
+    <!-- TWEET RECOVERY MODE -->
+    <div class="mode-content" id="modeTweet">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="tweetInput"
+          placeholder="Tweet URL (https://x.com/user/status/123…) or numeric tweet ID"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doTweet()">
+        <button class="btn-go" id="btnTweet" onclick="doTweet()">Recover →</button>
+      </div>
+      <div class="input-hint">Searches Wayback for snapshots of the specific tweet — works even after the tweet or account is deleted</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 3–10 seconds.
+      </div>
+    </div>
+
+    <!-- BULK MODE -->
+    <div class="mode-content" id="modeBulk">
+      <textarea class="batch-textarea" id="bulkInput"
+        placeholder="Paste up to 50 handles, one per line:&#10;&#10;@elonmusk&#10;jack&#10;https://x.com/twitter&#10;..."></textarea>
+      <div style="display:flex;gap:2px;margin-top:2px;flex-wrap:wrap;">
+        <button class="btn-go" id="btnBulk" onclick="doBulk()" style="flex:0 0 auto;">Check All →</button>
+        <button class="btn-secondary" onclick="document.getElementById('bulkInput').value=''">Clear</button>
+        <button class="btn-secondary" onclick="loadSampleHandles()">Load Examples</button>
+      </div>
+      <div class="input-hint">Up to 50 handles · Processed 6 in parallel · CSV export</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 30–90 seconds for 50 handles.
+      </div>
+    </div>
+
+    <!-- FINGERPRINT MODE -->
+    <div class="mode-content" id="modeFingerprint">
+      <div class="fingerprint-row">
+        <input type="text" class="handle-input" id="fpInput1" placeholder="First handle (@user1)" autocomplete="off" spellcheck="false">
+        <input type="text" class="handle-input" id="fpInput2" placeholder="Second handle (@user2)" autocomplete="off" spellcheck="false" style="border-left:none;">
+      </div>
+      <div style="display:flex;gap:2px;margin-top:2px;flex-wrap:wrap;">
+        <button class="btn-go" id="btnFingerprint" onclick="doFingerprint()">Compare →</button>
+      </div>
+      <div class="input-hint">Compares activity timelines and rename history for sock-puppet patterns</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 10–30 seconds.
+      </div>
+    </div>
+
+    <!-- DYNAMIC PROCESSING UI -->
+    <div class="processing-overlay" id="processingOverlay">
+      <div class="processing-head">
+        <div class="processing-spinner"></div>
+        <div class="processing-title" id="processingTitle">Querying archives…</div>
+        <div class="processing-time" id="processingTime">0s</div>
+      </div>
+      <div class="processing-eta" id="processingETA">—</div>
+      <div class="processing-step-list" id="processingSteps"></div>
+      <div class="processing-bar"><div class="processing-bar-inner"></div></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+    <div class="verdict-banner unknown" id="verdictBanner">
+      <div class="verdict-icon" id="verdictIcon">⊙</div>
+      <div class="verdict-text">
+        <div class="verdict-title">
+          <span class="verdict-handle" id="verdictHandle">—</span>
+          <span class="verdict-status unknown" id="verdictStatus">—</span>
+        </div>
+        <div class="verdict-sub" id="verdictSub">—</div>
+      </div>
+    </div>
+    <div id="cardsContainer"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Wayback Machine CDX API · memory.lol public archive · Live HTTP probe · No X API used. All data sources are publicly available and free.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let lastResult = null;
+let processingTimer = null;
+let processingStartTime = 0;
+
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  document.getElementById('resultsWrap').classList.remove('visible');
+  hideProcessing();
+}
+
+function showProcessing(title, eta, steps) {
+  const overlay = document.getElementById('processingOverlay');
+  document.getElementById('processingTitle').textContent = title;
+  document.getElementById('processingETA').textContent = eta;
+  const stepsEl = document.getElementById('processingSteps');
+  stepsEl.innerHTML = steps.map((s,i)=>`<div class="processing-step ${i===0?'active':''}" data-step="${i}"><span class="step-icon">${i===0?'◌':'·'}</span>${esc(s)}</div>`).join('');
+  overlay.classList.add('visible');
+  processingStartTime = Date.now();
+  processingTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - processingStartTime) / 1000);
+    document.getElementById('processingTime').textContent = sec + 's';
+    const stepEls = stepsEl.querySelectorAll('.processing-step');
+    const totalSteps = stepEls.length;
+    const targetStep = Math.min(totalSteps - 1, Math.floor(sec / 4));
+    stepEls.forEach((el, i) => {
+      el.classList.remove('active', 'done');
+      const icon = el.querySelector('.step-icon');
+      if (i < targetStep) { el.classList.add('done'); icon.textContent = '✓'; }
+      else if (i === targetStep) { el.classList.add('active'); icon.textContent = '◌'; }
+      else { icon.textContent = '·'; }
+    });
+  }, 250);
+}
+function hideProcessing() {
+  if (processingTimer) { clearInterval(processingTimer); processingTimer = null; }
+  document.getElementById('processingOverlay').classList.remove('visible');
+}
+function markAllStepsDone() {
+  document.querySelectorAll('.processing-step').forEach(el => {
+    el.classList.remove('active'); el.classList.add('done');
+    el.querySelector('.step-icon').textContent = '✓';
+  });
+}
+
+function cleanHandle(raw) {
+  if (!raw) return null;
+  let s = String(raw).trim();
+  s = s.replace(/^https?:\/\/(www\.|mobile\.|m\.)?(twitter\.com|x\.com)\//i, '');
+  s = s.replace(/^@/, '').replace(/^\/+/, '').split('/')[0].split('?')[0].split('#')[0];
+  if (!/^[A-Za-z0-9_]{1,15}$/.test(s)) return null;
+  return s.toLowerCase();
+}
+
+/* ── STATUS MODE ── */
+async function doStatus(){
+  const raw = document.getElementById('statusInput').value;
+  const h = cleanHandle(raw);
+  if (!h) { alert('Please enter a valid X/Twitter handle.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Checking @${h}…`,
+    'Expected: 5–20 seconds. Three queries running in parallel.',
+    [
+      'Querying Wayback Machine snapshots',
+      'Querying memory.lol for handle history',
+      'Probing live x.com and twitter.com',
+      'Detecting suspicious patterns',
+    ]
+  );
+  try {
+    const r = await fetch(`${PROXY}/x-status?handle=${encodeURIComponent(h)}`);
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'status', ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderStatusResult(lastResult); }, 350);
+  } catch(e) {
+    hideProcessing();
+    showError('Lookup failed: ' + e.message);
+  }
+}
+
+/* ── TIMELINE MODE ── */
+async function doTimeline(){
+  const h = cleanHandle(document.getElementById('timelineInput').value);
+  if (!h) { alert('Please enter a valid handle.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Building timeline for @${h}…`,
+    'Expected: 5–25 seconds.',
+    [
+      'Querying Wayback CDX (twitter.com)',
+      'Querying Wayback CDX (x.com)',
+      'Grouping snapshots by month',
+      'Building timeline visualization',
+    ]
+  );
+  try {
+    const r = await fetch(`${PROXY}/x-timeline?handle=${encodeURIComponent(h)}`);
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'timeline', ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderTimelineResult(lastResult); }, 350);
+  } catch(e) {
+    hideProcessing();
+    showError('Timeline failed: ' + e.message);
+  }
+}
+
+/* ── TWEET RECOVERY MODE ── */
+async function doTweet(){
+  const raw = document.getElementById('tweetInput').value.trim();
+  if (!raw) { alert('Please paste a tweet URL or ID.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Recovering tweet…`,
+    'Expected: 3–10 seconds. Searching multiple URL pattern variants.',
+    [
+      'Parsing tweet URL or ID',
+      'Querying Wayback for status URLs',
+      'Searching twitter.com and x.com variants',
+      'Sorting snapshots by date',
+    ]
+  );
+  try {
+    const r = await fetch(`${PROXY}/x-tweet-recover?tweet=${encodeURIComponent(raw)}`);
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'tweet', ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderTweetResult(lastResult); }, 350);
+  } catch(e) {
+    hideProcessing();
+    showError('Recovery failed: ' + e.message);
+  }
+}
+
+/* ── BULK MODE ── */
+function loadSampleHandles(){
+  document.getElementById('bulkInput').value = '@jack\n@elonmusk\n@twitter\n@nytimes\n@nasa';
+}
+async function doBulk(){
+  const text = document.getElementById('bulkInput').value.trim();
+  if (!text){ alert('Paste at least one handle.'); return; }
+  const lines = text.split(/[\n\r,;]+/).map(s=>cleanHandle(s)).filter(Boolean);
+  const unique = [...new Set(lines)].slice(0, 50);
+  if (!unique.length){ alert('No valid handles found.'); return; }
+
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Checking ${unique.length} handle(s)…`,
+    `Expected: 30–90 seconds for full batch.`,
+    [
+      'Validating and deduplicating handles',
+      'Running parallel Wayback queries',
+      'Running parallel live probes',
+      'Aggregating results',
+    ]
+  );
+  try {
+    const r = await fetch(`${PROXY}/x-bulk-status`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ handles: unique })
+    });
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'bulk', ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderBulkResult(lastResult); }, 350);
+  } catch(e) {
+    hideProcessing();
+    showError('Bulk failed: ' + e.message);
+  }
+}
+
+/* ── FINGERPRINT MODE ── */
+async function doFingerprint(){
+  const h1 = cleanHandle(document.getElementById('fpInput1').value);
+  const h2 = cleanHandle(document.getElementById('fpInput2').value);
+  if (!h1 || !h2) { alert('Both handles required.'); return; }
+  if (h1 === h2) { alert('Handles must be different.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Comparing @${h1} vs @${h2}…`,
+    'Expected: 10–30 seconds.',
+    [
+      'Building activity profile for handle 1',
+      'Building activity profile for handle 2',
+      'Computing temporal overlap',
+      'Detecting similarity signals',
+    ]
+  );
+  try {
+    const r = await fetch(`${PROXY}/x-fingerprint?h1=${encodeURIComponent(h1)}&h2=${encodeURIComponent(h2)}`);
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'fingerprint', ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderFingerprintResult(lastResult); }, 350);
+  } catch(e) {
+    hideProcessing();
+    showError('Fingerprint failed: ' + e.message);
+  }
+}
+
+/* ── RENDERERS ── */
+function showError(msg) {
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('verdictBanner').className = 'verdict-banner deleted';
+  document.getElementById('verdictIcon').textContent = '⚠';
+  document.getElementById('verdictHandle').textContent = '—';
+  document.getElementById('verdictStatus').textContent = 'error';
+  document.getElementById('verdictStatus').className = 'verdict-status deleted';
+  document.getElementById('verdictSub').textContent = msg;
+  document.getElementById('cardsContainer').innerHTML = '';
+}
+
+function renderCard(id, title, count, expanded, bodyHtml) {
+  return `<div class="card${expanded?' expanded':''}" id="${id}">
+    <div class="card-head" onclick="document.getElementById('${id}').classList.toggle('expanded')">
+      <div class="card-title">${title}${count!==''?` <span class="card-count">${count}</span>`:''}</div>
+      <div class="card-toggle">+</div>
+    </div>
+    <div class="card-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function fmtWaybackDate(ts) {
+  if (!ts || ts.length < 8) return '—';
+  return `${ts.slice(0,4)}-${ts.slice(4,6)}-${ts.slice(6,8)}`;
+}
+
+function renderStatusResult(r) {
+  const status = r.current_status || 'unknown';
+  const handle = r.handle || '—';
+  const banner = document.getElementById('verdictBanner');
+  banner.className = 'verdict-banner ' + status;
+  const icons = { alive:'✓', suspended:'⊘', deleted:'⊗', not_found:'⊗', deleted_or_unknown:'?', unknown:'⊙' };
+  document.getElementById('verdictIcon').textContent = icons[status] || '⊙';
+  document.getElementById('verdictHandle').textContent = '@' + handle;
+  const statusEl = document.getElementById('verdictStatus');
+  statusEl.textContent = status.replace(/_/g,' ');
+  statusEl.className = 'verdict-status ' + status;
+  document.getElementById('verdictSub').textContent = statusSubText(r);
+
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  // Earliest known existence
+  if (r.creation) {
+    html += renderCard('cardCreation', '◐ Earliest Known Existence', '', true,
+      `<div class="kv-list">
+        <div class="kv-row"><div class="kv-key">Earliest archived</div><div class="kv-val accent">${esc(r.creation.earliest_known)}</div></div>
+        <div class="kv-row"><div class="kv-key">Years ago</div><div class="kv-val">${r.creation.years_ago} years</div></div>
+        <div class="kv-row"><div class="kv-key">Source</div><div class="kv-val dim">${esc(r.creation.source)}</div></div>
+        <div class="kv-row"><div class="kv-key">Honesty caveat</div><div class="kv-val warn" style="font-size:11px;line-height:1.6;">${esc(r.creation.caveat)}</div></div>
+      </div>`);
+  } else {
+    html += renderCard('cardCreation', '◐ Earliest Known Existence', '—', true,
+      `<div class="empty">No archive evidence found. The account may be very new, may have actively avoided archival, or may never have existed at all.</div>`);
+  }
+
+  // Live probes
+  if (r.live) {
+    html += renderCard('cardLive', '◉ Live Probe Results', '', false,
+      `<div class="kv-list">
+        ${Object.entries(r.live).map(([k,v]) => v ?
+          `<div class="kv-row"><div class="kv-key">${esc(k.replace('_','.'))}</div><div class="kv-val ${v.status==='alive'?'green':v.status==='suspended'?'warn':'red'}">${esc(v.status)} <span style="color:rgba(240,236,228,0.30);font-size:10px;">(HTTP ${v.http_code||'?'})</span></div></div>` : ''
+        ).join('')}
+      </div>`);
+  }
+
+  // Suspicious patterns
+  if (r.patterns?.length) {
+    html += renderCard('cardPatterns', '⚑ Suspicious Patterns', r.patterns.length, true,
+      r.patterns.map(p => `<div class="pattern-card severity-${esc(p.severity||'low')}">
+        <div class="pattern-head">
+          <span class="pattern-kind">${esc(p.kind.replace(/_/g,' '))}</span>
+          <span class="pattern-sev ${esc(p.severity||'low')}">${esc(p.severity||'low')}</span>
+        </div>
+        <div class="pattern-desc">${esc(p.description||'')}</div>
+        ${p.details ? `<div class="pattern-details">${typeof p.details === 'string' ? esc(p.details) : esc(JSON.stringify(p.details, null, 2))}</div>` : ''}
+      </div>`).join(''));
+  }
+
+  // Handle history (renames)
+  if (r.handle_history?.found) {
+    const accts = r.handle_history.accounts || [];
+    let total_renames = 0;
+    accts.forEach(a => total_renames += (a.screen_names || []).length);
+    html += renderCard('cardHistory', '⇆ Handle Rename History', total_renames, true,
+      accts.map(a => `
+        <div style="padding:14px 24px;border-bottom:1px solid var(--border);">
+          <div style="font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.40);text-transform:uppercase;letter-spacing:0.12em;margin-bottom:10px;">User ID: ${esc(a.id || '?')}</div>
+          ${(a.screen_names || []).map(sn => `<div class="history-card">
+            <span class="history-handle">@${esc(sn.handle)}</span>
+            <span class="history-dates">${esc(sn.first_seen || '?')} → ${esc(sn.last_seen || '?')}</span>
+          </div>`).join('')}
+        </div>`).join(''));
+  } else {
+    html += renderCard('cardHistory', '⇆ Handle Rename History', 'none', false,
+      '<div class="empty">No rename history found in memory.lol. The account may not have changed handles, or may not be tracked by memory.lol.</div>');
+  }
+
+  // Snapshot summary
+  if (r.snapshot_count) {
+    html += renderCard('cardSnaps', '⏱ Archive Snapshot Sample', r.snapshot_count, false,
+      `<div class="kv-list">
+        <div class="kv-row"><div class="kv-key">Total snapshots</div><div class="kv-val accent">${r.snapshot_count}</div></div>
+        <div class="kv-row"><div class="kv-key">Earliest</div><div class="kv-val">${fmtWaybackDate(r.earliest_snapshot)}</div></div>
+        <div class="kv-row"><div class="kv-key">Latest</div><div class="kv-val">${fmtWaybackDate(r.latest_snapshot)}</div></div>
+      </div>
+      <div class="snap-list">${(r.snapshots_sample || []).slice(0, 30).map(s => `
+        <div class="snap-row">
+          <div class="snap-date">${fmtWaybackDate(s.timestamp)}</div>
+          <div class="snap-url" title="${esc(s.original||'')}">${esc(s.original||'')}</div>
+          <a class="snap-link" href="https://web.archive.org/web/${esc(s.timestamp||'')}/${esc(s.original||'')}" target="_blank" rel="noopener">View ↗</a>
+        </div>`).join('')}</div>`);
+  }
+
+  // Cross-tool actions
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">↗ Continue Investigation</div></div>
+    <div class="card-body always-on">
+      <div class="action-row">
+        <a class="btn-primary" href="https://inteldesk.io/#username" target="_blank" rel="noopener">↗ Search @${esc(handle)} on 500+ platforms</a>
+        <a class="btn-primary" href="https://web.archive.org/web/*/twitter.com/${esc(handle)}" target="_blank" rel="noopener">↗ Browse Wayback for @${esc(handle)}</a>
+        <button class="btn-secondary" onclick="exportJSON()">⇣ Export JSON</button>
+      </div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function statusSubText(r) {
+  const parts = [];
+  if (r.creation) parts.push(`Earliest known existence: ${r.creation.earliest_known} (${r.creation.years_ago} years ago)`);
+  if (r.snapshot_count) parts.push(`${r.snapshot_count} archive snapshots`);
+  if (r.handle_history?.found) {
+    let renames = 0;
+    (r.handle_history.accounts || []).forEach(a => renames += (a.screen_names || []).length);
+    if (renames > 1) parts.push(`${renames} handle(s) used over time`);
+  }
+  return parts.join(' · ') || 'No archive evidence found';
+}
+
+function renderTimelineResult(r) {
+  const total = r.total_snapshots || 0;
+  const banner = document.getElementById('verdictBanner');
+  banner.className = 'verdict-banner ' + (total > 0 ? 'alive' : 'unknown');
+  document.getElementById('verdictIcon').textContent = total > 0 ? '↻' : '⊙';
+  document.getElementById('verdictHandle').textContent = '@' + (r.handle || '—');
+  document.getElementById('verdictStatus').textContent = `${total} snapshots`;
+  document.getElementById('verdictStatus').className = 'verdict-status ' + (total > 0 ? 'alive' : 'unknown');
+  const subParts = [];
+  if (r.first) subParts.push(`First: ${fmtWaybackDate(r.first.timestamp)}`);
+  if (r.last)  subParts.push(`Last: ${fmtWaybackDate(r.last.timestamp)}`);
+  document.getElementById('verdictSub').textContent = subParts.join(' · ') || 'No snapshots';
+
+  const c = document.getElementById('cardsContainer');
+  if (total === 0) {
+    c.innerHTML = `<div class="card expanded"><div class="card-head" style="cursor:default;"><div class="card-title">No Timeline Available</div></div><div class="card-body always-on"><div class="empty">No Wayback snapshots found for @${esc(r.handle)}.</div></div></div>`;
+    document.getElementById('resultsWrap').classList.add('visible');
+    return;
+  }
+
+  // Find max count for activity-coloring
+  let maxCount = 1;
+  Object.values(r.by_month || {}).forEach(arr => { if (arr.length > maxCount) maxCount = arr.length; });
+  const sortedMonths = Object.keys(r.by_month || {}).sort();
+
+  let html = renderCard('cardTimeline', `↻ Monthly Activity Timeline`, sortedMonths.length + ' months', true,
+    `<div class="timeline-wrap">
+      <div class="timeline-grid">${sortedMonths.map(m => {
+        const arr = r.by_month[m];
+        const count = arr.length;
+        const isHigh = count > maxCount * 0.5;
+        const yyyy = m.slice(0,4), mm = m.slice(4,6);
+        const wbUrl = arr[0]?.wayback;
+        return `<a class="timeline-month ${isHigh?'high-activity':''}" href="${esc(wbUrl)}" target="_blank" rel="noopener" style="text-decoration:none;">
+          <div class="timeline-month-label">${yyyy}-${mm}</div>
+          <div class="timeline-month-count">${count}</div>
+        </a>`;
+      }).join('')}</div>
+    </div>`);
+
+  // Cross-tool
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">↗ Continue Investigation</div></div>
+    <div class="card-body always-on">
+      <div class="action-row">
+        <a class="btn-primary" href="https://web.archive.org/web/*/twitter.com/${esc(r.handle)}" target="_blank" rel="noopener">↗ Open in Wayback</a>
+        <button class="btn-secondary" onclick="exportJSON()">⇣ Export JSON</button>
+      </div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderTweetResult(r) {
+  const banner = document.getElementById('verdictBanner');
+  banner.className = 'verdict-banner ' + (r.found ? 'alive' : 'deleted');
+  document.getElementById('verdictIcon').textContent = r.found ? '⌖' : '⊗';
+  document.getElementById('verdictHandle').textContent = `Tweet ${r.tweet_id}`;
+  document.getElementById('verdictStatus').textContent = r.found ? `${r.snapshot_count} snapshot(s)` : 'not archived';
+  document.getElementById('verdictStatus').className = 'verdict-status ' + (r.found ? 'alive' : 'deleted');
+  document.getElementById('verdictSub').textContent = r.handle ? `from @${r.handle}` : 'Wayback Machine search';
+
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  if (!r.found) {
+    html += `<div class="card expanded"><div class="card-head" style="cursor:default;"><div class="card-title">No Snapshots Found</div></div><div class="card-body always-on"><div class="empty">Wayback Machine has no archived versions of this tweet. The tweet may never have been archived, or may not have existed.</div></div></div>`;
+  } else {
+    html += renderCard('cardTweetSnaps', '⌖ Recovered Snapshots', r.snapshot_count, true,
+      `<div class="snap-list" style="max-height:600px;">${r.snapshots.map(s => `
+        <div class="snap-row">
+          <div class="snap-date">${fmtWaybackDate(s.timestamp)}</div>
+          <div class="snap-url" title="${esc(s.original||'')}">${esc(s.original||'')}</div>
+          <a class="snap-link" href="${esc(s.wayback_url)}" target="_blank" rel="noopener">View ↗</a>
+        </div>`).join('')}</div>`);
+  }
+
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">↗ Continue Investigation</div></div>
+    <div class="card-body always-on">
+      <div class="action-row">
+        ${r.handle ? `<a class="btn-primary" href="javascript:void(0)" onclick="selectMode('status'); document.getElementById('statusInput').value='${esc(r.handle)}'; doStatus();">↗ Check @${esc(r.handle)} status</a>` : ''}
+        <button class="btn-secondary" onclick="exportJSON()">⇣ Export JSON</button>
+      </div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderBulkResult(r) {
+  const results = r.results || [];
+  const total = results.length;
+  const alive = results.filter(x => x.current_status === 'alive').length;
+  const suspended = results.filter(x => x.current_status === 'suspended').length;
+  const deleted = results.filter(x => ['deleted','not_found'].includes(x.current_status)).length;
+  const errors = results.filter(x => x.error).length;
+
+  const banner = document.getElementById('verdictBanner');
+  banner.className = 'verdict-banner unknown';
+  document.getElementById('verdictIcon').textContent = '≣';
+  document.getElementById('verdictHandle').textContent = `${total} handle(s) checked`;
+  document.getElementById('verdictStatus').textContent = `bulk`;
+  document.getElementById('verdictStatus').className = 'verdict-status alive';
+  document.getElementById('verdictSub').textContent = `${alive} alive · ${suspended} suspended · ${deleted} deleted/not found${errors ? ' · ' + errors + ' errors' : ''}`;
+
+  const c = document.getElementById('cardsContainer');
+  let html = `<div class="bulk-summary">
+    <div class="bulk-stats">
+      <div class="bulk-stat"><span class="bulk-stat-label">Total</span><span class="bulk-stat-value accent">${total}</span></div>
+      <div class="bulk-stat"><span class="bulk-stat-label">Alive</span><span class="bulk-stat-value green">${alive}</span></div>
+      <div class="bulk-stat"><span class="bulk-stat-label">Suspended</span><span class="bulk-stat-value warn">${suspended}</span></div>
+      <div class="bulk-stat"><span class="bulk-stat-label">Deleted</span><span class="bulk-stat-value red">${deleted}</span></div>
+    </div>
+    <button class="btn-secondary" onclick="exportBulkCSV()">⇣ Export CSV</button>
+  </div>
+  <div class="bulk-table">
+    <div class="bulk-head">
+      <div>#</div><div>Handle</div><div>Snapshots</div><div>Earliest</div><div>Status</div>
+    </div>
+    ${results.map((it,i) => {
+      const cls = it.error ? 'error' : (it.current_status || 'unknown');
+      return `<div class="bulk-row">
+        <div class="bulk-cell-num">${i+1}</div>
+        <div class="bulk-cell-handle">@${esc(it.handle)}</div>
+        <div class="bulk-cell-snaps">${it.snapshot_count || 0}</div>
+        <div class="bulk-cell-since">${fmtWaybackDate(it.earliest)}</div>
+        <div class="bulk-status-tag ${cls}">${esc(cls)}</div>
+      </div>`;
+    }).join('')}
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exportBulkCSV() {
+  if (!lastResult || lastResult.kind !== 'bulk') return;
+  const rows = [['#','Handle','Status','Snapshot Count','Earliest','Latest']];
+  (lastResult.results || []).forEach((it,i) => {
+    rows.push([i+1, it.handle, it.current_status || '', it.snapshot_count || 0, fmtWaybackDate(it.earliest), fmtWaybackDate(it.latest)]);
+  });
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c==null?'':c);
+    return s.includes(',')||s.includes('"')||s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `x-bulk-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function renderFingerprintResult(r) {
+  const a = r.handle_1 || {};
+  const b = r.handle_2 || {};
+  const sigs = r.similarity_signals || [];
+  const verdict = sigs.find(s => s.weight === 'very_strong')
+    ? { class:'suspended', icon:'⚠', label:'Strong Signal', sub: `${sigs.length} similarity pattern(s) detected.` }
+    : sigs.find(s => s.weight === 'moderate')
+      ? { class:'unknown', icon:'⇆', label:'Moderate Signal', sub: `${sigs.length} similarity pattern(s) detected.` }
+      : { class:'alive', icon:'✓', label:'No strong signals', sub: 'No clear sock-puppet indicators found.' };
+
+  const banner = document.getElementById('verdictBanner');
+  banner.className = 'verdict-banner ' + verdict.class;
+  document.getElementById('verdictIcon').textContent = verdict.icon;
+  document.getElementById('verdictHandle').textContent = `@${a.handle} ⇆ @${b.handle}`;
+  document.getElementById('verdictStatus').textContent = verdict.label;
+  document.getElementById('verdictStatus').className = 'verdict-status ' + verdict.class;
+  document.getElementById('verdictSub').textContent = verdict.sub;
+
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  // Similarity signals
+  if (sigs.length) {
+    html += renderCard('cardSigs', '⚑ Similarity Signals', sigs.length, true,
+      sigs.map(s => `<div class="pattern-card severity-${s.weight === 'very_strong' ? 'high' : 'medium'}">
+        <div class="pattern-head">
+          <span class="pattern-kind">${esc(s.kind.replace(/_/g,' '))}</span>
+          <span class="pattern-sev ${s.weight === 'very_strong' ? 'high' : 'medium'}">${esc(s.weight)}</span>
+        </div>
+        <div class="pattern-desc">${esc(s.summary || JSON.stringify(s.evidence||{}))}</div>
+        ${s.evidence ? `<div class="pattern-details">${esc(JSON.stringify(s.evidence))}</div>` : ''}
+      </div>`).join(''));
+  }
+
+  // Side-by-side stats
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">⇆ Side-by-Side Comparison</div></div>
+    <div class="card-body always-on">
+      <div class="kv-list">
+        <div class="kv-row"><div class="kv-key">Snapshot count</div><div class="kv-val">@${esc(a.handle)}: ${a.snapshot_count} · @${esc(b.handle)}: ${b.snapshot_count}</div></div>
+        <div class="kv-row"><div class="kv-key">Earliest snapshot</div><div class="kv-val">@${esc(a.handle)}: ${fmtWaybackDate(a.earliest)} · @${esc(b.handle)}: ${fmtWaybackDate(b.earliest)}</div></div>
+        <div class="kv-row"><div class="kv-key">Latest snapshot</div><div class="kv-val">@${esc(a.handle)}: ${fmtWaybackDate(a.latest)} · @${esc(b.handle)}: ${fmtWaybackDate(b.latest)}</div></div>
+        <div class="kv-row"><div class="kv-key">Active months overlap</div><div class="kv-val">${(r.overlap_months || []).length} months</div></div>
+        <div class="kv-row"><div class="kv-key">Mutual exclusion %</div><div class="kv-val ${r.mutual_exclusion_pct > 70 ? 'warn' : 'dim'}">${r.mutual_exclusion_pct}% (high % can suggest sock-puppet alternation)</div></div>
+        <div class="kv-row"><div class="kv-key">@${esc(a.handle)} renames</div><div class="kv-val">${(a.renames || []).length ? a.renames.join(', ') : '—'}</div></div>
+        <div class="kv-row"><div class="kv-key">@${esc(b.handle)} renames</div><div class="kv-val">${(b.renames || []).length ? b.renames.join(', ') : '—'}</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exportJSON() {
+  if (!lastResult) return;
+  const blob = new Blob([JSON.stringify(lastResult, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `x-forensics-${lastResult.kind}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+// Auto-load handle from query param
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const h = params.get('handle');
+  if (h) {
+    document.getElementById('statusInput').value = h;
+    setTimeout(doStatus, 200);
+  }
+});
+</script>
+</body>
+</html>

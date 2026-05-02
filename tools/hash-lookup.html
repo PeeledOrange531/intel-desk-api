@@ -1,0 +1,1171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Hash Lookup Tool — Malware Hash Intelligence & File Analysis | The Intel Desk</title>
+<meta name="description" content="Free malware hash lookup with deep file analysis. Paste an MD5/SHA1/SHA256 or drop a file — we hash locally, query MalwareBazaar, ThreatFox, URLhaus, run YARA rules, detect macros, JavaScript, suspicious strings, and extract IOCs. Includes .eml and archive analysis.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--gray:#666;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:640px;line-height:1.7;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* SECTION */
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* TOOL PANEL */
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+/* Mode pills */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);flex-wrap:wrap;}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 22px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* Input row */
+.search-row{display:flex;gap:0;flex-wrap:wrap;}
+.url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.url-input:focus{border-color:rgba(200,169,110,0.35);}
+.url-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-inspect{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-inspect:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-inspect:disabled{opacity:0.5;cursor:not-allowed;}
+
+.batch-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:16px 20px;outline:none;min-height:160px;resize:vertical;line-height:1.6;}
+.batch-textarea:focus{border-color:rgba(200,169,110,0.35);}
+.batch-actions{display:flex;gap:2px;flex-wrap:wrap;margin-top:2px;}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 22px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.3);color:#e8d5a3!important;}
+
+/* DROP ZONE */
+.drop-zone{border:1.5px dashed rgba(255,255,255,0.10);background:var(--bg2);padding:60px 24px;text-align:center;cursor:pointer;transition:all 0.2s;font-family:var(--mono);}
+.drop-zone:hover{border-color:rgba(200,169,110,0.40);background:rgba(200,169,110,0.03);}
+.drop-zone.dragging{border-color:var(--accent);background:rgba(200,169,110,0.06);}
+.drop-glyph{font-family:var(--serif);font-size:44px;font-weight:300;color:rgba(200,169,110,0.40)!important;line-height:1;margin-bottom:14px;}
+.drop-title{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;margin-bottom:6px;}
+.drop-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.7;}
+.drop-zone input[type=file]{display:none;}
+.privacy-notice{margin-top:14px;padding:12px 18px;background:rgba(78,201,148,0.04);border:1px solid rgba(78,201,148,0.20);font-family:var(--mono);font-size:10.5px;color:rgba(78,201,148,0.85)!important;line-height:1.7;}
+
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+/* Loading */
+.loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
+.loading-bar.visible{display:block;}
+.loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+.loading-status{font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.70)!important;margin-top:10px;}
+
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+/* Verdict */
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;}
+.verdict-banner.clean{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
+.verdict-banner.suspicious{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
+.verdict-banner.malicious{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.25);}
+.verdict-banner.neutral{background:var(--bg2);border-color:var(--border);}
+.verdict-icon{font-size:30px;flex-shrink:0;}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,26px);font-weight:300;color:#f5f2ec!important;margin-bottom:6px;}
+.verdict-sub{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+.verdict-badges{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.v-badge{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:4px 10px;border:1px solid;}
+.v-badge.green{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.v-badge.warn{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.v-badge.red{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.v-badge.dim{color:rgba(240,236,228,0.45)!important;border-color:var(--border);}
+
+/* Section card */
+.card{background:var(--bg2);border:1px solid var(--border);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.card-head:hover{background:rgba(255,255,255,0.02);}
+.card-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;display:flex;align-items:center;gap:10px;}
+.card-count{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;}
+.card-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.card.expanded .card-toggle{transform:rotate(45deg);}
+.card-body{display:none;}
+.card.expanded .card-body{display:block;animation:fadeUp 0.2s ease;}
+
+/* KV list */
+.kv-list{padding:0;}
+.kv-row{display:flex;gap:14px;padding:11px 24px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.40)!important;width:140px;flex-shrink:0;padding-top:1px;}
+.kv-val{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.80)!important;flex:1;line-height:1.6;word-break:break-word;}
+.kv-val.accent{color:#e8d5a3!important;}
+.kv-val.green{color:#4ec994!important;}
+.kv-val.warn{color:#e87b4a!important;}
+.kv-val.red{color:#c0392b!important;}
+.kv-val.mono-hash{font-size:11px;color:#c8a96e!important;letter-spacing:-0.01em;}
+
+/* Source results */
+.source-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1px;background:var(--border);}
+.source-card{background:var(--bg2);padding:18px 22px;display:flex;flex-direction:column;gap:8px;}
+.source-card-head{display:flex;align-items:center;justify-content:space-between;}
+.source-name{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:#e8d5a3!important;}
+.source-status{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:3px 8px;border:1px solid;}
+.source-status.hit{color:#c0392b!important;border-color:rgba(192,57,43,0.40);background:rgba(192,57,43,0.06);}
+.source-status.miss{color:rgba(240,236,228,0.45)!important;border-color:var(--border);}
+.source-detail{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+.source-link{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;text-decoration:none;letter-spacing:0.06em;}
+.source-link:hover{color:#e8d5a3!important;}
+
+/* Tag chip */
+.tag-list{display:flex;flex-wrap:wrap;gap:5px;}
+.tag{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,0.65)!important;border:1px solid var(--border);padding:3px 8px;background:var(--bg3);}
+.tag.red{color:#c0392b!important;border-color:rgba(192,57,43,0.30);}
+.tag.warn{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+
+/* IOC / strings list */
+.ioc-list{padding:0;max-height:280px;overflow-y:auto;}
+.ioc-list::-webkit-scrollbar{width:8px;}
+.ioc-list::-webkit-scrollbar-track{background:rgba(0,0,0,0.4);}
+.ioc-list::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.20);border-radius:4px;}
+.ioc-row{padding:8px 24px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.75)!important;word-break:break-all;line-height:1.5;}
+.ioc-row:last-child{border-bottom:none;}
+.ioc-row .ioc-action{float:right;font-size:10px;color:rgba(200,169,110,0.50)!important;cursor:pointer;text-decoration:none;}
+.ioc-row .ioc-action:hover{color:#e8d5a3!important;}
+
+.empty{padding:18px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+/* YARA / strings */
+.yara-match{padding:12px 24px;border-bottom:1px solid var(--border);}
+.yara-match:last-child{border-bottom:none;}
+.yara-rule{font-family:var(--mono);font-size:12px;color:#e8d5a3!important;font-weight:500;margin-bottom:4px;}
+.yara-meta{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.45)!important;line-height:1.6;}
+
+/* Batch */
+.batch-summary{background:var(--bg2);border:1px solid var(--border);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+.batch-stats{display:flex;gap:24px;flex-wrap:wrap;}
+.batch-stat{display:flex;flex-direction:column;gap:4px;}
+.batch-stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.40)!important;}
+.batch-stat-value{font-family:var(--serif);font-size:24px;font-weight:300;line-height:1;}
+.batch-stat-value.green{color:#4ec994!important;}
+.batch-stat-value.warn{color:#e87b4a!important;}
+.batch-stat-value.red{color:#c0392b!important;}
+.batch-stat-value.accent{color:#e8d5a3!important;}
+.batch-table{background:var(--bg2);border:1px solid var(--border);}
+.batch-head{display:grid;grid-template-columns:50px 1fr 70px 110px 90px;gap:10px;padding:12px 22px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;align-items:center;}
+.batch-row{display:grid;grid-template-columns:50px 1fr 70px 110px 90px;gap:10px;padding:11px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;cursor:pointer;transition:background 0.15s;}
+.batch-row:last-child{border-bottom:none;}
+.batch-row:hover{background:rgba(255,255,255,0.02);}
+.batch-cell-num{color:rgba(240,236,228,0.35)!important;font-size:10px;}
+.batch-cell-hash{color:#c8a96e!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;letter-spacing:-0.01em;}
+.batch-cell-type{color:rgba(240,236,228,0.55)!important;font-size:9px;text-transform:uppercase;letter-spacing:0.10em;}
+.batch-cell-family{color:rgba(240,236,228,0.75)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;}
+.batch-verdict{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:4px 8px;border:1px solid;text-align:center;}
+.batch-verdict.clean{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.batch-verdict.suspicious{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.batch-verdict.malicious{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.batch-verdict.pending{color:rgba(240,236,228,0.35)!important;border-color:var(--border);}
+.batch-verdict.error{color:rgba(240,236,228,0.35)!important;border-color:var(--border);}
+
+/* Cross-tool actions */
+.cross-tool-bar{padding:18px 24px;background:var(--bg3);border-top:1px solid var(--border);}
+.cross-tool-title{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.40)!important;margin-bottom:10px;}
+.cross-tool-actions{display:flex;gap:6px;flex-wrap:wrap;}
+.cross-tool-btn{font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.10em;padding:8px 14px;border:1px solid var(--border);background:var(--bg2);color:rgba(240,236,228,0.65)!important;cursor:pointer;text-decoration:none;display:inline-block;transition:all 0.15s;}
+.cross-tool-btn:hover{border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:540px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:900px){
+  .batch-head, .batch-row{grid-template-columns:30px 1fr 90px 80px!important;}
+  .batch-head > div:nth-child(3), .batch-row > .batch-cell-type{display:none;}
+}
+@media(max-width:768px){
+  .url-input{border-right:1px solid var(--border);min-width:100%;}
+  .btn-inspect{width:100%;margin-top:2px;}
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;}
+  .mode-pill{flex:1;justify-content:center;}
+  .kv-row{flex-direction:column;gap:4px;}
+  .kv-key{width:auto;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Malware Intelligence</span></div>
+    <h1>Hash Lookup <em>Tool</em></h1>
+    <p class="hero-sub">Look up file hashes in malware intelligence databases — or drop a file for full multi-layer analysis. Local hashing, server-side YARA scanning, IOC extraction, and email/archive support.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Free <strong>malware hash intelligence</strong> with deep file analysis. Paste an <strong>MD5, SHA1, or SHA256</strong> hash and the tool queries three abuse.ch threat databases in parallel — <strong>MalwareBazaar</strong> (full malware metadata, family, signature, tags), <strong>ThreatFox</strong> (IOC database with confidence scoring), and <strong>URLhaus</strong> (distribution URLs that have served the file). Or <strong>drop a file directly</strong> — it is hashed in your browser using Web Crypto API (the file never leaves your machine for hashing) then a small server-side analysis pipeline runs: <strong>file-type detection by magic bytes</strong> (catches `.pdf` files that are actually executables), <strong>Shannon entropy</strong> (high values indicate packed or encrypted payloads), <strong>YARA scanning</strong> against the community Yara-Rules ruleset (thousands of rules covering known malware families), <strong>VBA macro detection</strong> for Office documents, <strong>JavaScript and auto-action detection</strong> for PDFs, <strong>suspicious string scanning</strong> for known malicious API patterns, and <strong>IOC extraction</strong> (URLs, IPs, email addresses embedded in the file). Drop a <strong>.eml file</strong> and every attachment is extracted and analyzed individually. Drop a <strong>ZIP/RAR/7Z archive</strong> and every member file is unpacked and scanned. Bulk hash mode processes up to 100 hashes in parallel with CSV export. Used by <strong>SOC analysts</strong>, <strong>journalists investigating malware campaigns</strong>, <strong>incident responders</strong>, and <strong>security researchers</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Hash Lookup</span><span class="seo-tag">MD5</span>
+        <span class="seo-tag">SHA1</span><span class="seo-tag">SHA256</span>
+        <span class="seo-tag">MalwareBazaar</span><span class="seo-tag">URLhaus</span>
+        <span class="seo-tag">ThreatFox</span><span class="seo-tag">YARA Scan</span>
+        <span class="seo-tag">File Analysis</span><span class="seo-tag">Office Macros</span>
+        <span class="seo-tag">PDF Analysis</span><span class="seo-tag">EML Analysis</span>
+        <span class="seo-tag">IOC Extraction</span><span class="seo-tag">OSINT</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="tool-panel">
+    <div class="section-label">Hash Lookup Tool</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="hash" onclick="selectMode('hash')" role="tab">
+        <span class="mode-pill-icon">⊕</span> Hash Lookup
+      </button>
+      <button class="mode-pill" data-mode="file" onclick="selectMode('file')" role="tab">
+        <span class="mode-pill-icon">◰</span> File Analysis
+      </button>
+      <button class="mode-pill" data-mode="batch" onclick="selectMode('batch')" role="tab">
+        <span class="mode-pill-icon">≣</span> Bulk Hashes
+      </button>
+      <button class="mode-pill" data-mode="email" onclick="selectMode('email')" role="tab">
+        <span class="mode-pill-icon">✉</span> Email (.eml)
+      </button>
+      <button class="mode-pill" data-mode="archive" onclick="selectMode('archive')" role="tab">
+        <span class="mode-pill-icon">▤</span> Archive
+      </button>
+    </div>
+
+    <!-- HASH MODE -->
+    <div class="mode-content active" id="modeHash">
+      <div class="search-row">
+        <input type="text" class="url-input" id="hashInput"
+          placeholder="Paste MD5 (32 chars), SHA1 (40 chars), or SHA256 (64 chars)…"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')lookupHash()">
+        <button class="btn-inspect" id="btnHash" onclick="lookupHash()">Look Up →</button>
+      </div>
+      <div class="loading-bar" id="loadingBarHash"><div class="loading-bar-inner"></div></div>
+      <div class="input-hint">Hash is queried against MalwareBazaar, ThreatFox, and URLhaus simultaneously · No API key required</div>
+    </div>
+
+    <!-- FILE MODE -->
+    <div class="mode-content" id="modeFile">
+      <label class="drop-zone" id="fileDrop">
+        <input type="file" id="fileInput" onchange="handleFile(event)">
+        <div class="drop-glyph">◰</div>
+        <div class="drop-title">Drop a file here, or click to upload</div>
+        <div class="drop-sub">Max 10MB · Hashed locally in your browser before any server contact · YARA scan, macro/JS detection, IOC extraction</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> File hashes are computed in your browser using the Web Crypto API. The file's content is sent to our server only for static analysis (YARA, strings, macros) — it is processed in memory and never logged or retained.
+      </div>
+      <div class="loading-bar" id="loadingBarFile"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="fileStatus"></div>
+    </div>
+
+    <!-- BATCH MODE -->
+    <div class="mode-content" id="modeBatch">
+      <textarea class="batch-textarea" id="batchInput"
+        placeholder="Paste up to 100 hashes, one per line:&#10;&#10;d41d8cd98f00b204e9800998ecf8427e&#10;da39a3ee5e6b4b0d3255bfef95601890afd80709&#10;e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855&#10;..."></textarea>
+      <div class="batch-actions">
+        <button class="btn-inspect" id="btnBatch" onclick="lookupBatch()" style="flex:0 0 auto;">Look Up All →</button>
+        <button class="btn-secondary" onclick="clearBatch()">Clear</button>
+        <button class="btn-secondary" onclick="loadSampleHashes()">Load Examples</button>
+        <span class="loading-status" id="batchProgress" style="margin-left:auto;align-self:center;"></span>
+      </div>
+      <div class="loading-bar" id="loadingBarBatch"><div class="loading-bar-inner"></div></div>
+      <div class="input-hint">Up to 100 hashes · Processed 6 at a time · Click any row to view full details · CSV export</div>
+    </div>
+
+    <!-- EMAIL MODE -->
+    <div class="mode-content" id="modeEmail">
+      <label class="drop-zone" id="emlDrop">
+        <input type="file" id="emlInput" accept=".eml,.msg,message/rfc822" onchange="handleEml(event)">
+        <div class="drop-glyph">✉</div>
+        <div class="drop-title">Drop a .eml file here</div>
+        <div class="drop-sub">Max 25MB · Extracts every attachment automatically · Each attachment hashed and analyzed</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> .eml content and attachments are processed in memory on our server, never logged or retained. Email body URLs are extracted for review.
+      </div>
+      <div class="loading-bar" id="loadingBarEml"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="emlStatus"></div>
+    </div>
+
+    <!-- ARCHIVE MODE -->
+    <div class="mode-content" id="modeArchive">
+      <label class="drop-zone" id="archDrop">
+        <input type="file" id="archInput" accept=".zip,.rar,.7z,application/zip,application/x-rar,application/x-7z-compressed" onchange="handleArchive(event)">
+        <div class="drop-glyph">▤</div>
+        <div class="drop-title">Drop a ZIP, RAR, or 7Z archive</div>
+        <div class="drop-sub">Max 25MB · Each member ≤10MB extracted and analyzed individually</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> Archives are extracted in memory on our server, scanned, and discarded. Nothing written to disk; nothing logged.
+      </div>
+      <div class="loading-bar" id="loadingBarArch"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="archStatus"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+
+    <div class="verdict-banner neutral" id="verdictBanner">
+      <div class="verdict-icon" id="verdictIcon">⊙</div>
+      <div class="verdict-text">
+        <div class="verdict-title" id="verdictTitle">—</div>
+        <div class="verdict-sub" id="verdictSub">—</div>
+        <div class="verdict-badges" id="verdictBadges"></div>
+      </div>
+    </div>
+
+    <!-- Hashes -->
+    <div class="card expanded" id="cardHashes">
+      <div class="card-head" onclick="toggleCard('cardHashes')">
+        <div class="card-title">⊕ Hashes</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="hashesBody"></div>
+    </div>
+
+    <!-- Threat Intelligence Sources -->
+    <div class="card expanded" id="cardIntel">
+      <div class="card-head" onclick="toggleCard('cardIntel')">
+        <div class="card-title">◈ Threat Intelligence Sources <span class="card-count" id="intelCount"></span></div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="intelBody"></div>
+    </div>
+
+    <!-- File analysis sections (only show on file/eml/archive) -->
+    <div class="card" id="cardFileType" style="display:none;">
+      <div class="card-head" onclick="toggleCard('cardFileType')">
+        <div class="card-title">◐ File Type & Entropy</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="fileTypeBody"></div>
+    </div>
+
+    <div class="card" id="cardYara" style="display:none;">
+      <div class="card-head" onclick="toggleCard('cardYara')">
+        <div class="card-title">◇ YARA Rule Matches <span class="card-count" id="yaraCount"></span></div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="yaraBody"></div>
+    </div>
+
+    <div class="card" id="cardOffice" style="display:none;">
+      <div class="card-head" onclick="toggleCard('cardOffice')">
+        <div class="card-title">▣ Office Macro Analysis</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="officeBody"></div>
+    </div>
+
+    <div class="card" id="cardPdf" style="display:none;">
+      <div class="card-head" onclick="toggleCard('cardPdf')">
+        <div class="card-title">▦ PDF Analysis</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="pdfBody"></div>
+    </div>
+
+    <div class="card" id="cardSusStrings" style="display:none;">
+      <div class="card-head" onclick="toggleCard('cardSusStrings')">
+        <div class="card-title">⚠ Suspicious String Patterns <span class="card-count" id="susCount"></span></div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="susBody"></div>
+    </div>
+
+    <div class="card" id="cardIOCs" style="display:none;">
+      <div class="card-head" onclick="toggleCard('cardIOCs')">
+        <div class="card-title">↗ Extracted IOCs <span class="card-count" id="iocCount"></span></div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body" id="iocsBody"></div>
+    </div>
+
+    <!-- Cross-tool actions -->
+    <div class="card" id="cardActions">
+      <div class="card-head" style="cursor:default;">
+        <div class="card-title">↗ Continue Investigation</div>
+      </div>
+      <div class="card-body" id="actionsBody" style="display:block;">
+        <div class="cross-tool-bar">
+          <div class="cross-tool-title">External lookups</div>
+          <div class="cross-tool-actions" id="externalActions"></div>
+        </div>
+        <div class="cross-tool-bar">
+          <div class="cross-tool-title">Export</div>
+          <div class="cross-tool-actions" id="exportActions"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Batch results table (shown only in batch mode) -->
+    <div id="batchResultsWrap" style="display:none;">
+      <div class="batch-summary">
+        <div class="batch-stats">
+          <div class="batch-stat"><span class="batch-stat-label">Total</span><span class="batch-stat-value accent" id="bsTotal">0</span></div>
+          <div class="batch-stat"><span class="batch-stat-label">Malicious</span><span class="batch-stat-value red" id="bsMalicious">0</span></div>
+          <div class="batch-stat"><span class="batch-stat-label">Suspicious</span><span class="batch-stat-value warn" id="bsSuspicious">0</span></div>
+          <div class="batch-stat"><span class="batch-stat-label">Clean</span><span class="batch-stat-value green" id="bsClean">0</span></div>
+          <div class="batch-stat"><span class="batch-stat-label">Errors</span><span class="batch-stat-value" id="bsError">0</span></div>
+        </div>
+        <button class="btn-secondary" onclick="exportBatchCSV()">⇣ Export CSV</button>
+      </div>
+      <div class="batch-table">
+        <div class="batch-head">
+          <div>#</div><div>Hash</div><div>Type</div><div>Family</div><div>Verdict</div>
+        </div>
+        <div id="batchRows"></div>
+      </div>
+    </div>
+
+    <!-- Member file results (eml/archive) -->
+    <div id="memberResultsWrap" style="display:none;"></div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Hashes computed in-browser via Web Crypto API. Threat intelligence via abuse.ch (MalwareBazaar, ThreatFox, URLhaus). YARA scanning via Yara-Rules community ruleset. File contents processed in memory only.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let lastResult = null;
+let batchData = [];
+
+/* ── UTIL ── */
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  document.getElementById('resultsWrap').classList.remove('visible');
+}
+
+function toggleCard(id){
+  document.getElementById(id).classList.toggle('expanded');
+}
+
+function setBar(id, on, btnId, btnText){
+  document.getElementById(id).classList.toggle('visible', on);
+  if (btnId) {
+    const b = document.getElementById(btnId);
+    b.disabled = on;
+    if (btnText) b.textContent = on ? btnText[0] : btnText[1];
+  }
+}
+
+/* ── HASH MODE ── */
+function detectHashType(h){
+  h = (h||'').trim().toLowerCase();
+  if (/^[a-f0-9]{32}$/.test(h)) return 'md5';
+  if (/^[a-f0-9]{40}$/.test(h)) return 'sha1';
+  if (/^[a-f0-9]{64}$/.test(h)) return 'sha256';
+  return null;
+}
+
+async function lookupHash(){
+  const h = document.getElementById('hashInput').value.trim().toLowerCase();
+  if (!h) { alert('Please paste a hash.'); return; }
+  if (!detectHashType(h)) { alert('Not a valid MD5, SHA1, or SHA256 hash.'); return; }
+  setBar('loadingBarHash', true, 'btnHash', ['Looking up…','Look Up →']);
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const r = await fetch(`${PROXY}/hash-lookup?hash=${encodeURIComponent(h)}`);
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+    lastResult = { kind:'hash', hash:h, type:data.type, intel:data.intel, verdict:data.verdict };
+    renderHashResult(lastResult);
+  } catch(e) {
+    showError('Could not reach lookup server.');
+  } finally {
+    setBar('loadingBarHash', false, 'btnHash', ['','Look Up →']);
+  }
+}
+
+/* ── FILE MODE ── */
+const fileDrop = document.getElementById('fileDrop');
+['dragenter','dragover'].forEach(ev=>fileDrop.addEventListener(ev,e=>{e.preventDefault();fileDrop.classList.add('dragging');}));
+['dragleave','drop'].forEach(ev=>fileDrop.addEventListener(ev,e=>{e.preventDefault();fileDrop.classList.remove('dragging');}));
+fileDrop.addEventListener('drop', e=>{
+  if (e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]);
+});
+
+function handleFile(e){
+  if (e.target.files[0]) processFile(e.target.files[0]);
+}
+
+async function computeFileHashes(file){
+  const buffer = await file.arrayBuffer();
+  const md5_p    = computeHash(buffer, 'MD5-not-available').catch(()=>'(SHA1+SHA256 only)');
+  const sha1_p   = crypto.subtle.digest('SHA-1', buffer).then(toHex);
+  const sha256_p = crypto.subtle.digest('SHA-256', buffer).then(toHex);
+  const [sha1, sha256] = await Promise.all([sha1_p, sha256_p]);
+  return { sha1, sha256, size: file.size };
+}
+function toHex(buf){
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function computeHash(buffer, algo){
+  // Web Crypto doesn't support MD5; we accept only SHA1/SHA256 client-side.
+  // The server returns MD5 too as part of file analysis.
+  throw new Error('MD5 not available in Web Crypto');
+}
+
+async function processFile(file){
+  if (file.size > 10*1024*1024){
+    alert('File exceeds 10MB limit.');
+    return;
+  }
+  setBar('loadingBarFile', true);
+  document.getElementById('resultsWrap').classList.remove('visible');
+  document.getElementById('fileStatus').textContent = `Hashing ${file.name} locally (${(file.size/1024).toFixed(1)} KB)…`;
+
+  try {
+    // First: hash locally for display speed
+    const localHashes = await computeFileHashes(file);
+    document.getElementById('fileStatus').textContent =
+      `Local SHA-256: ${localHashes.sha256.slice(0,16)}…  ·  Sending for full analysis…`;
+
+    // Then: full server-side analysis
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(`${PROXY}/file-analyze`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+
+    lastResult = { kind:'file', filename:file.name, ...data };
+    renderFileResult(lastResult);
+    document.getElementById('fileStatus').textContent = `Analysis complete · ${file.name}`;
+  } catch(e) {
+    showError('Could not analyze file: '+e.message);
+  } finally {
+    setBar('loadingBarFile', false);
+  }
+}
+
+/* ── BATCH MODE ── */
+function clearBatch(){
+  document.getElementById('batchInput').value = '';
+  document.getElementById('resultsWrap').classList.remove('visible');
+  document.getElementById('batchProgress').textContent = '';
+  batchData = [];
+}
+function loadSampleHashes(){
+  document.getElementById('batchInput').value =
+`d41d8cd98f00b204e9800998ecf8427e
+e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+44d88612fea8a8f36de82e1278abb02f
+3395856ce81f2b7382dee72602f798b642f14140
+2cc4c1d077222e16b50ee48a5b73d28a30bdb2dab9c8e0a99cef58c25b7a4d6c`;
+}
+
+async function lookupBatch(){
+  const text = document.getElementById('batchInput').value.trim();
+  if (!text){ alert('Paste at least one hash.'); return; }
+  const lines = text.split(/[\n\r,;\s]+/).map(s=>s.trim().toLowerCase()).filter(Boolean).slice(0,100);
+  const valid = lines.filter(h => detectHashType(h));
+  const invalid = lines.length - valid.length;
+  if (!valid.length){ alert('No valid hashes detected.'); return; }
+  if (invalid > 0) console.warn(`${invalid} invalid hashes skipped`);
+
+  batchData = valid.map(h => ({ hash:h, type:detectHashType(h), status:'pending' }));
+  setBar('loadingBarBatch', true, 'btnBatch', ['Looking up…','Look Up All →']);
+
+  // Show batch results table, hide other cards
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('verdictBanner').style.display = 'none';
+  ['cardHashes','cardIntel','cardFileType','cardYara','cardOffice','cardPdf','cardSusStrings','cardIOCs','cardActions','memberResultsWrap'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  document.getElementById('batchResultsWrap').style.display = 'block';
+  renderBatchTable();
+
+  let done = 0;
+  const total = batchData.length;
+  const updateProgress = ()=>{ document.getElementById('batchProgress').textContent = `${done}/${total} processed`; };
+  updateProgress();
+
+  async function processOne(idx){
+    batchData[idx].status = 'processing';
+    renderBatchRow(idx);
+    try {
+      const r = await fetch(`${PROXY}/hash-lookup?hash=${encodeURIComponent(batchData[idx].hash)}`);
+      const data = await r.json();
+      if (data.error) {
+        batchData[idx].status = 'error'; batchData[idx].error = data.error;
+      } else {
+        batchData[idx].verdict = data.verdict;
+        batchData[idx].intel = data.intel;
+        batchData[idx].status = 'done';
+      }
+    } catch(e) {
+      batchData[idx].status = 'error'; batchData[idx].error = 'Fetch failed';
+    }
+    done++; updateProgress();
+    renderBatchRow(idx);
+    updateBatchStats();
+  }
+
+  const concurrency = 6;
+  let cursor = 0;
+  await Promise.all(Array(concurrency).fill(0).map(async () => {
+    while (cursor < total) { const i = cursor++; await processOne(i); }
+  }));
+
+  setBar('loadingBarBatch', false, 'btnBatch', ['','Look Up All →']);
+  document.getElementById('batchProgress').textContent = `Complete · ${total} hashes`;
+}
+
+function renderBatchTable(){
+  document.getElementById('batchRows').innerHTML = batchData.map((_,i)=>renderBatchRowHTML(i)).join('');
+  updateBatchStats();
+}
+function renderBatchRow(idx){
+  const el = document.querySelector(`[data-bidx="${idx}"]`);
+  if (el) el.outerHTML = renderBatchRowHTML(idx);
+}
+function renderBatchRowHTML(idx){
+  const it = batchData[idx];
+  const v = it.verdict || {};
+  const verdictCls = it.status === 'pending' ? 'pending'
+                  : it.status === 'processing' ? 'pending'
+                  : it.status === 'error' ? 'error'
+                  : v.level === 'malicious' ? 'malicious'
+                  : v.level === 'suspicious' ? 'suspicious'
+                  : 'clean';
+  const verdictLabel = it.status === 'pending' ? 'queued'
+                    : it.status === 'processing' ? '…'
+                    : it.status === 'error' ? 'error'
+                    : v.level || 'clean';
+  const family = (v.families && v.families.length) ? v.families.slice(0,2).join(', ') :
+                 it.status === 'done' ? '—' : '—';
+  return `<div class="batch-row" data-bidx="${idx}" onclick="batchRowClick(${idx})">
+    <div class="batch-cell-num">${idx+1}</div>
+    <div class="batch-cell-hash" title="${esc(it.hash)}">${esc(it.hash)}</div>
+    <div class="batch-cell-type">${esc(it.type||'')}</div>
+    <div class="batch-cell-family" title="${esc(family)}">${esc(family)}</div>
+    <div class="batch-verdict ${verdictCls}">${esc(verdictLabel)}</div>
+  </div>`;
+}
+function updateBatchStats(){
+  let mal=0,sus=0,cln=0,err=0;
+  batchData.forEach(it=>{
+    if (it.status==='error') err++;
+    else if (it.status==='done'){
+      const l = (it.verdict||{}).level;
+      if (l==='malicious') mal++;
+      else if (l==='suspicious') sus++;
+      else cln++;
+    }
+  });
+  document.getElementById('bsTotal').textContent = batchData.length;
+  document.getElementById('bsMalicious').textContent = mal;
+  document.getElementById('bsSuspicious').textContent = sus;
+  document.getElementById('bsClean').textContent = cln;
+  document.getElementById('bsError').textContent = err;
+}
+function batchRowClick(idx){
+  const it = batchData[idx];
+  if (it.status !== 'done') return;
+  selectMode('hash');
+  document.getElementById('hashInput').value = it.hash;
+  lastResult = { kind:'hash', hash:it.hash, type:it.type, intel:it.intel, verdict:it.verdict };
+  document.getElementById('verdictBanner').style.display = '';
+  ['cardHashes','cardIntel','cardActions'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.style.display = '';
+  });
+  document.getElementById('batchResultsWrap').style.display = 'none';
+  renderHashResult(lastResult);
+}
+
+function exportBatchCSV(){
+  if (!batchData.length) return;
+  const rows = [['#','Hash','Type','Verdict','Confidence','Sources Hit','Family','Tags']];
+  batchData.forEach((it,i)=>{
+    const v = it.verdict || {};
+    rows.push([
+      i+1, it.hash, it.type, v.level||'', v.confidence||'',
+      v.sources_hit||'', (v.families||[]).join('|'), (v.tags||[]).join('|')
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c==null?'':c);
+    return s.includes(',')||s.includes('"')||s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `hash-batch-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+/* ── EML MODE ── */
+const emlDrop = document.getElementById('emlDrop');
+['dragenter','dragover'].forEach(ev=>emlDrop.addEventListener(ev,e=>{e.preventDefault();emlDrop.classList.add('dragging');}));
+['dragleave','drop'].forEach(ev=>emlDrop.addEventListener(ev,e=>{e.preventDefault();emlDrop.classList.remove('dragging');}));
+emlDrop.addEventListener('drop', e=>{
+  if (e.dataTransfer.files[0]) processEml(e.dataTransfer.files[0]);
+});
+function handleEml(e){ if (e.target.files[0]) processEml(e.target.files[0]); }
+
+async function processEml(file){
+  if (file.size > 25*1024*1024){ alert('.eml exceeds 25MB.'); return; }
+  setBar('loadingBarEml', true);
+  document.getElementById('emlStatus').textContent = `Sending ${file.name} for analysis…`;
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(`${PROXY}/eml-analyze`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error){ showError(data.error); return; }
+    lastResult = { kind:'eml', filename:file.name, ...data };
+    renderEmlResult(lastResult);
+    document.getElementById('emlStatus').textContent = `Analysis complete · ${(data.attachments||[]).length} attachment(s)`;
+  } catch(e) { showError('Could not analyze .eml: '+e.message); }
+  finally { setBar('loadingBarEml', false); }
+}
+
+/* ── ARCHIVE MODE ── */
+const archDrop = document.getElementById('archDrop');
+['dragenter','dragover'].forEach(ev=>archDrop.addEventListener(ev,e=>{e.preventDefault();archDrop.classList.add('dragging');}));
+['dragleave','drop'].forEach(ev=>archDrop.addEventListener(ev,e=>{e.preventDefault();archDrop.classList.remove('dragging');}));
+archDrop.addEventListener('drop', e=>{
+  if (e.dataTransfer.files[0]) processArchive(e.dataTransfer.files[0]);
+});
+function handleArchive(e){ if (e.target.files[0]) processArchive(e.target.files[0]); }
+
+async function processArchive(file){
+  if (file.size > 25*1024*1024){ alert('Archive exceeds 25MB.'); return; }
+  setBar('loadingBarArch', true);
+  document.getElementById('archStatus').textContent = `Sending ${file.name} for analysis…`;
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData();
+    fd.append('file', file);
+    const r = await fetch(`${PROXY}/archive-analyze`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error){ showError(data.error); return; }
+    lastResult = { kind:'archive', filename:file.name, ...data };
+    renderArchiveResult(lastResult);
+    document.getElementById('archStatus').textContent = `Analysis complete · ${(data.members||[]).length} member(s)`;
+  } catch(e) { showError('Could not analyze archive: '+e.message); }
+  finally { setBar('loadingBarArch', false); }
+}
+
+/* ── RENDERERS ── */
+function showError(msg){
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('verdictBanner').style.display = '';
+  document.getElementById('verdictBanner').className = 'verdict-banner malicious';
+  document.getElementById('verdictIcon').textContent = '⚠';
+  document.getElementById('verdictTitle').textContent = 'Lookup failed';
+  document.getElementById('verdictSub').textContent = msg;
+  document.getElementById('verdictBadges').innerHTML = '';
+  ['cardHashes','cardIntel','cardFileType','cardYara','cardOffice','cardPdf','cardSusStrings','cardIOCs','cardActions','batchResultsWrap','memberResultsWrap'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+}
+
+function showOnly(...ids){
+  // Hide all then show specified
+  ['cardHashes','cardIntel','cardFileType','cardYara','cardOffice','cardPdf','cardSusStrings','cardIOCs','cardActions','batchResultsWrap','memberResultsWrap'].forEach(id=>{
+    const el = document.getElementById(id); if (el) el.style.display = 'none';
+  });
+  ids.forEach(id => { const el = document.getElementById(id); if (el) el.style.display = ''; });
+}
+
+function renderVerdictBanner(verdict, contextDesc){
+  const banner = document.getElementById('verdictBanner');
+  banner.style.display = '';
+  const lvl = verdict.level || 'clean';
+  banner.className = 'verdict-banner ' + lvl;
+  const icons = { clean:'✓', suspicious:'⚠', malicious:'⊗', neutral:'⊙' };
+  document.getElementById('verdictIcon').textContent = icons[lvl] || '⊙';
+  document.getElementById('verdictTitle').textContent = verdict.label || '—';
+  document.getElementById('verdictSub').textContent = verdict.summary || contextDesc || '';
+  const badges = [];
+  if (verdict.confidence) badges.push(`<span class="v-badge ${lvl==='clean'?'green':lvl==='suspicious'?'warn':'red'}">${esc(verdict.confidence)} confidence</span>`);
+  if (typeof verdict.sources_hit === 'number')
+    badges.push(`<span class="v-badge dim">${verdict.sources_hit} source${verdict.sources_hit===1?'':'s'} hit</span>`);
+  (verdict.families||[]).slice(0,5).forEach(f => badges.push(`<span class="v-badge red">${esc(f)}</span>`));
+  document.getElementById('verdictBadges').innerHTML = badges.join('');
+}
+
+function renderHashesCard(hashes, hashHint){
+  const rows = [];
+  if (hashes && hashes.md5)    rows.push(['MD5',    hashes.md5,    'mono-hash']);
+  if (hashes && hashes.sha1)   rows.push(['SHA1',   hashes.sha1,   'mono-hash']);
+  if (hashes && hashes.sha256) rows.push(['SHA256', hashes.sha256, 'mono-hash']);
+  if (hashes && hashes.size)   rows.push(['Size',   hashes.size + ' bytes', 'accent']);
+  if (!rows.length && hashHint) {
+    rows.push([hashHint.type.toUpperCase(), hashHint.value, 'mono-hash']);
+  }
+  document.getElementById('hashesBody').innerHTML = rows.length
+    ? `<div class="kv-list">${rows.map(([k,v,c])=>`<div class="kv-row"><div class="kv-key">${k}</div><div class="kv-val ${c||''}">${esc(v)}</div></div>`).join('')}</div>`
+    : '<div class="empty">—</div>';
+}
+
+function renderIntelCard(intel){
+  const html = (intel||[]).map(s=>{
+    const hit = s.found;
+    let detail = '';
+    if (hit) {
+      if (s.source === 'malwarebazaar') {
+        const tags = (s.tags||[]).slice(0,8).map(t=>`<span class="tag red">${esc(t)}</span>`).join(' ');
+        detail = `
+          <div class="source-detail"><strong style="color:#e8d5a3">${esc(s.signature || 'Unknown family')}</strong></div>
+          ${s.file_type ? `<div class="source-detail">Type: ${esc(s.file_type)}</div>` : ''}
+          ${s.first_seen ? `<div class="source-detail">First seen: ${esc(s.first_seen)}</div>` : ''}
+          ${tags ? `<div class="tag-list" style="margin-top:6px;">${tags}</div>` : ''}
+        `;
+      } else if (s.source === 'threatfox') {
+        const fams = (s.malware||[]).slice(0,4).join(', ');
+        const tags = (s.tags||[]).slice(0,8).map(t=>`<span class="tag red">${esc(t)}</span>`).join(' ');
+        detail = `
+          <div class="source-detail"><strong style="color:#e8d5a3">${esc(fams || 'IOC match')}</strong></div>
+          ${s.threat_types && s.threat_types.length ? `<div class="source-detail">Threat: ${esc(s.threat_types.join(', '))}</div>` : ''}
+          ${s.first_seen ? `<div class="source-detail">First seen: ${esc(s.first_seen)}</div>` : ''}
+          ${tags ? `<div class="tag-list" style="margin-top:6px;">${tags}</div>` : ''}
+          <div class="source-detail">Confidence: ${esc(s.confidence||0)}/100</div>
+        `;
+      } else if (s.source === 'urlhaus') {
+        detail = `
+          <div class="source-detail"><strong style="color:#e8d5a3">Distributed via ${s.url_count || 0} URL(s)</strong></div>
+          ${s.signature ? `<div class="source-detail">Family: ${esc(s.signature)}</div>` : ''}
+          ${s.first_seen ? `<div class="source-detail">First seen: ${esc(s.first_seen)}</div>` : ''}
+        `;
+      }
+    } else {
+      detail = `<div class="source-detail" style="color:rgba(240,236,228,0.40)!important">No record (${esc(s.status||'no_results')})</div>`;
+    }
+    return `
+      <div class="source-card">
+        <div class="source-card-head">
+          <span class="source-name">${esc(({malwarebazaar:'MalwareBazaar',threatfox:'ThreatFox',urlhaus:'URLhaus'})[s.source] || s.source)}</span>
+          <span class="source-status ${hit?'hit':'miss'}">${hit?'HIT':'CLEAN'}</span>
+        </div>
+        ${detail}
+        ${s.permalink ? `<a class="source-link" href="${esc(s.permalink)}" target="_blank" rel="noopener">View on source ↗</a>` : ''}
+      </div>
+    `;
+  }).join('');
+  document.getElementById('intelCount').textContent = `${(intel||[]).filter(s=>s.found).length}/${(intel||[]).length}`;
+  document.getElementById('intelBody').innerHTML = `<div class="source-grid">${html}</div>`;
+}
+
+function renderActions(forValue, kind){
+  const ext = [];
+  // Build VirusTotal link from sha256 (most reliable)
+  let sha = (lastResult.hashes && lastResult.hashes.sha256) || (kind==='hash' && lastResult.type==='sha256' ? lastResult.hash : null);
+  if (sha) {
+    ext.push(`<a class="cross-tool-btn" href="https://www.virustotal.com/gui/file/${esc(sha)}" target="_blank" rel="noopener">VirusTotal ↗</a>`);
+    ext.push(`<a class="cross-tool-btn" href="https://www.hybrid-analysis.com/search?query=${esc(sha)}" target="_blank" rel="noopener">Hybrid Analysis ↗</a>`);
+    ext.push(`<a class="cross-tool-btn" href="https://www.joesandbox.com/analysis/search?q=${esc(sha)}" target="_blank" rel="noopener">Joe Sandbox ↗</a>`);
+    ext.push(`<a class="cross-tool-btn" href="https://app.any.run/submissions/?query=${esc(sha)}" target="_blank" rel="noopener">ANY.RUN ↗</a>`);
+  } else if (kind==='hash') {
+    const h = lastResult.hash;
+    ext.push(`<a class="cross-tool-btn" href="https://www.virustotal.com/gui/search/${esc(h)}" target="_blank" rel="noopener">VirusTotal ↗</a>`);
+  }
+  document.getElementById('externalActions').innerHTML = ext.join('');
+  document.getElementById('exportActions').innerHTML = `
+    <button class="cross-tool-btn" onclick="exportJSON()">⇣ JSON</button>
+    <button class="cross-tool-btn" onclick="exportSTIX()">⇣ STIX 2.1</button>
+    <button class="cross-tool-btn" onclick="exportMISP()">⇣ MISP</button>
+  `;
+}
+
+function renderHashResult(r){
+  showOnly('cardHashes','cardIntel','cardActions');
+  renderVerdictBanner(r.verdict, `Hash type: ${(r.type||'').toUpperCase()}`);
+  renderHashesCard(null, { type:r.type, value:r.hash });
+  renderIntelCard(r.intel);
+  renderActions(r.hash, 'hash');
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderFileResult(r){
+  const cards = ['cardHashes','cardIntel','cardFileType','cardActions'];
+  // File type
+  if (r.file_type){
+    document.getElementById('fileTypeBody').innerHTML = `<div class="kv-list">
+      <div class="kv-row"><div class="kv-key">MIME</div><div class="kv-val accent">${esc(r.file_type.mime||'—')}</div></div>
+      <div class="kv-row"><div class="kv-key">Description</div><div class="kv-val">${esc(r.file_type.description||'—')}</div></div>
+      <div class="kv-row"><div class="kv-key">Extension match</div><div class="kv-val ${r.file_type.extension_mismatch?'red':'green'}">${r.file_type.extension_mismatch?'⚠ Mismatch (claimed extension differs from actual file type)':'✓ Matches claimed extension'}</div></div>
+      <div class="kv-row"><div class="kv-key">Entropy</div><div class="kv-val ${r.entropy>7.5?'warn':r.entropy>7.0?'warn':'green'}">${r.entropy} ${r.entropy>7.5?'(very high — likely packed/encrypted)':r.entropy>7.0?'(high)':'(normal)'}</div></div>
+    </div>`;
+  }
+  // YARA
+  if (r.yara && r.yara.match_count>0){
+    cards.push('cardYara');
+    document.getElementById('yaraCount').textContent = r.yara.match_count;
+    document.getElementById('yaraBody').innerHTML = (r.yara.matches||[]).map(m=>`
+      <div class="yara-match">
+        <div class="yara-rule">${esc(m.rule)}</div>
+        ${m.namespace ? `<div class="yara-meta">Namespace: ${esc(m.namespace)}</div>` : ''}
+        ${m.tags && m.tags.length ? `<div class="tag-list" style="margin-top:6px;">${m.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(' ')}</div>` : ''}
+        ${m.meta && m.meta.description ? `<div class="yara-meta" style="margin-top:6px;">${esc(m.meta.description)}</div>` : ''}
+      </div>`).join('');
+  }
+  // Office macros
+  if (r.office){
+    cards.push('cardOffice');
+    document.getElementById('officeBody').innerHTML = `<div class="kv-list">
+      <div class="kv-row"><div class="kv-key">Has Macros</div><div class="kv-val ${r.office.has_macros?'red':'green'}">${r.office.has_macros?'⚠ YES — VBA macros detected':'✓ None'}</div></div>
+      ${r.office.macro_count ? `<div class="kv-row"><div class="kv-key">Macro Count</div><div class="kv-val warn">${r.office.macro_count}</div></div>`:''}
+      ${r.office.macro_keywords && r.office.macro_keywords.length ? `<div class="kv-row"><div class="kv-key">Keywords</div><div class="kv-val warn">${r.office.macro_keywords.map(k=>esc(k)).join('<br>')}</div></div>`:''}
+      ${(r.office.warnings||[]).length ? `<div class="kv-row"><div class="kv-key">Warnings</div><div class="kv-val red">${r.office.warnings.map(w=>esc(w)).join('<br>')}</div></div>`:''}
+    </div>`;
+  }
+  // PDF
+  if (r.pdf){
+    cards.push('cardPdf');
+    document.getElementById('pdfBody').innerHTML = `<div class="kv-list">
+      ${r.pdf.page_count ? `<div class="kv-row"><div class="kv-key">Pages</div><div class="kv-val">${r.pdf.page_count}</div></div>`:''}
+      <div class="kv-row"><div class="kv-key">Encrypted</div><div class="kv-val ${r.pdf.is_encrypted?'warn':'green'}">${r.pdf.is_encrypted?'⚠ Yes':'No'}</div></div>
+      <div class="kv-row"><div class="kv-key">JavaScript</div><div class="kv-val ${r.pdf.has_javascript?'red':'green'}">${r.pdf.has_javascript?'⚠ Embedded JavaScript':'None'}</div></div>
+      <div class="kv-row"><div class="kv-key">Forms</div><div class="kv-val ${r.pdf.has_forms?'warn':'dim'}">${r.pdf.has_forms?'AcroForm present':'None'}</div></div>
+      ${(r.pdf.warnings||[]).length ? `<div class="kv-row"><div class="kv-key">Warnings</div><div class="kv-val red">${r.pdf.warnings.map(w=>esc(w)).join('<br>')}</div></div>`:''}
+    </div>`;
+  }
+  // Suspicious strings
+  if ((r.suspicious_strings||[]).length){
+    cards.push('cardSusStrings');
+    document.getElementById('susCount').textContent = r.suspicious_strings.length;
+    document.getElementById('susBody').innerHTML = `<div class="ioc-list">${r.suspicious_strings.map(s=>`<div class="ioc-row" style="color:#e87b4a">${esc(s)}</div>`).join('')}</div>`;
+  }
+  // IOCs
+  if (r.iocs){
+    const total = (r.iocs.urls||[]).length + (r.iocs.ips||[]).length + (r.iocs.emails||[]).length;
+    if (total){
+      cards.push('cardIOCs');
+      document.getElementById('iocCount').textContent = total;
+      let html = '';
+      if ((r.iocs.urls||[]).length) html += `<div class="kv-row" style="border-bottom:1px solid var(--border);"><div class="kv-key">URLs (${r.iocs.urls.length})</div><div class="kv-val">${r.iocs.urls.map(u=>`<div style="margin:3px 0;"><a href="https://inteldesk.io/burner-previewer?url=${encodeURIComponent(u)}" target="_blank" rel="noopener" style="color:#c8a96e;text-decoration:none;">${esc(u)} ↗</a></div>`).join('')}</div></div>`;
+      if ((r.iocs.ips||[]).length) html += `<div class="kv-row" style="border-bottom:1px solid var(--border);"><div class="kv-key">IPs (${r.iocs.ips.length})</div><div class="kv-val">${r.iocs.ips.map(ip=>`<div style="margin:3px 0;"><a href="https://inteldesk.io/#ip" target="_blank" rel="noopener" style="color:#c8a96e;text-decoration:none;">${esc(ip)} ↗</a></div>`).join('')}</div></div>`;
+      if ((r.iocs.emails||[]).length) html += `<div class="kv-row"><div class="kv-key">Emails (${r.iocs.emails.length})</div><div class="kv-val">${r.iocs.emails.map(e=>esc(e)).join('<br>')}</div></div>`;
+      document.getElementById('iocsBody').innerHTML = `<div class="kv-list">${html}</div>`;
+    }
+  }
+  showOnly(...cards);
+  renderVerdictBanner(r.verdict, `File: ${r.filename}`);
+  renderHashesCard(r.hashes);
+  renderIntelCard(r.intel);
+  renderActions(null, 'file');
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderEmlResult(r){
+  showOnly('memberResultsWrap','cardActions');
+  // Use verdict banner to summarize
+  const m = r.meta || {};
+  const att = r.attachments || [];
+  const malicious = att.filter(a=>a.verdict && a.verdict.level==='malicious').length;
+  const suspicious = att.filter(a=>a.verdict && a.verdict.level==='suspicious').length;
+  const verdict = malicious > 0 ? {level:'malicious', label:'Malicious attachment(s) detected', summary:`${malicious} of ${att.length} attachments matched malware databases.`}
+                : suspicious > 0 ? {level:'suspicious', label:'Suspicious attachment(s)', summary:`${suspicious} of ${att.length} attachments show suspicious indicators.`}
+                : {level:'clean', label:'Email scanned', summary:`${att.length} attachment(s) analyzed. No malicious matches.`};
+  renderVerdictBanner(verdict, '');
+
+  let html = '';
+  html += `<div class="card expanded" style="margin-bottom:2px;">
+    <div class="card-head" style="cursor:default;"><div class="card-title">✉ Email Headers</div></div>
+    <div class="card-body" style="display:block;">
+      <div class="kv-list">
+        <div class="kv-row"><div class="kv-key">From</div><div class="kv-val accent">${esc(m.from||'—')}</div></div>
+        <div class="kv-row"><div class="kv-key">To</div><div class="kv-val">${esc(m.to||'—')}</div></div>
+        <div class="kv-row"><div class="kv-key">Subject</div><div class="kv-val accent">${esc(m.subject||'—')}</div></div>
+        <div class="kv-row"><div class="kv-key">Date</div><div class="kv-val">${esc(m.date||'—')}</div></div>
+        ${(r.body_urls||[]).length ? `<div class="kv-row"><div class="kv-key">URLs in body</div><div class="kv-val">${r.body_urls.map(u=>`<div><a href="https://inteldesk.io/burner-previewer?url=${encodeURIComponent(u)}" target="_blank" rel="noopener" style="color:#c8a96e;text-decoration:none;">${esc(u)} ↗</a></div>`).join('')}</div></div>`:''}
+      </div>
+    </div>
+  </div>`;
+
+  att.forEach((a,i)=>{
+    const v = a.verdict || {level:'clean',label:'—'};
+    const cls = v.level || 'clean';
+    html += `<div class="card expanded" style="margin-bottom:2px;border-left:3px solid ${cls==='malicious'?'#c0392b':cls==='suspicious'?'#e87b4a':'#4ec994'};">
+      <div class="card-head"><div class="card-title">📎 Attachment ${i+1}: ${esc(a.filename||'(unnamed)')}</div><div class="batch-verdict ${cls}">${esc(v.level||'')}</div></div>
+      <div class="card-body" style="display:block;">
+        ${a.error ? `<div class="empty" style="color:#c0392b">${esc(a.error)}</div>` :
+          `<div class="kv-list">
+            ${a.hashes ? `<div class="kv-row"><div class="kv-key">SHA256</div><div class="kv-val mono-hash">${esc(a.hashes.sha256||'')}</div></div>`:''}
+            ${a.file_type ? `<div class="kv-row"><div class="kv-key">Type</div><div class="kv-val">${esc(a.file_type.description||a.file_type.mime||'')}</div></div>`:''}
+            <div class="kv-row"><div class="kv-key">Verdict</div><div class="kv-val ${cls==='malicious'?'red':cls==='suspicious'?'warn':'green'}">${esc(v.summary||v.label||'—')}</div></div>
+            ${(v.families||[]).length ? `<div class="kv-row"><div class="kv-key">Family</div><div class="kv-val red">${v.families.map(f=>esc(f)).join(', ')}</div></div>`:''}
+          </div>`}
+      </div>
+    </div>`;
+  });
+  document.getElementById('memberResultsWrap').innerHTML = html;
+  renderActions(null, 'eml');
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderArchiveResult(r){
+  showOnly('memberResultsWrap','cardActions');
+  const members = r.members || [];
+  const malicious = members.filter(a=>a.verdict && a.verdict.level==='malicious').length;
+  const suspicious = members.filter(a=>a.verdict && a.verdict.level==='suspicious').length;
+  const verdict = malicious > 0 ? {level:'malicious', label:`Malicious member(s) in ${r.archive_type} archive`, summary:`${malicious} of ${members.length} members matched malware databases.`}
+                : suspicious > 0 ? {level:'suspicious', label:'Suspicious member(s)', summary:`${suspicious} of ${members.length} members show suspicious indicators.`}
+                : {level:'clean', label:`Archive scanned (${r.archive_type})`, summary:`${members.length} member(s) analyzed. No malicious matches.`};
+  renderVerdictBanner(verdict, '');
+
+  let html = '';
+  members.forEach((a,i)=>{
+    const v = a.verdict || {level:'clean'};
+    const cls = v.level || 'clean';
+    html += `<div class="card expanded" style="margin-bottom:2px;border-left:3px solid ${cls==='malicious'?'#c0392b':cls==='suspicious'?'#e87b4a':'#4ec994'};">
+      <div class="card-head"><div class="card-title">▤ ${esc(a.filename||'')}</div><div class="batch-verdict ${cls}">${esc(v.level||'')}</div></div>
+      <div class="card-body" style="display:block;">
+        ${a.error ? `<div class="empty" style="color:#c0392b">${esc(a.error)}</div>` :
+          `<div class="kv-list">
+            ${a.hashes ? `<div class="kv-row"><div class="kv-key">SHA256</div><div class="kv-val mono-hash">${esc(a.hashes.sha256||'')}</div></div>`:''}
+            ${a.file_type ? `<div class="kv-row"><div class="kv-key">Type</div><div class="kv-val">${esc(a.file_type.description||'')}</div></div>`:''}
+            <div class="kv-row"><div class="kv-key">Verdict</div><div class="kv-val ${cls==='malicious'?'red':cls==='suspicious'?'warn':'green'}">${esc(v.summary||v.label||'—')}</div></div>
+            ${a.yara && a.yara.match_count ? `<div class="kv-row"><div class="kv-key">YARA</div><div class="kv-val red">${a.yara.match_count} rule match(es): ${(a.yara.matches||[]).slice(0,3).map(m=>esc(m.rule)).join(', ')}</div></div>`:''}
+          </div>`}
+      </div>
+    </div>`;
+  });
+  document.getElementById('memberResultsWrap').innerHTML = html;
+  renderActions(null, 'archive');
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+/* ── EXPORTS ── */
+function downloadJSON(obj, name){
+  const blob = new Blob([JSON.stringify(obj,null,2)],{type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = name;
+  a.click();
+}
+function exportJSON(){
+  if (!lastResult) return;
+  downloadJSON(lastResult, `intel-desk-${lastResult.kind}-${new Date().toISOString().slice(0,10)}.json`);
+}
+function exportSTIX(){
+  if (!lastResult) return;
+  // Minimal STIX 2.1 bundle
+  const sha = (lastResult.hashes && lastResult.hashes.sha256) || (lastResult.kind==='hash' && lastResult.type==='sha256' ? lastResult.hash : null);
+  const family = (lastResult.verdict && (lastResult.verdict.families||[]).join(', ')) || 'unknown';
+  const id = 'indicator--' + crypto.randomUUID();
+  const bundle = {
+    type: 'bundle',
+    id: 'bundle--' + crypto.randomUUID(),
+    objects: [{
+      type: 'indicator',
+      spec_version: '2.1',
+      id,
+      created: new Date().toISOString(),
+      modified: new Date().toISOString(),
+      pattern: sha ? `[file:hashes.'SHA-256' = '${sha}']` : `[file:hashes.MD5 = '${lastResult.hash||''}']`,
+      pattern_type: 'stix',
+      valid_from: new Date().toISOString(),
+      labels: [lastResult.verdict ? lastResult.verdict.level || 'unknown' : 'unknown'],
+      description: `Reported family: ${family}`,
+    }],
+  };
+  downloadJSON(bundle, `intel-desk-stix-${new Date().toISOString().slice(0,10)}.json`);
+}
+function exportMISP(){
+  if (!lastResult) return;
+  const sha = (lastResult.hashes && lastResult.hashes.sha256) || (lastResult.kind==='hash' && lastResult.type==='sha256' ? lastResult.hash : null);
+  const family = (lastResult.verdict && (lastResult.verdict.families||[]).join(', ')) || 'unknown';
+  const event = {
+    Event: {
+      info: `Hash analysis · ${lastResult.kind} · family: ${family}`,
+      analysis: '2',
+      threat_level_id: lastResult.verdict && lastResult.verdict.level==='malicious' ? '1' : '3',
+      Attribute: [
+        sha ? { type:'sha256', category:'Payload delivery', value:sha, to_ids:true } : null,
+        lastResult.hashes && lastResult.hashes.md5 ? { type:'md5', category:'Payload delivery', value:lastResult.hashes.md5, to_ids:true } : null,
+        lastResult.hashes && lastResult.hashes.sha1 ? { type:'sha1', category:'Payload delivery', value:lastResult.hashes.sha1, to_ids:true } : null,
+      ].filter(Boolean),
+    }
+  };
+  downloadJSON(event, `intel-desk-misp-${new Date().toISOString().slice(0,10)}.json`);
+}
+
+/* Auto-load hash from query param */
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const h = params.get('hash');
+  if (h) {
+    document.getElementById('hashInput').value = h;
+    setTimeout(lookupHash, 200);
+  }
+});
+</script>
+</body>
+</html>

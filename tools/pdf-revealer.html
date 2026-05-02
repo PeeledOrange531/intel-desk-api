@@ -1,0 +1,959 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PDF Hidden Content Revealer — Find Failed Redactions, Hidden Layers, Off-Page Text | The Intel Desk</title>
+<meta name="description" content="Free PDF forensics tool. Reveal text behind black redaction boxes, find hidden layers (OCGs), extract embedded JavaScript, walk revision history, render visible vs all-content side-by-side. Used by journalists analyzing leaked documents.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:660px;line-height:1.7;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+/* Mode pills */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);flex-wrap:wrap;max-width:100%;}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 20px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* Drop zone */
+.drop-zone{border:1.5px dashed rgba(255,255,255,0.10);background:var(--bg2);padding:60px 24px;text-align:center;cursor:pointer;transition:all 0.2s;font-family:var(--mono);}
+.drop-zone:hover{border-color:rgba(200,169,110,0.40);background:rgba(200,169,110,0.03);}
+.drop-zone.dragging{border-color:var(--accent);background:rgba(200,169,110,0.06);}
+.drop-glyph{font-family:var(--serif);font-size:44px;font-weight:300;color:rgba(200,169,110,0.40)!important;line-height:1;margin-bottom:14px;}
+.drop-title{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;margin-bottom:6px;}
+.drop-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.7;}
+.drop-zone input[type=file]{display:none;}
+.privacy-notice{margin-top:14px;padding:12px 18px;background:rgba(78,201,148,0.04);border:1px solid rgba(78,201,148,0.20);font-family:var(--mono);font-size:10.5px;color:rgba(78,201,148,0.85)!important;line-height:1.7;}
+.processing-warning{margin-top:14px;padding:12px 18px;background:rgba(232,123,74,0.05);border:1px solid rgba(232,123,74,0.22);font-family:var(--mono);font-size:10.5px;color:rgba(232,123,74,0.85)!important;line-height:1.7;}
+
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 22px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+.btn-primary{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.35);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 26px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-block;}
+.btn-primary:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+
+/* Dynamic processing UI */
+.processing-overlay{display:none;flex-direction:column;gap:16px;padding:36px 32px;background:var(--bg2);border:1px solid var(--border);margin-top:16px;animation:fadeUp 0.3s ease both;}
+.processing-overlay.visible{display:flex;}
+.processing-head{display:flex;align-items:center;gap:14px;}
+.processing-spinner{width:24px;height:24px;border:2px solid rgba(200,169,110,0.20);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.processing-title{font-family:var(--serif);font-size:18px;font-weight:300;color:#e8d5a3!important;}
+.processing-time{margin-left:auto;font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.65)!important;}
+.processing-eta{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.6;}
+.processing-step-list{display:flex;flex-direction:column;gap:6px;font-family:var(--mono);font-size:11px;}
+.processing-step{display:flex;align-items:center;gap:10px;padding:6px 0;color:rgba(240,236,228,0.35)!important;transition:color 0.3s;}
+.processing-step.active{color:#c8a96e!important;}
+.processing-step.done{color:#4ec994!important;}
+.processing-step .step-icon{flex-shrink:0;width:18px;text-align:center;}
+.processing-step.active .step-icon{animation:pulse 1.4s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.processing-bar{height:3px;background:var(--bg3);overflow:hidden;}
+.processing-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+/* Verdict banner — same patterns as metadata-tool */
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;}
+.verdict-banner.clean{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
+.verdict-banner.minor{background:rgba(78,201,148,0.04);border-color:rgba(78,201,148,0.20);}
+.verdict-banner.moderate{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
+.verdict-banner.severe{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.25);}
+.verdict-banner.unknown{background:var(--bg2);border-color:var(--border);}
+.verdict-icon{font-size:30px;flex-shrink:0;font-family:var(--serif);}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,26px);font-weight:300;color:#f5f2ec!important;margin-bottom:4px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+.verdict-score{font-family:var(--serif);font-size:42px;line-height:1;}
+.verdict-score.green{color:#4ec994!important;}
+.verdict-score.warn{color:#e87b4a!important;}
+.verdict-score.red{color:#c0392b!important;}
+.verdict-out-of{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.30)!important;}
+.verdict-sub{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.card-head:hover{background:rgba(255,255,255,0.02);}
+.card-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;display:flex;align-items:center;gap:10px;}
+.card-count{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;}
+.card-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.card.expanded .card-toggle{transform:rotate(45deg);}
+.card-body{display:none;}
+.card.expanded .card-body{display:block;animation:fadeUp 0.2s ease;}
+.card-body.always-on{display:block!important;}
+
+/* KV list */
+.kv-list{padding:0;}
+.kv-row{display:flex;gap:14px;padding:10px 24px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.40)!important;width:180px;flex-shrink:0;padding-top:1px;}
+.kv-val{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.80)!important;flex:1;line-height:1.6;word-break:break-word;}
+.kv-val.accent{color:#e8d5a3!important;}
+.kv-val.green{color:#4ec994!important;}
+.kv-val.warn{color:#e87b4a!important;}
+.kv-val.red{color:#c0392b!important;}
+.kv-val.dim{color:rgba(240,236,228,0.45)!important;}
+
+/* Flag list */
+.flag-list{padding:14px 24px;display:flex;flex-direction:column;gap:6px;}
+.flag-row{display:flex;align-items:flex-start;gap:10px;font-family:var(--mono);font-size:11.5px;line-height:1.7;}
+.flag-row .sym{flex-shrink:0;width:14px;text-align:center;}
+.flag-row.critical{color:#c0392b!important;font-weight:500;}
+.flag-row.high{color:rgba(232,123,74,0.95)!important;}
+.flag-row.medium{color:rgba(240,236,228,0.85)!important;}
+.flag-row.low{color:rgba(240,236,228,0.55)!important;}
+
+/* Failed redaction findings */
+.redaction-card{padding:14px 24px;border-bottom:1px solid var(--border);background:rgba(192,57,43,0.04);border-left:3px solid var(--red);}
+.redaction-card:last-child{border-bottom:none;}
+.redaction-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.redaction-page{font-family:var(--mono);font-size:11px;color:#e8d5a3!important;font-weight:500;}
+.redaction-pct{font-family:var(--mono);font-size:9px;color:#e87b4a!important;}
+.redaction-text{font-family:var(--mono);font-size:12px;color:#f5f2ec!important;background:#1a1a1a;padding:10px 14px;border:1px dashed var(--red);line-height:1.6;word-break:break-word;}
+.redaction-coords{font-family:var(--mono);font-size:9px;color:rgba(240,236,228,0.30)!important;margin-top:6px;}
+
+/* Layer rows */
+.layer-card{padding:11px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.layer-card:last-child{border-bottom:none;}
+.layer-name{font-family:var(--mono);font-size:12px;color:#e8d5a3!important;flex:1;min-width:140px;}
+.layer-state{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:3px 8px;border:1px solid;}
+.layer-state.on{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.layer-state.off{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+
+/* Code block (JS, raw text) */
+.code-block{padding:14px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.80)!important;line-height:1.6;background:#0a0a0a;max-height:400px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;}
+.code-block::-webkit-scrollbar{width:8px;}
+.code-block::-webkit-scrollbar-track{background:rgba(0,0,0,0.4);}
+.code-block::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.20);border-radius:4px;}
+
+/* Annotation rows */
+.annot-card{padding:12px 24px;border-bottom:1px solid var(--border);}
+.annot-card:last-child{border-bottom:none;}
+.annot-head{display:flex;gap:12px;align-items:baseline;flex-wrap:wrap;font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;letter-spacing:0.08em;text-transform:uppercase;}
+.annot-content{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.80)!important;margin-top:6px;line-height:1.6;word-break:break-word;}
+
+/* Side-by-side rendered comparison */
+.compare-render{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.compare-render-side{background:var(--bg2);border:1px solid var(--border);}
+.compare-render-head{padding:10px 18px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:10px;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;display:flex;align-items:center;justify-content:space-between;}
+.compare-render-img-wrap{padding:14px;text-align:center;background:#0a0a0a;min-height:300px;display:flex;align-items:center;justify-content:center;}
+.compare-render-img-wrap img{max-width:100%;display:block;}
+.compare-render-loading{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;}
+.page-nav{padding:10px 24px;background:var(--bg3);border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;justify-content:center;flex-wrap:wrap;}
+.page-nav-btn{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;padding:8px 14px;cursor:pointer;transition:all 0.15s;}
+.page-nav-btn:hover:not(:disabled){border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+.page-nav-btn:disabled{opacity:0.4;cursor:not-allowed;}
+.page-nav-info{font-family:var(--mono);font-size:11px;color:#c8a96e!important;letter-spacing:0.06em;}
+
+/* Revision card */
+.revision-card{padding:14px 24px;border-bottom:1px solid var(--border);}
+.revision-card:last-child{border-bottom:none;}
+.revision-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.revision-num{font-family:var(--serif);font-size:18px;color:#e8d5a3!important;}
+.revision-meta{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.40)!important;}
+.revision-text{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.75)!important;background:#0a0a0a;padding:12px 16px;border:1px solid var(--border);max-height:240px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;line-height:1.6;}
+.revision-text::-webkit-scrollbar{width:8px;}
+.revision-text::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.20);border-radius:4px;}
+
+/* Empty state */
+.empty{padding:18px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+.action-row{padding:18px 24px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:540px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:900px){
+  .compare-render{grid-template-columns:1fr;}
+}
+@media(max-width:768px){
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;}
+  .mode-pill{flex:1 0 50%;justify-content:center;font-size:10px;padding:10px 12px;}
+  .kv-row{flex-direction:column;gap:4px;}
+  .kv-key{width:auto;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Document Forensics</span></div>
+    <h1>PDF <em>Hidden Content</em><br>Revealer</h1>
+    <p class="hero-sub">Reveal text behind black redaction boxes, find hidden layers, extract embedded JavaScript, walk revision history, and render visible-vs-actual side-by-side. The forensic lens journalists, lawyers, and investigators need for any leaked PDF.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Free <strong>PDF forensics tool</strong> that reveals content invisible when the PDF is opened normally — but still embedded in the file. The Reveal All mode runs eight independent extraction layers on a single uploaded PDF: <strong>failed redaction detection</strong> uses geometric coordinate matching to find text positioned underneath filled black or white rectangles (the classic "Acrobat black box over text" failure that has exposed names in court filings, NSA documents, and corporate depositions); <strong>Optional Content Group (OCG) layer extraction</strong> lists every PDF layer including ones configured as default-off, which CAD drawings and technical documents commonly hide from casual viewers; <strong>off-page text detection</strong> finds text positioned outside the visible page boundary (clipped from view but extractable); <strong>JavaScript extraction</strong> dumps every embedded JS block; <strong>annotation extraction</strong> pulls all comments, sticky notes, highlights with author + timestamp; <strong>form field analysis</strong> shows both default and current values for every field; <strong>incremental revision walking</strong> reconstructs each previous version of the PDF (PDFs use append-only updates, so "deleted" content often remains in earlier sections); <strong>visible-vs-actual page rendering</strong> shows the PDF as a casual viewer sees it side by side with how it renders when all hidden content is surfaced. Each PDF gets a 0-100 hidden content severity score. Used by <strong>journalists analyzing leaked documents</strong>, <strong>lawyers reviewing produced files</strong>, <strong>activists verifying redactions</strong>, <strong>FOIA requesters checking what was withheld</strong>, and <strong>OSINT investigators</strong> who know that the most interesting parts of a document are often the parts someone tried to hide.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">PDF Forensics</span><span class="seo-tag">Failed Redaction Detection</span>
+        <span class="seo-tag">Hidden Layers</span><span class="seo-tag">OCG</span>
+        <span class="seo-tag">PDF Revisions</span><span class="seo-tag">JavaScript Extraction</span>
+        <span class="seo-tag">Off-Page Text</span><span class="seo-tag">Annotation Extraction</span>
+        <span class="seo-tag">FOIA Analysis</span><span class="seo-tag">Document Investigation</span>
+        <span class="seo-tag">OSINT</span><span class="seo-tag">Journalism Tool</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="tool-panel">
+    <div class="section-label">PDF Hidden Content Revealer</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="reveal" onclick="selectMode('reveal')" role="tab">
+        <span class="mode-pill-icon">⊕</span> Reveal All
+      </button>
+      <button class="mode-pill" data-mode="compare" onclick="selectMode('compare')" role="tab">
+        <span class="mode-pill-icon">⇆</span> Visible vs Total
+      </button>
+      <button class="mode-pill" data-mode="revisions" onclick="selectMode('revisions')" role="tab">
+        <span class="mode-pill-icon">↻</span> Revision Walker
+      </button>
+      <button class="mode-pill" data-mode="render" onclick="selectMode('render')" role="tab">
+        <span class="mode-pill-icon">▦</span> Page Render
+      </button>
+    </div>
+
+    <!-- REVEAL ALL MODE -->
+    <div class="mode-content active" id="modeReveal">
+      <label class="drop-zone" id="revealDrop">
+        <input type="file" id="revealInput" accept="application/pdf,.pdf" onchange="handleReveal(event)">
+        <div class="drop-glyph">⊕</div>
+        <div class="drop-title">Drop a PDF for full hidden content analysis</div>
+        <div class="drop-sub">Max 50MB · Detects failed redactions, hidden layers, JavaScript, off-page text, annotations, embedded files</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> PDFs are processed in memory and discarded after analysis. Never logged or retained.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> Large or complex PDFs may take 15–60 seconds (failed redaction detection scans every text/rectangle pair on every page).
+      </div>
+    </div>
+
+    <!-- VISIBLE VS TOTAL MODE -->
+    <div class="mode-content" id="modeCompare">
+      <label class="drop-zone" id="compareDrop">
+        <input type="file" id="compareInput" accept="application/pdf,.pdf" onchange="handleCompare(event)">
+        <div class="drop-glyph">⇆</div>
+        <div class="drop-title">Drop a PDF to compare visible vs. extractable text</div>
+        <div class="drop-sub">Max 50MB · Side-by-side text from "what a casual viewer sees" vs "what the PDF actually contains"</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> PDFs are processed in memory and discarded after analysis.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> Typically 10–30 seconds for both extraction passes.
+      </div>
+    </div>
+
+    <!-- REVISION WALKER MODE -->
+    <div class="mode-content" id="modeRevisions">
+      <label class="drop-zone" id="revisionsDrop">
+        <input type="file" id="revisionsInput" accept="application/pdf,.pdf" onchange="handleRevisions(event)">
+        <div class="drop-glyph">↻</div>
+        <div class="drop-title">Drop a PDF to walk revision history</div>
+        <div class="drop-sub">Max 50MB · Reconstructs each previous version · Reveals "deleted" content from incremental updates</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> PDFs are processed in memory and discarded.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 10–45 seconds depending on revision count. PDFs with no incremental updates return immediately.
+      </div>
+    </div>
+
+    <!-- PAGE RENDER MODE -->
+    <div class="mode-content" id="modeRender">
+      <label class="drop-zone" id="renderDrop">
+        <input type="file" id="renderInput" accept="application/pdf,.pdf" onchange="handleRenderUpload(event)">
+        <div class="drop-glyph">▦</div>
+        <div class="drop-title">Drop a PDF to render pages visually</div>
+        <div class="drop-sub">Max 50MB · Page-by-page navigation · Renders at 120 DPI</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> PDFs are rendered in memory and discarded.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> Each page renders in ~2–5 seconds. Longer PDFs are paginated for navigation.
+      </div>
+    </div>
+
+    <!-- DYNAMIC PROCESSING UI -->
+    <div class="processing-overlay" id="processingOverlay">
+      <div class="processing-head">
+        <div class="processing-spinner"></div>
+        <div class="processing-title" id="processingTitle">Analyzing PDF…</div>
+        <div class="processing-time" id="processingTime">0s</div>
+      </div>
+      <div class="processing-eta" id="processingETA">Expected completion: 15–60 seconds depending on file complexity.</div>
+      <div class="processing-step-list" id="processingSteps"></div>
+      <div class="processing-bar"><div class="processing-bar-inner"></div></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+    <div class="verdict-banner unknown" id="verdictBanner">
+      <div class="verdict-icon" id="verdictIcon">⊙</div>
+      <div class="verdict-text">
+        <div class="verdict-title">
+          <span id="verdictLabel">—</span>
+          <span class="verdict-score" id="verdictScore">—</span>
+          <span class="verdict-out-of">/100</span>
+        </div>
+        <div class="verdict-sub" id="verdictSub">—</div>
+      </div>
+    </div>
+    <div id="cardsContainer"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">PDF analysis via Poppler (pdftotext, pdftoppm, pdfinfo) and pdfminer.six. Failed redaction detection uses geometric coordinate matching. Files are processed in memory only — never logged or retained.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let lastResult = null;
+let renderFile = null;
+let renderCurrentPage = 1;
+let renderTotalPages = 0;
+let processingTimer = null;
+let processingStartTime = 0;
+
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  document.getElementById('resultsWrap').classList.remove('visible');
+  hideProcessing();
+}
+
+function wireDropZone(zoneId, callback) {
+  const z = document.getElementById(zoneId);
+  ['dragenter','dragover'].forEach(ev => z.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); z.classList.add('dragging');
+  }));
+  ['dragleave','drop'].forEach(ev => z.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); z.classList.remove('dragging');
+  }));
+  z.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) callback(e.dataTransfer.files[0]);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  wireDropZone('revealDrop',    file => processReveal(file));
+  wireDropZone('compareDrop',   file => processCompare(file));
+  wireDropZone('revisionsDrop', file => processRevisions(file));
+  wireDropZone('renderDrop',    file => initRender(file));
+});
+
+/* ── Dynamic processing UI ── */
+function showProcessing(title, eta, steps) {
+  const overlay = document.getElementById('processingOverlay');
+  document.getElementById('processingTitle').textContent = title;
+  document.getElementById('processingETA').textContent = eta;
+  const stepsEl = document.getElementById('processingSteps');
+  stepsEl.innerHTML = steps.map((s,i)=>`<div class="processing-step ${i===0?'active':''}" data-step="${i}"><span class="step-icon">${i===0?'◌':'·'}</span>${esc(s)}</div>`).join('');
+  overlay.classList.add('visible');
+  processingStartTime = Date.now();
+  processingTimer = setInterval(() => {
+    const sec = Math.floor((Date.now() - processingStartTime) / 1000);
+    document.getElementById('processingTime').textContent = sec + 's';
+    // Auto-advance steps based on elapsed time (rough simulation since we can't poll)
+    const stepEls = stepsEl.querySelectorAll('.processing-step');
+    const totalSteps = stepEls.length;
+    const targetStep = Math.min(totalSteps - 1, Math.floor(sec / 4));
+    stepEls.forEach((el, i) => {
+      el.classList.remove('active', 'done');
+      const icon = el.querySelector('.step-icon');
+      if (i < targetStep) {
+        el.classList.add('done');
+        icon.textContent = '✓';
+      } else if (i === targetStep) {
+        el.classList.add('active');
+        icon.textContent = '◌';
+      } else {
+        icon.textContent = '·';
+      }
+    });
+  }, 250);
+}
+
+function hideProcessing() {
+  if (processingTimer) { clearInterval(processingTimer); processingTimer = null; }
+  document.getElementById('processingOverlay').classList.remove('visible');
+}
+
+function markAllStepsDone() {
+  document.querySelectorAll('.processing-step').forEach(el => {
+    el.classList.remove('active');
+    el.classList.add('done');
+    el.querySelector('.step-icon').textContent = '✓';
+  });
+}
+
+/* ── REVEAL ALL ── */
+function handleReveal(e) { if (e.target.files[0]) processReveal(e.target.files[0]); }
+
+async function processReveal(file) {
+  if (file.size > 50*1024*1024) { alert('File exceeds 50MB.'); return; }
+  if (!file.name.toLowerCase().endsWith('.pdf')) { alert('Please upload a PDF file.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Analyzing ${file.name}…`,
+    'Expected completion: 15–60 seconds. Failed redaction detection scans every text/rectangle pair on every page.',
+    [
+      'Reading file structure and metadata',
+      'Extracting text via pdftotext (visible + layout pass)',
+      'Scanning for hidden layers (OCGs)',
+      'Detecting failed redactions — coordinate matching',
+      'Extracting embedded JavaScript',
+      'Finding off-page text positions',
+      'Reading annotations and form fields',
+      'Computing hidden-content severity score',
+    ]
+  );
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${PROXY}/pdf-reveal-all`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'reveal', filename:file.name, ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderRevealResult(lastResult); }, 400);
+  } catch(e) {
+    hideProcessing();
+    showError('Could not analyze PDF: ' + e.message);
+  }
+}
+
+/* ── VISIBLE vs TOTAL (uses same backend, different rendering focus) ── */
+function handleCompare(e) { if (e.target.files[0]) processCompare(e.target.files[0]); }
+
+async function processCompare(file) {
+  if (file.size > 50*1024*1024) { alert('File exceeds 50MB.'); return; }
+  if (!file.name.toLowerCase().endsWith('.pdf')) { alert('Please upload a PDF file.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Extracting ${file.name}…`,
+    'Expected completion: 10–30 seconds.',
+    [
+      'Reading file',
+      'Running visible-text extraction pass',
+      'Running full-extraction pass (layout-preserving)',
+      'Computing diff statistics',
+    ]
+  );
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${PROXY}/pdf-reveal-all`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'compare', filename:file.name, ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderCompareResult(lastResult); }, 400);
+  } catch(e) {
+    hideProcessing();
+    showError('Could not analyze PDF: ' + e.message);
+  }
+}
+
+/* ── REVISION WALKER ── */
+function handleRevisions(e) { if (e.target.files[0]) processRevisions(e.target.files[0]); }
+
+async function processRevisions(file) {
+  if (file.size > 50*1024*1024) { alert('File exceeds 50MB.'); return; }
+  if (!file.name.toLowerCase().endsWith('.pdf')) { alert('Please upload a PDF file.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Walking revisions in ${file.name}…`,
+    'Expected completion: 10–45 seconds depending on revision count.',
+    [
+      'Reading file',
+      'Locating %%EOF markers (each = one revision)',
+      'Slicing each revision as standalone PDF',
+      'Extracting text from each revision',
+    ]
+  );
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${PROXY}/pdf-revisions`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'revisions', filename:file.name, ...data };
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderRevisionsResult(lastResult); }, 400);
+  } catch(e) {
+    hideProcessing();
+    showError('Could not analyze PDF: ' + e.message);
+  }
+}
+
+/* ── PAGE RENDER ── */
+function handleRenderUpload(e) { if (e.target.files[0]) initRender(e.target.files[0]); }
+
+async function initRender(file) {
+  if (file.size > 50*1024*1024) { alert('File exceeds 50MB.'); return; }
+  if (!file.name.toLowerCase().endsWith('.pdf')) { alert('Please upload a PDF file.'); return; }
+  renderFile = file;
+  renderCurrentPage = 1;
+  // First do a reveal-all to know page count
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Loading ${file.name}…`,
+    'Expected completion: 5–15 seconds for initial scan.',
+    [ 'Reading PDF structure', 'Counting pages and analyzing content', 'Rendering page 1' ]
+  );
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${PROXY}/pdf-reveal-all`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { hideProcessing(); showError(data.error); return; }
+    renderTotalPages = data.page_count || 1;
+    lastResult = { kind:'render', filename:file.name, ...data };
+    await renderPage(1);
+    markAllStepsDone();
+    setTimeout(() => { hideProcessing(); renderRenderResult(lastResult); }, 400);
+  } catch(e) {
+    hideProcessing();
+    showError('Could not load PDF: ' + e.message);
+  }
+}
+
+async function renderPage(pageNum) {
+  if (!renderFile) return;
+  const fd = new FormData();
+  fd.append('file', renderFile);
+  fd.append('page', String(pageNum));
+  fd.append('dpi', '120');
+  try {
+    const r = await fetch(`${PROXY}/pdf-render-page`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+    return data.png_b64;
+  } catch(e) {
+    return null;
+  }
+}
+
+async function navigateRender(direction) {
+  const newPage = renderCurrentPage + direction;
+  if (newPage < 1 || newPage > renderTotalPages) return;
+  renderCurrentPage = newPage;
+  document.getElementById('renderPageNum').textContent = renderCurrentPage;
+  document.getElementById('renderImgWrap').innerHTML = '<div class="compare-render-loading">Rendering page ' + renderCurrentPage + '…</div>';
+  document.getElementById('renderPrev').disabled = renderCurrentPage <= 1;
+  document.getElementById('renderNext').disabled = renderCurrentPage >= renderTotalPages;
+  const png = await renderPage(renderCurrentPage);
+  if (png) {
+    document.getElementById('renderImgWrap').innerHTML = `<img src="data:image/png;base64,${png}" alt="Page ${renderCurrentPage}">`;
+  } else {
+    document.getElementById('renderImgWrap').innerHTML = '<div class="compare-render-loading" style="color:#c0392b">Render failed</div>';
+  }
+}
+
+/* ── RENDERERS ── */
+function showError(msg) {
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('verdictBanner').className = 'verdict-banner severe';
+  document.getElementById('verdictIcon').textContent = '⚠';
+  document.getElementById('verdictLabel').textContent = 'Operation failed';
+  document.getElementById('verdictScore').textContent = '—';
+  document.getElementById('verdictSub').textContent = msg;
+  document.getElementById('cardsContainer').innerHTML = '';
+}
+
+function renderVerdictBanner(verdict, contextLabel) {
+  const b = document.getElementById('verdictBanner');
+  const lbl = (verdict?.label || 'Unknown').toLowerCase();
+  b.className = 'verdict-banner ' + (lbl === 'severe' ? 'severe' : lbl === 'moderate' ? 'moderate' : lbl === 'minor' ? 'minor' : lbl === 'clean' ? 'clean' : 'unknown');
+  const icons = { clean:'✓', minor:'·', moderate:'⚠', severe:'⊗', unknown:'⊙' };
+  document.getElementById('verdictIcon').textContent = icons[lbl] || '⊙';
+  document.getElementById('verdictLabel').textContent = contextLabel || (verdict?.label || 'Unknown');
+  const scoreEl = document.getElementById('verdictScore');
+  scoreEl.textContent = verdict?.score ?? '—';
+  scoreEl.className = 'verdict-score ' + (verdict?.score >= 60 ? 'red' : verdict?.score >= 30 ? 'warn' : 'green');
+  document.getElementById('verdictSub').textContent = verdict?.summary || '';
+}
+
+function renderCard(id, title, count, expanded, bodyHtml) {
+  return `<div class="card${expanded?' expanded':''}" id="${id}">
+    <div class="card-head" onclick="document.getElementById('${id}').classList.toggle('expanded')">
+      <div class="card-title">${title}${count!==''?` <span class="card-count">${count}</span>`:''}</div>
+      <div class="card-toggle">+</div>
+    </div>
+    <div class="card-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function renderRevealResult(r) {
+  renderVerdictBanner(r.verdict, `${r.verdict?.label || 'Unknown'} — ${r.filename}`);
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  // Why this score
+  if (r.verdict?.flags?.length) {
+    html += renderCard('cardFlags', '⚑ Findings', r.verdict.flags.length, true,
+      `<div class="flag-list">${r.verdict.flags.map(f =>
+        `<div class="flag-row ${esc(f.severity||'low')}"><span class="sym">${esc(f.sym||'·')}</span><span>${esc(f.text)}</span></div>`).join('')}</div>`);
+  }
+
+  // FAILED REDACTIONS — the headline finding, always expanded if present
+  const fr = r.failed_redactions || {};
+  if (fr.count > 0) {
+    html += renderCard('cardRedactions', '⊗ Failed Redactions — recoverable text under boxes', fr.count, true,
+      fr.findings.slice(0, 50).map(f => `
+        <div class="redaction-card">
+          <div class="redaction-head">
+            <span class="redaction-page">Page ${f.page}</span>
+            <span class="redaction-pct">${Math.round(f.overlap_pct*100)}% overlap${f.redaction_white?' · white-on-white':''}</span>
+          </div>
+          <div class="redaction-text">${esc(f.hidden_text)}</div>
+          <div class="redaction-coords">Rect: ${f.rect.join(', ')} · Text box: ${f.text_box.join(', ')}</div>
+        </div>`).join(''));
+  } else {
+    html += renderCard('cardRedactions', '⊗ Failed Redactions', 'none', false,
+      '<div class="empty">No text detected under apparent redaction boxes.</div>');
+  }
+
+  // Hidden Layers
+  const layers = r.layers?.layers || [];
+  if (layers.length) {
+    html += renderCard('cardLayers', '◇ Optional Content Layers (OCGs)', layers.length, true,
+      layers.map(l => `<div class="layer-card">
+        <span class="layer-name">${esc(l.name)}</span>
+        <span class="layer-state ${l.default_state.includes('off')?'off':'on'}">${esc(l.default_state)}</span>
+      </div>`).join(''));
+  }
+
+  // Off-page text
+  const op = r.off_page_text || {};
+  if (op.count > 0) {
+    html += renderCard('cardOffPage', '⤢ Off-Page Text', op.count, true,
+      op.findings.slice(0,30).map(f => `<div class="redaction-card" style="border-left-color:#e87b4a;background:rgba(232,123,74,0.04);">
+        <div class="redaction-head">
+          <span class="redaction-page">Page ${f.page}</span>
+          <span class="redaction-pct">Outside page bounds</span>
+        </div>
+        <div class="redaction-text">${esc(f.text)}</div>
+        <div class="redaction-coords">Position: ${f.position.join(', ')} · Page size: ${f.page_size.join('×')}</div>
+      </div>`).join(''));
+  }
+
+  // JavaScript
+  if (r.javascript?.length) {
+    html += renderCard('cardJS', '⚠ Embedded JavaScript', r.javascript.length, true,
+      r.javascript.map((js,i) => `<div style="padding:14px 24px;border-bottom:1px solid var(--border);">
+        <div style="font-family:var(--mono);font-size:10px;color:#e87b4a;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.12em;">JS Block ${i+1}</div>
+        <pre class="code-block">${esc(js)}</pre>
+      </div>`).join(''));
+  }
+
+  // Annotations
+  if (r.annotations?.length) {
+    html += renderCard('cardAnnots', '✎ Annotations', r.annotations.length, false,
+      r.annotations.map(a => `<div class="annot-card">
+        <div class="annot-head">
+          <span>Page ${a.page}</span>
+          <span style="color:#e8d5a3">${esc(a.type)}</span>
+          ${a.author ? `<span>· by ${esc(a.author)}</span>` : ''}
+          ${a.date ? `<span>· ${esc(a.date)}</span>` : ''}
+        </div>
+        ${a.contents ? `<div class="annot-content">${esc(a.contents)}</div>` : ''}
+      </div>`).join(''));
+  }
+
+  // Form fields
+  if (r.form_fields?.length) {
+    html += renderCard('cardForms', '▣ Form Fields', r.form_fields.length, false,
+      `<div class="kv-list">${r.form_fields.map(f =>
+        `<div class="kv-row">
+          <div class="kv-key">${esc(f.name)}${f.type?` <span style="color:rgba(200,169,110,0.50);font-weight:400;text-transform:none;letter-spacing:0;">[${esc(f.type)}]</span>`:''}</div>
+          <div class="kv-val">${f.value ? `<strong style="color:#e8d5a3">${esc(f.value)}</strong>` : '<span style="color:rgba(240,236,228,0.30)">(empty)</span>'}${f.default && f.default !== f.value ? `<br><span style="font-size:10px;color:rgba(240,236,228,0.40)">default: ${esc(f.default)}</span>` : ''}</div>
+        </div>`).join('')}</div>`);
+  }
+
+  // Embedded files
+  if (r.embedded_files_count > 0) {
+    html += renderCard('cardEmbedded', '📎 Embedded Files', r.embedded_files_count, true,
+      `<div class="kv-list">${r.embedded_filenames.map(f => `<div class="kv-row"><div class="kv-key">File</div><div class="kv-val warn">${esc(f)}</div></div>`).join('')}</div>`);
+  }
+
+  // PDF info / metadata
+  const info = r.pdfinfo || {};
+  if (Object.keys(info).length) {
+    html += renderCard('cardInfo', '◈ PDF Info', '', false,
+      `<div class="kv-list">${Object.entries(info).filter(([k])=>!k.startsWith('_')).map(([k,v]) =>
+        `<div class="kv-row"><div class="kv-key">${esc(k)}</div><div class="kv-val">${esc(v)}</div></div>`).join('')}</div>`);
+  }
+
+  // Full extracted text
+  if (r.extracted_text) {
+    html += renderCard('cardFullText', '☷ Full Extracted Text', r.extracted_text.length + ' chars', false,
+      `<pre class="code-block">${esc(r.extracted_text)}${r.extracted_text.length >= 50000 ? '\n\n…(truncated)' : ''}</pre>`);
+  }
+
+  // Cross-tool actions
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">↗ Continue Investigation</div></div>
+    <div class="card-body always-on">
+      <div class="action-row">
+        <a class="btn-primary" href="https://inteldesk.io/#metadata-tool" target="_blank" rel="noopener">↗ Full Metadata Analysis</a>
+        <a class="btn-primary" href="https://inteldesk.io/#hash-lookup" target="_blank" rel="noopener">↗ Hash Lookup / Malware Check</a>
+        <button class="btn-secondary" onclick="exportJSON()">⇣ Export Full Report (JSON)</button>
+        <button class="btn-secondary" onclick="exportHiddenText()">⇣ Hidden Text Only</button>
+      </div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderCompareResult(r) {
+  renderVerdictBanner(r.verdict, `Visible vs Total — ${r.filename}`);
+  const c = document.getElementById('cardsContainer');
+  const stats = r.text_stats || {};
+  let html = '';
+
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">⇆ Extraction Statistics</div></div>
+    <div class="card-body always-on">
+      <div class="kv-list">
+        <div class="kv-row"><div class="kv-key">Visible Text Length</div><div class="kv-val">${stats.visible_chars || 0} chars</div></div>
+        <div class="kv-row"><div class="kv-key">Layout Extraction</div><div class="kv-val">${stats.layout_chars || 0} chars</div></div>
+        <div class="kv-row"><div class="kv-key">Difference</div><div class="kv-val ${stats.delta > 100 ? 'warn' : 'green'}">${stats.delta || 0} chars</div></div>
+        <div class="kv-row"><div class="kv-key">Hidden Redactions</div><div class="kv-val ${(r.failed_redactions?.count||0)>0?'red':'green'}">${r.failed_redactions?.count || 0}</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  // Side-by-side text panels
+  html += `<div class="compare-render">
+    <div class="compare-render-side">
+      <div class="compare-render-head"><span>What a viewer sees</span><span style="color:rgba(240,236,228,0.40)">${stats.visible_chars} chars</span></div>
+      <pre class="code-block">${esc(r.raw_text || '(no text)')}${(r.raw_text||'').length >= 50000 ? '\n\n…(truncated)' : ''}</pre>
+    </div>
+    <div class="compare-render-side">
+      <div class="compare-render-head"><span>What the file contains</span><span style="color:rgba(232,123,74,0.65)">${stats.layout_chars} chars</span></div>
+      <pre class="code-block">${esc(r.extracted_text || '(no text)')}${(r.extracted_text||'').length >= 50000 ? '\n\n…(truncated)' : ''}</pre>
+    </div>
+  </div>`;
+
+  // Surface redactions if any
+  const fr = r.failed_redactions || {};
+  if (fr.count > 0) {
+    html += renderCard('cardRedactionsCmp', '⊗ Specifically Hidden Text', fr.count, true,
+      fr.findings.slice(0, 30).map(f => `<div class="redaction-card">
+        <div class="redaction-head">
+          <span class="redaction-page">Page ${f.page}</span>
+          <span class="redaction-pct">${Math.round(f.overlap_pct*100)}% overlap</span>
+        </div>
+        <div class="redaction-text">${esc(f.hidden_text)}</div>
+      </div>`).join(''));
+  }
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderRevisionsResult(r) {
+  const verdict = r.revision_count > 1
+    ? {score: Math.min(100, r.revision_count * 15), label: 'Moderate', summary: `${r.revision_count} incremental revisions detected. Older content may be recoverable.`}
+    : {score: 0, label: 'Clean', summary: `Single revision PDF. No incremental update history.`};
+  renderVerdictBanner(verdict, `Revision Walker — ${r.filename}`);
+
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  if (r.revision_count <= 1) {
+    html += `<div class="card expanded">
+      <div class="card-head" style="cursor:default;"><div class="card-title">↻ Revision History</div></div>
+      <div class="card-body always-on">
+        <div class="empty">This PDF has only one revision (no incremental updates). The content you see is the only version that exists in the file.</div>
+      </div>
+    </div>`;
+  } else {
+    html += renderCard('cardRevList', `↻ ${r.revision_count} Revisions Found`, '', true,
+      (r.revisions || []).map(rev => `<div class="revision-card">
+        <div class="revision-head">
+          <span class="revision-num">Revision ${rev.revision}</span>
+          <span class="revision-meta">${rev.size_bytes ? (rev.size_bytes/1024).toFixed(1) + ' KB' : '—'} · ${rev.page_count || '?'} page(s) · ${rev.text_chars || 0} chars</span>
+        </div>
+        ${rev.error ? `<div class="empty" style="color:#c0392b">${esc(rev.error)}</div>` :
+          rev.text ? `<div class="revision-text">${esc(rev.text)}${rev.text.length >= 30000 ? '\n\n…(truncated)' : ''}</div>` :
+          '<div class="empty">No extractable text from this revision.</div>'}
+      </div>`).join(''));
+  }
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+async function renderRenderResult(r) {
+  renderVerdictBanner(r.verdict || {score:0,label:'Loaded'}, `Page Render — ${r.filename}`);
+  const c = document.getElementById('cardsContainer');
+  // Get first page render that was already loaded during init
+  const firstPagePng = await renderPage(1);
+
+  let html = `<div class="card expanded">
+    <div class="card-head" style="cursor:default;">
+      <div class="card-title">▦ Page Render · ${r.page_count || 1} pages</div>
+      <span class="card-count">DPI 120</span>
+    </div>
+    <div class="card-body always-on">
+      <div class="compare-render-side" style="border:none;">
+        <div class="compare-render-head">
+          <span>Page <span id="renderPageNum">1</span> of ${r.page_count || 1}</span>
+          <span style="color:rgba(200,169,110,0.65)">${esc(r.filename)}</span>
+        </div>
+        <div class="compare-render-img-wrap" id="renderImgWrap">
+          ${firstPagePng ? `<img src="data:image/png;base64,${firstPagePng}" alt="Page 1">` :
+            '<div class="compare-render-loading" style="color:#c0392b">Could not render this page</div>'}
+        </div>
+      </div>
+      <div class="page-nav">
+        <button class="page-nav-btn" id="renderPrev" onclick="navigateRender(-1)" ${renderCurrentPage<=1?'disabled':''}>← Previous</button>
+        <span class="page-nav-info">Page <span>${renderCurrentPage}</span> / ${r.page_count || 1}</span>
+        <button class="page-nav-btn" id="renderNext" onclick="navigateRender(1)" ${renderCurrentPage>=renderTotalPages?'disabled':''}>Next →</button>
+      </div>
+    </div>
+  </div>`;
+
+  // Also show key findings briefly
+  if (r.failed_redactions?.count > 0) {
+    html += `<div class="card expanded">
+      <div class="card-head" style="cursor:default;"><div class="card-title">⊗ Hidden Content On This PDF</div></div>
+      <div class="card-body always-on">
+        <div style="padding:14px 24px;font-family:var(--mono);font-size:11.5px;color:#e87b4a;line-height:1.7;">
+          ⚠ This PDF has ${r.failed_redactions.count} failed redaction(s). Use <strong style="color:#e8d5a3">Reveal All</strong> mode to see the recoverable text.
+        </div>
+      </div>
+    </div>`;
+  }
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exportJSON() {
+  if (!lastResult) return;
+  const blob = new Blob([JSON.stringify(lastResult, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pdf-revealer-${lastResult.kind}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function exportHiddenText() {
+  if (!lastResult) return;
+  const lines = ['# PDF Revealer — Hidden Content Report', `# File: ${lastResult.filename}`, `# Generated: ${new Date().toISOString()}`, ''];
+  const fr = lastResult.failed_redactions || {};
+  if (fr.findings?.length) {
+    lines.push('## FAILED REDACTIONS (text under apparent redaction boxes)', '');
+    fr.findings.forEach(f => {
+      lines.push(`Page ${f.page} (${Math.round(f.overlap_pct*100)}% overlap):`);
+      lines.push(f.hidden_text);
+      lines.push('');
+    });
+  }
+  const op = lastResult.off_page_text || {};
+  if (op.findings?.length) {
+    lines.push('## OFF-PAGE TEXT', '');
+    op.findings.forEach(f => {
+      lines.push(`Page ${f.page}: ${f.text}`);
+    });
+    lines.push('');
+  }
+  if (lastResult.javascript?.length) {
+    lines.push('## EMBEDDED JAVASCRIPT', '');
+    lastResult.javascript.forEach((js,i) => {
+      lines.push(`--- JS Block ${i+1} ---`);
+      lines.push(js);
+      lines.push('');
+    });
+  }
+  const blob = new Blob([lines.join('\n')], {type:'text/plain'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pdf-revealer-hidden-text-${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+}
+</script>
+</body>
+</html>

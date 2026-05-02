@@ -1,0 +1,751 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Burner Link Previewer — See What's On a Page Without Visiting | The Intel Desk</title>
+<meta name="description" content="Free burner link previewer. Paste any URL — or a suspicious email/SMS — and see a full-page screenshot, page content, embedded forms, and outbound links without ever visiting the link yourself. Used by journalists, investigators, and security researchers.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;--gray:#666;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:640px;line-height:1.7;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* SECTION LABEL */
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+/* INPUT SECTION */
+.input-section{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.6s 0.05s ease both;}
+
+/* Mode pills */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:20px;background:var(--bg2);}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 22px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* URL input */
+.search-row{display:flex;gap:0;flex-wrap:wrap;}
+.url-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.url-input:focus{border-color:rgba(200,169,110,0.35);}
+.url-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-inspect{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-inspect:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-inspect:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+/* Email/SMS textarea */
+.msg-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:16px 20px;outline:none;min-height:140px;resize:vertical;transition:border-color 0.2s;line-height:1.6;}
+.msg-textarea:focus{border-color:rgba(200,169,110,0.35);}
+.msg-textarea::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 22px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.3);color:#e8d5a3!important;}
+.btn-secondary:disabled{opacity:0.5;cursor:not-allowed;}
+
+/* Extracted URLs from email */
+.extracted-urls{display:none;margin-top:2px;background:var(--bg2);border:1px solid var(--border);padding:18px 22px;}
+.extracted-urls.visible{display:block;}
+.extracted-urls-header{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.50)!important;margin-bottom:12px;}
+.extracted-list{display:flex;flex-direction:column;gap:6px;}
+.extracted-item{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--bg3);border:1px solid var(--border);font-family:var(--mono);font-size:11px;cursor:pointer;transition:all 0.15s;}
+.extracted-item:hover{border-color:rgba(200,169,110,0.30);background:rgba(200,169,110,0.04);}
+.extracted-item-num{color:rgba(240,236,228,0.35)!important;flex-shrink:0;}
+.extracted-item-url{color:#e8d5a3!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.extracted-item-arrow{color:rgba(200,169,110,0.40)!important;flex-shrink:0;font-size:14px;}
+.extracted-empty{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;padding:18px 0;text-align:center;}
+
+/* Loading bar */
+.loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
+.loading-bar.visible{display:block;}
+.loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+/* URL header banner */
+.url-banner{background:var(--bg2);border:1px solid var(--border);padding:18px 24px;display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.url-banner-favicon{width:32px;height:32px;flex-shrink:0;background:var(--bg3);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-family:var(--serif);color:rgba(200,169,110,0.6)!important;font-size:18px;border-radius:2px;overflow:hidden;}
+.url-banner-favicon img{width:100%;height:100%;object-fit:contain;}
+.url-banner-meta{flex:1;min-width:200px;}
+.url-banner-title{font-family:var(--serif);font-size:18px;font-weight:300;color:#f5f2ec!important;line-height:1.3;margin-bottom:4px;}
+.url-banner-domain{font-family:var(--mono);font-size:11px;color:#c8a96e!important;}
+.url-banner-actions{display:flex;gap:2px;}
+
+/* SCREENSHOT — the big one */
+.preview-screenshot{background:var(--bg2);border:1px solid var(--border);}
+.preview-screenshot-head{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:1px solid var(--border);}
+.preview-screenshot-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:10px;}
+.preview-screenshot-hint{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.35)!important;}
+.preview-screenshot-frame{position:relative;background:#0a0a0a;}
+.preview-screenshot-scroll{max-height:720px;overflow-y:auto;padding:0;}
+.preview-screenshot-scroll::-webkit-scrollbar{width:8px;}
+.preview-screenshot-scroll::-webkit-scrollbar-track{background:rgba(0,0,0,0.4);}
+.preview-screenshot-scroll::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.25);border-radius:4px;}
+.preview-screenshot-scroll::-webkit-scrollbar-thumb:hover{background:rgba(200,169,110,0.50);}
+.preview-screenshot-scroll img{display:block;width:100%;}
+.preview-screenshot-loading{padding:80px 24px;text-align:center;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;}
+.preview-screenshot-fade{position:absolute;left:0;right:0;bottom:0;height:60px;background:linear-gradient(transparent,rgba(0,0,0,0.7));pointer-events:none;}
+
+/* CARDS — extraction sections */
+.preview-card{background:var(--bg2);border:1px solid var(--border);}
+.preview-card-head{display:flex;align-items:center;justify-content:space-between;padding:12px 22px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.preview-card-head:hover{background:rgba(255,255,255,0.02);}
+.preview-card-title{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:10px;}
+.preview-card-count{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.60)!important;}
+.preview-card-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.preview-card.expanded .preview-card-toggle{transform:rotate(45deg);}
+.preview-card-body{padding:0;display:none;}
+.preview-card.expanded .preview-card-body{display:block;animation:fadeUp 0.2s ease;}
+.preview-card-empty{padding:18px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+/* Page basics list */
+.kv-list{padding:0;}
+.kv-row{display:flex;gap:14px;padding:11px 22px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.40)!important;width:140px;flex-shrink:0;padding-top:1px;}
+.kv-val{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.80)!important;flex:1;line-height:1.6;word-break:break-word;}
+.kv-val.accent{color:#e8d5a3!important;}
+.kv-val img{max-width:280px;max-height:160px;border:1px solid var(--border);}
+
+/* Body excerpt */
+.body-excerpt{padding:18px 24px;font-family:var(--mono);font-size:12px;line-height:1.85;color:rgba(240,236,228,0.78)!important;max-height:280px;overflow-y:auto;}
+.body-excerpt::-webkit-scrollbar{width:8px;}
+.body-excerpt::-webkit-scrollbar-track{background:rgba(0,0,0,0.4);}
+.body-excerpt::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.25);border-radius:4px;}
+
+/* Headings list */
+.headings-list{padding:14px 22px 18px;display:flex;flex-direction:column;gap:6px;}
+.heading-item{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.75)!important;line-height:1.5;}
+.heading-item.h1{font-size:14px;color:#e8d5a3!important;font-weight:500;}
+.heading-item.h2{padding-left:18px;color:rgba(240,236,228,0.85)!important;}
+.heading-item.h3{padding-left:36px;color:rgba(240,236,228,0.65)!important;}
+.heading-marker{font-family:var(--mono);font-size:9px;color:rgba(200,169,110,0.50)!important;margin-right:8px;}
+
+/* Forms — danger callout */
+.form-card{padding:14px 22px;border-bottom:1px solid var(--border);}
+.form-card:last-child{border-bottom:none;}
+.form-card.has-password{background:rgba(192,57,43,0.06);border-left:3px solid var(--red);}
+.form-card-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap;}
+.form-card-method{font-family:var(--mono);font-size:9px;font-weight:500;padding:3px 8px;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;letter-spacing:0.08em;}
+.form-card-method.post{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.form-card-action{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.65)!important;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.form-card-pwbadge{font-family:var(--mono);font-size:9px;font-weight:500;letter-spacing:0.10em;color:#c0392b!important;border:1px solid rgba(192,57,43,0.40);padding:3px 8px;background:rgba(192,57,43,0.08);}
+.form-fields{display:flex;flex-direction:column;gap:4px;}
+.form-field{display:flex;gap:10px;padding:5px 0;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.70)!important;}
+.form-field-type{width:80px;flex-shrink:0;color:rgba(200,169,110,0.65)!important;font-size:10px;text-transform:uppercase;letter-spacing:0.08em;}
+.form-field-type.password{color:#c0392b!important;font-weight:500;}
+.form-field-name{color:#e8d5a3!important;}
+.form-field-placeholder{color:rgba(240,236,228,0.40)!important;font-style:italic;}
+
+/* Outbound links */
+.links-list{padding:0;max-height:380px;overflow-y:auto;}
+.links-list::-webkit-scrollbar{width:8px;}
+.links-list::-webkit-scrollbar-track{background:rgba(0,0,0,0.4);}
+.links-list::-webkit-scrollbar-thumb{background:rgba(200,169,110,0.25);border-radius:4px;}
+.link-item{display:grid;grid-template-columns:1fr 180px 30px;gap:14px;padding:10px 22px;border-bottom:1px solid var(--border);align-items:center;font-family:var(--mono);font-size:11px;}
+.link-item:last-child{border-bottom:none;}
+.link-text{color:rgba(240,236,228,0.85)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.link-host{color:#c8a96e!important;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.link-arrow{color:rgba(200,169,110,0.40)!important;font-size:13px;text-align:center;text-decoration:none;}
+
+/* OG image preview */
+.og-preview-card{padding:18px 24px;display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap;}
+.og-preview-image{flex:0 0 auto;max-width:240px;background:var(--bg3);border:1px solid var(--border);}
+.og-preview-image img{width:100%;display:block;}
+.og-preview-content{flex:1;min-width:200px;display:flex;flex-direction:column;gap:8px;}
+.og-preview-title{font-family:var(--serif);font-size:18px;font-weight:400;color:#f5f2ec!important;line-height:1.3;}
+.og-preview-desc{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+.og-preview-site{font-family:var(--mono);font-size:10px;color:#c8a96e!important;text-transform:uppercase;letter-spacing:0.12em;}
+
+/* Error banner */
+.error-banner{background:rgba(192,57,43,0.08);border:1px solid rgba(192,57,43,0.30);padding:18px 24px;display:flex;align-items:center;gap:14px;}
+.error-banner-icon{font-size:22px;}
+.error-banner-text{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:500px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+/* ── MOBILE ── */
+@media(max-width:900px){
+  .url-banner{flex-direction:column;align-items:flex-start;}
+}
+@media(max-width:768px){
+  .url-input{border-right:1px solid var(--border);min-width:100%;}
+  .btn-inspect{width:100%;margin-top:2px;}
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;flex-wrap:wrap;}
+  .mode-pill{flex:1;min-width:120px;justify-content:center;}
+  .kv-row{flex-direction:column;gap:4px;}
+  .kv-key{width:auto;}
+  .link-item{grid-template-columns:1fr 30px;}
+  .link-item .link-host{display:none;}
+  .preview-screenshot-scroll{max-height:540px;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Network Intelligence</span></div>
+    <h1>Burner Link <em>Previewer</em></h1>
+    <p class="hero-sub">See exactly what's on a page without ever visiting it. Full-page screenshot plus extracted page content, embedded forms, and outbound links — all rendered safely on our server.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Sometimes you need to see what's on a webpage without giving up your IP address, your fingerprint, or risking the page itself. The <strong>Burner Link Previewer</strong> fetches and renders any URL on our server, then returns it to you as a <strong>full-page scrollable screenshot</strong> plus a complete extraction of the page's content. You see the <strong>page title, meta description, and Open Graph card</strong> exactly as it would appear in a social media preview. You see all <strong>headings (H1, H2, H3)</strong> in document order, a <strong>1500-character body excerpt</strong>, every <strong>embedded form</strong> with its action URL and field types — with <strong>password forms flagged in red</strong> as a phishing indicator — and every <strong>outbound link</strong> with its destination host. Paste a suspicious <strong>email or text message</strong> and the tool extracts every URL it contains for you to inspect one by one. The link is fetched once on our server using a generic browser user-agent. Your browser never opens the URL. Used by <strong>journalists previewing sources</strong>, <strong>security researchers analysing phishing pages</strong>, <strong>investigators reviewing suspicious links</strong>, and <strong>anyone who received a sketchy text and wants to know what's on the other end</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Link Preview</span><span class="seo-tag">Burner Browser</span>
+        <span class="seo-tag">Phishing Analysis</span><span class="seo-tag">Page Screenshot</span>
+        <span class="seo-tag">Form Detection</span><span class="seo-tag">Open Graph</span>
+        <span class="seo-tag">SMS Forensics</span><span class="seo-tag">OSINT</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- INPUT -->
+  <section class="input-section">
+    <div class="section-label">Enter URL or Paste Suspicious Message</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="url" onclick="selectMode('url')" role="tab">
+        <span class="mode-pill-icon">⟶</span> URL
+      </button>
+      <button class="mode-pill" data-mode="msg" onclick="selectMode('msg')" role="tab">
+        <span class="mode-pill-icon">✉</span> Email / SMS Text
+      </button>
+    </div>
+
+    <!-- URL MODE -->
+    <div class="mode-content active" id="modeUrl">
+      <div class="search-row">
+        <input type="text" class="url-input" id="urlInput"
+          placeholder="e.g. https://example.com/some-page  or  bit.ly/abc123"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')previewURL()">
+        <button class="btn-inspect" id="btnPreview" onclick="previewURL()">Preview →</button>
+      </div>
+      <div class="loading-bar" id="loadingBar"><div class="loading-bar-inner"></div></div>
+      <div class="input-hint">URL is fetched server-side — your browser never visits the link · Supports http:// and https://</div>
+    </div>
+
+    <!-- EMAIL/SMS MODE -->
+    <div class="mode-content" id="modeMsg">
+      <textarea class="msg-textarea" id="msgInput"
+        oninput="extractURLsFromMessage()"
+        placeholder="Paste a suspicious email, text message, or any text containing URLs:&#10;&#10;Hi, your USPS package is held. Click here to verify:&#10;https://usps-redelivery.tk/track?id=8472&#10;&#10;The tool will extract every URL automatically."></textarea>
+      <div style="display:flex;gap:2px;margin-top:2px;flex-wrap:wrap;">
+        <button class="btn-secondary" onclick="document.getElementById('msgInput').value='';extractURLsFromMessage();">Clear</button>
+        <button class="btn-secondary" onclick="loadSampleMessage()">Load Example</button>
+      </div>
+
+      <div class="extracted-urls" id="extractedUrls">
+        <div class="extracted-urls-header" id="extractedHeader">URLs found in message</div>
+        <div class="extracted-list" id="extractedList"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+
+    <div class="url-banner">
+      <div class="url-banner-favicon" id="urlBannerFavicon">⟶</div>
+      <div class="url-banner-meta">
+        <div class="url-banner-title" id="urlBannerTitle">—</div>
+        <div class="url-banner-domain" id="urlBannerDomain">—</div>
+      </div>
+      <div class="url-banner-actions">
+        <button class="btn-secondary" onclick="copyFinalURL()">Copy URL</button>
+        <a class="btn-secondary" id="btnSafetyCheck" href="#" target="_blank" rel="noopener">Run Safety Check ↗</a>
+      </div>
+    </div>
+
+    <!-- SCROLLABLE SCREENSHOT -->
+    <div class="preview-screenshot">
+      <div class="preview-screenshot-head">
+        <div class="preview-screenshot-label">
+          <span>◰ Full-Page Preview</span>
+        </div>
+        <div class="preview-screenshot-hint">Scroll within frame to see full page</div>
+      </div>
+      <div class="preview-screenshot-frame">
+        <div class="preview-screenshot-scroll" id="screenshotScroll">
+          <div class="preview-screenshot-loading" id="screenshotLoading">Loading screenshot…</div>
+        </div>
+        <div class="preview-screenshot-fade"></div>
+      </div>
+    </div>
+
+    <!-- OG/SOCIAL PREVIEW (collapsible) -->
+    <div class="preview-card" id="cardOG">
+      <div class="preview-card-head" onclick="toggleCard('cardOG')">
+        <div class="preview-card-title">
+          <span>◇ Social / Open Graph Preview</span>
+          <span class="preview-card-count" id="ogCount"></span>
+        </div>
+        <div class="preview-card-toggle">+</div>
+      </div>
+      <div class="preview-card-body" id="ogBody"></div>
+    </div>
+
+    <!-- PAGE BASICS -->
+    <div class="preview-card expanded" id="cardBasics">
+      <div class="preview-card-head" onclick="toggleCard('cardBasics')">
+        <div class="preview-card-title">
+          <span>◈ Page Basics</span>
+        </div>
+        <div class="preview-card-toggle">+</div>
+      </div>
+      <div class="preview-card-body" id="basicsBody"></div>
+    </div>
+
+    <!-- HEADINGS -->
+    <div class="preview-card" id="cardHeadings">
+      <div class="preview-card-head" onclick="toggleCard('cardHeadings')">
+        <div class="preview-card-title">
+          <span>◯ Headings & Structure</span>
+          <span class="preview-card-count" id="headingsCount"></span>
+        </div>
+        <div class="preview-card-toggle">+</div>
+      </div>
+      <div class="preview-card-body" id="headingsBody"></div>
+    </div>
+
+    <!-- BODY TEXT -->
+    <div class="preview-card" id="cardBody">
+      <div class="preview-card-head" onclick="toggleCard('cardBody')">
+        <div class="preview-card-title">
+          <span>◌ Body Text Excerpt</span>
+        </div>
+        <div class="preview-card-toggle">+</div>
+      </div>
+      <div class="preview-card-body" id="bodyTextBody"></div>
+    </div>
+
+    <!-- FORMS -->
+    <div class="preview-card" id="cardForms">
+      <div class="preview-card-head" onclick="toggleCard('cardForms')">
+        <div class="preview-card-title">
+          <span>▣ Embedded Forms</span>
+          <span class="preview-card-count" id="formsCount"></span>
+        </div>
+        <div class="preview-card-toggle">+</div>
+      </div>
+      <div class="preview-card-body" id="formsBody"></div>
+    </div>
+
+    <!-- OUTBOUND LINKS -->
+    <div class="preview-card" id="cardLinks">
+      <div class="preview-card-head" onclick="toggleCard('cardLinks')">
+        <div class="preview-card-title">
+          <span>↗ Outbound Links</span>
+          <span class="preview-card-count" id="linksCount"></span>
+        </div>
+        <div class="preview-card-toggle">+</div>
+      </div>
+      <div class="preview-card-body" id="linksBody"></div>
+    </div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Pages fetched server-side via Intel Desk proxy. Screenshots via thum.io (tall crop). Your browser never visits the inspected URL.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let lastFinalURL = null;
+
+/* SEO */
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+/* Mode switch */
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+}
+
+/* Card toggle */
+function toggleCard(id){
+  document.getElementById(id).classList.toggle('expanded');
+}
+
+/* ── EMAIL/SMS URL EXTRACTION ── */
+function extractURLsFromMessage() {
+  const text = document.getElementById('msgInput').value;
+  const wrap = document.getElementById('extractedUrls');
+  const list = document.getElementById('extractedList');
+  const header = document.getElementById('extractedHeader');
+
+  if (!text.trim()) {
+    wrap.classList.remove('visible');
+    return;
+  }
+
+  // Match URLs (with or without protocol) and bare domains
+  const urlRegex = /\b((?:https?:\/\/|www\.)?[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+(?:\/[^\s\]\)\}\">]*)?)/gi;
+  const matches = text.match(urlRegex) || [];
+
+  // Dedupe + filter (require at least one dot, exclude email-like)
+  const seen = new Set();
+  const urls = [];
+  matches.forEach(raw => {
+    let u = raw.trim().replace(/[.,;!?\)\]]+$/, '');
+    if (!u.includes('.')) return;
+    // Skip email addresses (heuristic)
+    if (text.includes('@'+u.split('/')[0])) return;
+    if (!seen.has(u)) { seen.add(u); urls.push(u); }
+  });
+
+  if (urls.length === 0) {
+    wrap.classList.add('visible');
+    header.textContent = 'No URLs detected';
+    list.innerHTML = '<div class="extracted-empty">Paste text containing one or more URLs to see them extracted here.</div>';
+    return;
+  }
+
+  header.textContent = `${urls.length} URL${urls.length>1?'s':''} found · click to preview`;
+  list.innerHTML = urls.slice(0, 50).map((u, i) => `
+    <div class="extracted-item" onclick="previewExtracted('${esc(u).replace(/'/g,'%27')}')">
+      <span class="extracted-item-num">${i+1}.</span>
+      <span class="extracted-item-url">${esc(u)}</span>
+      <span class="extracted-item-arrow">→</span>
+    </div>`).join('');
+  wrap.classList.add('visible');
+}
+
+function loadSampleMessage() {
+  document.getElementById('msgInput').value =
+`Hi, this is USPS. Your package #8472 was held due to incomplete address.
+
+To reschedule delivery, click: https://usps-redelivery.tk/track?id=8472
+
+If you do not respond within 24 hours your package will be returned. For questions visit usps.com or our support partner at support-portal.click
+
+Thanks,
+USPS Customer Service`;
+  extractURLsFromMessage();
+}
+
+function previewExtracted(url) {
+  selectMode('url');
+  document.getElementById('urlInput').value = decodeURIComponent(url);
+  setTimeout(() => previewURL(), 100);
+}
+
+/* ── URL PREVIEW ── */
+function setLoading(on) {
+  document.getElementById('loadingBar').classList.toggle('visible', on);
+  const btn = document.getElementById('btnPreview');
+  btn.disabled = on;
+  btn.textContent = on ? 'Loading…' : 'Preview →';
+}
+
+async function previewURL() {
+  const raw = document.getElementById('urlInput').value.trim();
+  if (!raw) { alert('Please enter a URL.'); return; }
+
+  setLoading(true);
+  document.getElementById('resultsWrap').classList.remove('visible');
+
+  try {
+    const resp = await fetch(`${PROXY}/url-preview?url=${encodeURIComponent(raw)}`);
+    const data = await resp.json();
+    if (data.error && !data.final_url) {
+      showError(data.error);
+      return;
+    }
+    renderPreview(data, raw);
+  } catch (e) {
+    showError('Could not reach preview server. Please try again.');
+  } finally {
+    setLoading(false);
+  }
+}
+
+function showError(msg) {
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.querySelector('.results-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('urlBannerTitle').textContent = 'Preview failed';
+  document.getElementById('urlBannerDomain').textContent = '—';
+  document.getElementById('screenshotScroll').innerHTML =
+    `<div class="preview-screenshot-loading" style="color:#c0392b">⚠ ${esc(msg)}</div>`;
+  ['ogBody','basicsBody','headingsBody','bodyTextBody','formsBody','linksBody'].forEach(id => {
+    document.getElementById(id).innerHTML = '<div class="preview-card-empty">—</div>';
+  });
+}
+
+function renderPreview(d, original) {
+  const finalUrl    = d.final_url || original;
+  const finalDomain = d.final_domain || '';
+  lastFinalURL = finalUrl;
+
+  // ── URL Banner ──
+  const fav = document.getElementById('urlBannerFavicon');
+  if (d.favicon) {
+    fav.innerHTML = `<img src="${esc(d.favicon)}" alt="" onerror="this.parentElement.innerHTML='⟶'">`;
+  } else {
+    fav.innerHTML = '⟶';
+  }
+  document.getElementById('urlBannerTitle').textContent = d.title || finalDomain || 'Untitled';
+  document.getElementById('urlBannerDomain').textContent = finalDomain || finalUrl;
+
+  // Safety check link → URL Intelligence page (with this URL)
+  const safetyHref = `https://inteldesk.io/url-intelligence?url=${encodeURIComponent(finalUrl)}`;
+  document.getElementById('btnSafetyCheck').href = safetyHref;
+
+  // ── Screenshot ──
+  const ssURL = d.screenshot_url ||
+    `https://image.thum.io/get/width/1024/crop/2400/noanimate/${encodeURIComponent(finalUrl)}`;
+  document.getElementById('screenshotScroll').innerHTML = `
+    <img src="${esc(ssURL)}" alt="Full-page preview of ${esc(finalDomain)}"
+      onerror="this.parentElement.innerHTML='<div class=\\'preview-screenshot-loading\\'>Screenshot unavailable</div>'">`;
+
+  // ── OG / Social ──
+  renderOG(d);
+
+  // ── Page Basics ──
+  renderBasics(d);
+
+  // ── Headings ──
+  renderHeadings(d);
+
+  // ── Body Text ──
+  renderBody(d);
+
+  // ── Forms ──
+  renderForms(d);
+
+  // ── Links ──
+  renderLinks(d);
+
+  // Reveal results
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.querySelector('.results-wrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function renderOG(d) {
+  const og = d.og || {};
+  const tw = d.twitter || {};
+  const card = document.getElementById('cardOG');
+  const body = document.getElementById('ogBody');
+  const count = document.getElementById('ogCount');
+
+  const ogTitle = og.title || tw.title || d.title;
+  const ogDesc  = og.description || tw.description || d.description;
+  const ogImg   = og.image || tw.image;
+  const ogSite  = og.site_name || tw.site;
+
+  const hasContent = ogTitle || ogDesc || ogImg;
+  count.textContent = hasContent ? '✓' : '—';
+
+  if (!hasContent) {
+    body.innerHTML = '<div class="preview-card-empty">No Open Graph or Twitter Card metadata</div>';
+    return;
+  }
+
+  // Auto-expand if has content
+  card.classList.add('expanded');
+
+  body.innerHTML = `
+    <div class="og-preview-card">
+      ${ogImg ? `<div class="og-preview-image"><img src="${esc(ogImg)}" alt="" onerror="this.parentElement.style.display='none'"></div>` : ''}
+      <div class="og-preview-content">
+        ${ogSite ? `<div class="og-preview-site">${esc(ogSite)}</div>` : ''}
+        ${ogTitle ? `<div class="og-preview-title">${esc(ogTitle)}</div>` : ''}
+        ${ogDesc ? `<div class="og-preview-desc">${esc(ogDesc)}</div>` : ''}
+      </div>
+    </div>`;
+}
+
+function renderBasics(d) {
+  const rows = [];
+  if (d.title) rows.push(['Title', esc(d.title), 'accent']);
+  if (d.description) rows.push(['Meta Description', esc(d.description)]);
+  if (d.final_url) rows.push(['Final URL', esc(d.final_url)]);
+  if (d.status_code) rows.push(['HTTP Status', String(d.status_code)]);
+  if (d.language) rows.push(['Language', esc(d.language)]);
+  if (typeof d.internal_links_count === 'number')
+    rows.push(['Internal Links', String(d.internal_links_count)]);
+  if (typeof d.external_links_count === 'number')
+    rows.push(['External Links', String(d.external_links_count)]);
+  if (d.error) rows.push(['Note', esc(d.error)]);
+
+  const body = document.getElementById('basicsBody');
+  if (!rows.length) {
+    body.innerHTML = '<div class="preview-card-empty">No metadata extracted</div>';
+    return;
+  }
+  body.innerHTML = `<div class="kv-list">${rows.map(([k,v,cls])=>`
+    <div class="kv-row">
+      <div class="kv-key">${k}</div>
+      <div class="kv-val ${cls||''}">${v}</div>
+    </div>`).join('')}</div>`;
+}
+
+function renderHeadings(d) {
+  const headings = d.headings || [];
+  const body = document.getElementById('headingsBody');
+  document.getElementById('headingsCount').textContent = headings.length || '—';
+
+  if (!headings.length) {
+    body.innerHTML = '<div class="preview-card-empty">No headings found</div>';
+    return;
+  }
+  body.innerHTML = `<div class="headings-list">${headings.map(h => `
+    <div class="heading-item h${h.level}">
+      <span class="heading-marker">H${h.level}</span>${esc(h.text)}
+    </div>`).join('')}</div>`;
+}
+
+function renderBody(d) {
+  const body = document.getElementById('bodyTextBody');
+  if (!d.body_excerpt) {
+    body.innerHTML = '<div class="preview-card-empty">No body text extracted</div>';
+    return;
+  }
+  body.innerHTML = `<div class="body-excerpt">${esc(d.body_excerpt)}${d.body_excerpt.length >= 1500 ? '…' : ''}</div>`;
+}
+
+function renderForms(d) {
+  const forms = d.forms || [];
+  const body = document.getElementById('formsBody');
+  const count = document.getElementById('formsCount');
+  count.textContent = forms.length || '—';
+
+  if (!forms.length) {
+    body.innerHTML = '<div class="preview-card-empty">No forms detected on this page</div>';
+    return;
+  }
+
+  // Auto-expand if any form has password
+  if (forms.some(f => f.has_password)) {
+    document.getElementById('cardForms').classList.add('expanded');
+    count.textContent = `${forms.length} · ⚠ password input`;
+    count.style.color = '#c0392b';
+  }
+
+  body.innerHTML = forms.map((f, i) => `
+    <div class="form-card ${f.has_password?'has-password':''}">
+      <div class="form-card-head">
+        <span class="form-card-method ${f.method.toLowerCase()}">${esc(f.method)}</span>
+        <span class="form-card-action">${esc(f.action)}</span>
+        ${f.has_password ? `<span class="form-card-pwbadge">⚠ password</span>` : ''}
+      </div>
+      <div class="form-fields">
+        ${(f.fields||[]).map(field => `
+          <div class="form-field">
+            <span class="form-field-type ${field.type==='password'?'password':''}">${esc(field.type||'text')}</span>
+            <span class="form-field-name">${esc(field.name||'(unnamed)')}</span>
+            ${field.placeholder ? `<span class="form-field-placeholder">"${esc(field.placeholder)}"</span>` : ''}
+          </div>`).join('')}
+      </div>
+    </div>`).join('');
+}
+
+function renderLinks(d) {
+  const links = d.outbound_links || [];
+  const body = document.getElementById('linksBody');
+  const count = document.getElementById('linksCount');
+  count.textContent = links.length || '—';
+
+  if (!links.length) {
+    body.innerHTML = '<div class="preview-card-empty">No external links found</div>';
+    return;
+  }
+  body.innerHTML = `<div class="links-list">${links.map(l => `
+    <div class="link-item">
+      <span class="link-text" title="${esc(l.text||'')}">${esc(l.text||'(no text)')}</span>
+      <span class="link-host" title="${esc(l.href||'')}">${esc(l.host||'—')}</span>
+      <span class="link-arrow" title="Preview this link" onclick="previewExtracted('${esc(l.href).replace(/'/g,'%27')}')" style="cursor:pointer">↗</span>
+    </div>`).join('')}</div>`;
+}
+
+function copyFinalURL() {
+  if (!lastFinalURL) return;
+  navigator.clipboard.writeText(lastFinalURL).then(() => {
+    const btns = document.querySelectorAll('.url-banner-actions .btn-secondary');
+    if (btns[0]) {
+      const orig = btns[0].textContent;
+      btns[0].textContent = '✓ Copied';
+      setTimeout(() => btns[0].textContent = orig, 1500);
+    }
+  });
+}
+
+// Read URL param on load (e.g. ?url=...)
+window.addEventListener('DOMContentLoaded', () => {
+  const params = new URLSearchParams(window.location.search);
+  const initialURL = params.get('url');
+  if (initialURL) {
+    document.getElementById('urlInput').value = initialURL;
+    setTimeout(previewURL, 200);
+  }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Metadata Extractor & Scrubber — Read or Strip Hidden File Data | The Intel Desk</title>
+<meta name="description" content="Free metadata extractor and scrubber. Reveal every hidden field in Office documents, PDFs, images, audio, and video — author identity, GPS coordinates, edit history, hidden slides, tracked changes. Then download a cleaned version with metadata stripped.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1200px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(36px,6vw,68px);font-weight:300;line-height:0.95;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:660px;line-height:1.7;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:600px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+/* SECTION */
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+/* Mode pills */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);flex-wrap:wrap;max-width:100%;}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 20px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* Drop zone */
+.drop-zone{border:1.5px dashed rgba(255,255,255,0.10);background:var(--bg2);padding:60px 24px;text-align:center;cursor:pointer;transition:all 0.2s;font-family:var(--mono);}
+.drop-zone:hover{border-color:rgba(200,169,110,0.40);background:rgba(200,169,110,0.03);}
+.drop-zone.dragging{border-color:var(--accent);background:rgba(200,169,110,0.06);}
+.drop-glyph{font-family:var(--serif);font-size:44px;font-weight:300;color:rgba(200,169,110,0.40)!important;line-height:1;margin-bottom:14px;}
+.drop-title{font-family:var(--mono);font-size:13px;color:#f5f2ec!important;margin-bottom:6px;}
+.drop-sub{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;line-height:1.7;}
+.drop-zone input[type=file]{display:none;}
+
+.privacy-notice{margin-top:14px;padding:12px 18px;background:rgba(78,201,148,0.04);border:1px solid rgba(78,201,148,0.20);font-family:var(--mono);font-size:10.5px;color:rgba(78,201,148,0.85)!important;line-height:1.7;}
+
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 22px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+
+/* Loading */
+.loading-bar{display:none;height:2px;background:var(--bg3);margin-top:2px;overflow:hidden;}
+.loading-bar.visible{display:block;}
+.loading-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+.loading-status{font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.70)!important;margin-top:10px;}
+
+/* RESULTS */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+/* Leakiness banner */
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;}
+.verdict-banner.clean{background:rgba(78,201,148,0.06);border-color:rgba(78,201,148,0.25);}
+.verdict-banner.minor{background:rgba(78,201,148,0.04);border-color:rgba(78,201,148,0.20);}
+.verdict-banner.moderate{background:rgba(232,123,74,0.06);border-color:rgba(232,123,74,0.25);}
+.verdict-banner.severe{background:rgba(192,57,43,0.07);border-color:rgba(192,57,43,0.25);}
+.verdict-banner.unknown{background:var(--bg2);border-color:var(--border);}
+.verdict-icon{font-size:30px;flex-shrink:0;font-family:var(--serif);}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,26px);font-weight:300;color:#f5f2ec!important;margin-bottom:4px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+.verdict-score{font-family:var(--serif);font-size:42px;line-height:1;}
+.verdict-score.green{color:#4ec994!important;}
+.verdict-score.warn{color:#e87b4a!important;}
+.verdict-score.red{color:#c0392b!important;}
+.verdict-out-of{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.30)!important;}
+.verdict-sub{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+
+/* Cards */
+.card{background:var(--bg2);border:1px solid var(--border);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.card-head:hover{background:rgba(255,255,255,0.02);}
+.card-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;display:flex;align-items:center;gap:10px;}
+.card-count{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;}
+.card-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.card.expanded .card-toggle{transform:rotate(45deg);}
+.card-body{display:none;}
+.card.expanded .card-body{display:block;animation:fadeUp 0.2s ease;}
+.card-body.always-on{display:block!important;}
+
+/* KV list */
+.kv-list{padding:0;}
+.kv-row{display:flex;gap:14px;padding:10px 24px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.40)!important;width:180px;flex-shrink:0;padding-top:1px;}
+.kv-val{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.80)!important;flex:1;line-height:1.6;word-break:break-word;}
+.kv-val.accent{color:#e8d5a3!important;}
+.kv-val.green{color:#4ec994!important;}
+.kv-val.warn{color:#e87b4a!important;}
+.kv-val.red{color:#c0392b!important;}
+.kv-val.dim{color:rgba(240,236,228,0.45)!important;}
+.kv-val.mono-hash{font-size:11px;color:#c8a96e!important;letter-spacing:-0.01em;}
+
+/* Flags list (leakiness reasons) */
+.flag-list{padding:14px 24px;display:flex;flex-direction:column;gap:6px;}
+.flag-row{display:flex;align-items:flex-start;gap:10px;font-family:var(--mono);font-size:11.5px;line-height:1.7;}
+.flag-row .sym{flex-shrink:0;width:14px;text-align:center;}
+.flag-row.critical{color:#c0392b!important;font-weight:500;}
+.flag-row.high{color:rgba(232,123,74,0.95)!important;}
+.flag-row.medium{color:rgba(240,236,228,0.85)!important;}
+.flag-row.low{color:rgba(240,236,228,0.55)!important;}
+
+/* Ghost data */
+.ghost-card{padding:14px 24px;border-bottom:1px solid var(--border);}
+.ghost-card:last-child{border-bottom:none;}
+.ghost-card.severity-high{border-left:3px solid var(--orange);}
+.ghost-card.severity-critical{border-left:3px solid var(--red);}
+.ghost-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;flex-wrap:wrap;gap:8px;}
+.ghost-kind{font-family:var(--mono);font-size:11.5px;color:#e8d5a3!important;font-weight:500;letter-spacing:0.04em;}
+.ghost-sev{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:3px 8px;border:1px solid;}
+.ghost-sev.high{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.ghost-sev.critical{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.ghost-sev.medium{color:rgba(240,236,228,0.65)!important;border-color:var(--border);}
+.ghost-sev.low{color:rgba(240,236,228,0.40)!important;border-color:var(--border);}
+.ghost-desc{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.70)!important;line-height:1.6;}
+.ghost-details{font-family:var(--mono);font-size:10.5px;color:rgba(240,236,228,0.50)!important;line-height:1.7;margin-top:8px;padding:10px 14px;background:rgba(0,0,0,0.20);border:1px solid var(--border);max-height:280px;overflow-y:auto;}
+
+/* Empty state */
+.empty{padding:18px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+/* Action buttons row */
+.action-row{padding:18px 24px;background:var(--bg3);border-top:1px solid var(--border);display:flex;gap:8px;flex-wrap:wrap;}
+
+.btn-primary{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.35);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:14px 26px;cursor:pointer;transition:all 0.2s;text-decoration:none;display:inline-block;}
+.btn-primary:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-primary.danger{background:rgba(192,57,43,0.10);border-color:rgba(192,57,43,0.40);color:#e87b4a!important;}
+.btn-primary.danger:hover{background:rgba(192,57,43,0.20);color:#f5f2ec!important;}
+
+/* Bulk table */
+.bulk-summary{background:var(--bg2);border:1px solid var(--border);padding:18px 22px;display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap;}
+.bulk-stats{display:flex;gap:24px;flex-wrap:wrap;}
+.bulk-stat{display:flex;flex-direction:column;gap:4px;}
+.bulk-stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.40)!important;}
+.bulk-stat-value{font-family:var(--serif);font-size:24px;font-weight:300;line-height:1;}
+.bulk-stat-value.green{color:#4ec994!important;}
+.bulk-stat-value.warn{color:#e87b4a!important;}
+.bulk-stat-value.red{color:#c0392b!important;}
+.bulk-stat-value.accent{color:#e8d5a3!important;}
+
+.bulk-table{background:var(--bg2);border:1px solid var(--border);}
+.bulk-head{display:grid;grid-template-columns:50px 1fr 90px 80px 110px 90px;gap:10px;padding:12px 22px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;align-items:center;}
+.bulk-row{display:grid;grid-template-columns:50px 1fr 90px 80px 110px 90px;gap:10px;padding:11px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;cursor:pointer;transition:background 0.15s;}
+.bulk-row:last-child{border-bottom:none;}
+.bulk-row:hover{background:rgba(255,255,255,0.02);}
+.bulk-cell-num{color:rgba(240,236,228,0.35)!important;font-size:10px;}
+.bulk-cell-name{color:#e8d5a3!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bulk-cell-size{color:rgba(240,236,228,0.45)!important;font-size:10px;}
+.bulk-cell-author{color:rgba(240,236,228,0.65)!important;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;}
+.bulk-cell-ghosts{color:rgba(232,123,74,0.85)!important;text-align:center;font-size:10px;}
+.bulk-verdict{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:4px 8px;border:1px solid;text-align:center;}
+.bulk-verdict.clean{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+.bulk-verdict.minor{color:#4ec994!important;border-color:rgba(78,201,148,0.20);}
+.bulk-verdict.moderate{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.bulk-verdict.severe{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.bulk-verdict.unknown,.bulk-verdict.error{color:rgba(240,236,228,0.35)!important;border-color:var(--border);}
+
+/* Compare layout */
+.compare-row{display:grid;grid-template-columns:140px 1fr 1fr;gap:12px;padding:11px 24px;border-bottom:1px solid var(--border);align-items:flex-start;font-family:var(--mono);font-size:11px;line-height:1.6;}
+.compare-key{color:rgba(240,236,228,0.40)!important;font-size:10px;text-transform:uppercase;letter-spacing:0.10em;}
+.compare-val{word-break:break-word;color:rgba(240,236,228,0.80)!important;}
+.compare-val.diff-only-1{color:#e87b4a!important;}
+.compare-val.diff-only-2{color:#c8a96e!important;}
+.compare-val.empty{color:rgba(240,236,228,0.20)!important;font-style:italic;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:540px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:900px){
+  .bulk-head, .bulk-row{grid-template-columns:30px 1fr 110px 80px!important;}
+  .bulk-head > div:nth-child(3), .bulk-head > div:nth-child(4),
+  .bulk-row > .bulk-cell-size, .bulk-row > .bulk-cell-author {display:none;}
+  .compare-row{grid-template-columns:1fr;}
+  .compare-key{margin-bottom:2px;}
+}
+@media(max-width:768px){
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;}
+  .mode-pill{flex:1 0 33%;justify-content:center;font-size:10px;padding:10px 12px;}
+  .kv-row{flex-direction:column;gap:4px;}
+  .kv-key{width:auto;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Forensic Tools</span></div>
+    <h1>Metadata <em>Extractor</em><br>&amp; <em>Scrubber</em></h1>
+    <p class="hero-sub">Read every hidden field in your file — author identity, GPS, edit history, hidden slides, tracked changes, embedded objects. Then download a cleaned version with metadata stripped. Single files, bulk operations, side-by-side comparison.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Free <strong>metadata extractor and scrubber</strong> for Office documents, PDFs, images, audio, and video. The Extract mode reveals every hidden field embedded in your file — <strong>author identity</strong>, <strong>last modified by</strong>, <strong>company name</strong>, <strong>GPS coordinates</strong>, <strong>device serial numbers</strong>, <strong>file paths leaked from the original computer</strong>, <strong>creator software fingerprints</strong>, full <strong>EXIF/IPTC/XMP</strong> data on images, <strong>ID3 tags</strong> on audio, <strong>tracked changes</strong> and <strong>reviewer comments</strong> in Word docs, <strong>hidden slides</strong> in PowerPoint, <strong>hidden sheets/columns</strong> in Excel, <strong>PDF revisions</strong> that may contain pre-redaction text, and <strong>embedded files</strong> hidden inside other documents. Each file gets a 0-100 <strong>leakiness score</strong> that tells you exactly how much identifying information you'd expose by sharing it. The Scrub mode strips all metadata using ExifTool then returns a downloadable cleaned version. <strong>Bulk modes</strong> handle up to 25 files at once. <strong>Compare mode</strong> diffs metadata between two files — spot when someone modified a leaked document, or verify two files came from the same source. <strong>Revision history reconstruction</strong> shows you previous versions of PDFs (including text that was supposedly redacted) and full Office edit history. Used by <strong>journalists protecting sources</strong>, <strong>activists sharing documents safely</strong>, <strong>investigators verifying leaked files</strong>, and anyone publishing files who doesn't want their identity, location, or organization leaked along with the content.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Metadata Extractor</span><span class="seo-tag">Metadata Scrubber</span>
+        <span class="seo-tag">EXIF</span><span class="seo-tag">XMP</span>
+        <span class="seo-tag">PDF Forensics</span><span class="seo-tag">Office Documents</span>
+        <span class="seo-tag">Tracked Changes</span><span class="seo-tag">Hidden Slides</span>
+        <span class="seo-tag">Revision History</span><span class="seo-tag">Leakiness Score</span>
+        <span class="seo-tag">Document Comparison</span><span class="seo-tag">Source Protection</span>
+        <span class="seo-tag">OSINT</span><span class="seo-tag">Privacy Tool</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="tool-panel">
+    <div class="section-label">Metadata Extractor & Scrubber</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="extract" onclick="selectMode('extract')" role="tab">
+        <span class="mode-pill-icon">⊕</span> Extract
+      </button>
+      <button class="mode-pill" data-mode="scrub" onclick="selectMode('scrub')" role="tab">
+        <span class="mode-pill-icon">◌</span> Scrub
+      </button>
+      <button class="mode-pill" data-mode="bulk-extract" onclick="selectMode('bulk-extract')" role="tab">
+        <span class="mode-pill-icon">≣</span> Bulk Extract
+      </button>
+      <button class="mode-pill" data-mode="bulk-scrub" onclick="selectMode('bulk-scrub')" role="tab">
+        <span class="mode-pill-icon">⫳</span> Bulk Scrub
+      </button>
+      <button class="mode-pill" data-mode="compare" onclick="selectMode('compare')" role="tab">
+        <span class="mode-pill-icon">⇆</span> Compare
+      </button>
+    </div>
+
+    <!-- EXTRACT MODE -->
+    <div class="mode-content active" id="modeExtract">
+      <label class="drop-zone" id="extractDrop">
+        <input type="file" id="extractInput" onchange="handleExtract(event)">
+        <div class="drop-glyph">⊕</div>
+        <div class="drop-title">Drop a file to extract metadata</div>
+        <div class="drop-sub">Max 50MB · Office docs, PDFs, images, audio, video · Detects authors, GPS, hidden content, edit history</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> Files are processed in memory on our server, never logged or retained. After analysis, the file is immediately deleted from temp storage.
+      </div>
+      <div class="loading-bar" id="loadingBarExtract"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="extractStatus"></div>
+    </div>
+
+    <!-- SCRUB MODE -->
+    <div class="mode-content" id="modeScrub">
+      <label class="drop-zone" id="scrubDrop">
+        <input type="file" id="scrubInput" onchange="handleScrub(event)">
+        <div class="drop-glyph">◌</div>
+        <div class="drop-title">Drop a file to clean metadata</div>
+        <div class="drop-sub">Max 50MB · Returns the same file with metadata stripped · Original is processed in memory and discarded</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> The original file is uploaded, scrubbed, and the cleaned version is returned. The original is never logged, retained, or stored to disk after the response is sent.
+      </div>
+      <div class="loading-bar" id="loadingBarScrub"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="scrubStatus"></div>
+    </div>
+
+    <!-- BULK EXTRACT MODE -->
+    <div class="mode-content" id="modeBulkExtract">
+      <label class="drop-zone" id="bulkExtractDrop">
+        <input type="file" id="bulkExtractInput" multiple onchange="handleBulkExtract(event)">
+        <div class="drop-glyph">≣</div>
+        <div class="drop-title">Drop multiple files to scan for leakiness</div>
+        <div class="drop-sub">Up to 25 files · 100MB total · Each ≤50MB · Sorted by leakiness · Click any row to view full details</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> Files are processed sequentially in memory and discarded.
+      </div>
+      <div class="loading-bar" id="loadingBarBulkE"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="bulkExtractStatus"></div>
+    </div>
+
+    <!-- BULK SCRUB MODE -->
+    <div class="mode-content" id="modeBulkScrub">
+      <label class="drop-zone" id="bulkScrubDrop">
+        <input type="file" id="bulkScrubInput" multiple onchange="handleBulkScrub(event)">
+        <div class="drop-glyph">⫳</div>
+        <div class="drop-title">Drop multiple files to clean and download as zip</div>
+        <div class="drop-sub">Up to 25 files · 100MB total · Returns zipped cleaned versions plus a scrub report</div>
+      </label>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> Files are scrubbed in memory, packed into a zip, and delivered. Originals are discarded.
+      </div>
+      <div class="loading-bar" id="loadingBarBulkS"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="bulkScrubStatus"></div>
+    </div>
+
+    <!-- COMPARE MODE -->
+    <div class="mode-content" id="modeCompare">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;">
+        <label class="drop-zone" id="cmpDrop1">
+          <input type="file" id="cmpInput1" onchange="handleCmp(event,1)">
+          <div class="drop-glyph">①</div>
+          <div class="drop-title" id="cmpName1">File 1</div>
+          <div class="drop-sub">Drop or click to upload</div>
+        </label>
+        <label class="drop-zone" id="cmpDrop2">
+          <input type="file" id="cmpInput2" onchange="handleCmp(event,2)">
+          <div class="drop-glyph">②</div>
+          <div class="drop-title" id="cmpName2">File 2</div>
+          <div class="drop-sub">Drop or click to upload</div>
+        </label>
+      </div>
+      <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn-primary" id="btnCompare" onclick="runCompare()" disabled>Compare →</button>
+        <button class="btn-secondary" onclick="resetCompare()">Reset</button>
+      </div>
+      <div class="privacy-notice" style="margin-top:14px;">
+        🔒 <strong>Privacy:</strong> Both files are analyzed in memory and discarded. Only the diff is returned.
+      </div>
+      <div class="loading-bar" id="loadingBarCmp"><div class="loading-bar-inner"></div></div>
+      <div class="loading-status" id="cmpStatus"></div>
+    </div>
+  </section>
+
+  <!-- RESULTS -->
+  <div class="results-wrap" id="resultsWrap">
+
+    <!-- Leakiness banner -->
+    <div class="verdict-banner unknown" id="verdictBanner">
+      <div class="verdict-icon" id="verdictIcon">⊙</div>
+      <div class="verdict-text">
+        <div class="verdict-title">
+          <span id="verdictLabel">—</span>
+          <span class="verdict-score" id="verdictScore">—</span>
+          <span class="verdict-out-of">/100</span>
+        </div>
+        <div class="verdict-sub" id="verdictSub">—</div>
+      </div>
+    </div>
+
+    <!-- Container for dynamically rendered cards -->
+    <div id="cardsContainer"></div>
+
+  </div>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Metadata extracted via ExifTool. Format-specific analysis (Office XML, PDF revisions) handled in Python. Files are processed in memory only — never logged or retained.</div>
+  </footer>
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+let lastResult = null;
+let cmpFile1 = null, cmpFile2 = null;
+
+function toggleSEO(){
+  const b=document.getElementById('seoBlockBody'),btn=document.getElementById('seoToggleBtn');
+  const e=b.classList.toggle('expanded');btn.textContent=e?'Show Less':'Read More';
+}
+function esc(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.split('-').map(s=>s.charAt(0).toUpperCase()+s.slice(1)).join('')).classList.add('active');
+  document.getElementById('resultsWrap').classList.remove('visible');
+}
+
+function setBar(id, on){
+  document.getElementById(id).classList.toggle('visible', on);
+}
+
+/* ── Drop zone wiring ── */
+function wireDropZone(zoneId, callback) {
+  const z = document.getElementById(zoneId);
+  ['dragenter','dragover'].forEach(ev => z.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); z.classList.add('dragging');
+  }));
+  ['dragleave','drop'].forEach(ev => z.addEventListener(ev, e => {
+    e.preventDefault(); e.stopPropagation(); z.classList.remove('dragging');
+  }));
+  z.addEventListener('drop', e => {
+    if (e.dataTransfer.files.length) callback(e.dataTransfer.files);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  wireDropZone('extractDrop',      files => processExtract(files[0]));
+  wireDropZone('scrubDrop',        files => processScrub(files[0]));
+  wireDropZone('bulkExtractDrop',  files => processBulkExtract(files));
+  wireDropZone('bulkScrubDrop',    files => processBulkScrub(files));
+  wireDropZone('cmpDrop1',         files => setCmpFile(1, files[0]));
+  wireDropZone('cmpDrop2',         files => setCmpFile(2, files[0]));
+});
+
+/* ── Single file extract ── */
+function handleExtract(e) { if (e.target.files[0]) processExtract(e.target.files[0]); }
+
+async function processExtract(file) {
+  if (file.size > 50*1024*1024) { alert('File exceeds 50MB.'); return; }
+  setBar('loadingBarExtract', true);
+  document.getElementById('extractStatus').textContent = `Analyzing ${file.name} (${formatSize(file.size)})…`;
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${PROXY}/metadata-extract`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+    lastResult = { kind:'extract', ...data };
+    renderExtractResult(lastResult);
+    document.getElementById('extractStatus').textContent = `Analysis complete · ${file.name}`;
+  } catch(e) {
+    showError('Could not analyze file: ' + e.message);
+  } finally {
+    setBar('loadingBarExtract', false);
+  }
+}
+
+/* ── Single file scrub ── */
+function handleScrub(e) { if (e.target.files[0]) processScrub(e.target.files[0]); }
+
+async function processScrub(file) {
+  if (file.size > 50*1024*1024) { alert('File exceeds 50MB.'); return; }
+  setBar('loadingBarScrub', true);
+  document.getElementById('scrubStatus').textContent = `Scrubbing ${file.name}…`;
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData(); fd.append('file', file);
+    const r = await fetch(`${PROXY}/metadata-scrub`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+    lastResult = { kind:'scrub', originalFilename:file.name, ...data };
+    renderScrubResult(lastResult);
+    document.getElementById('scrubStatus').textContent = `Scrub complete · ${data.removed_count} field(s) removed`;
+  } catch(e) {
+    showError('Could not scrub file: ' + e.message);
+  } finally {
+    setBar('loadingBarScrub', false);
+  }
+}
+
+/* ── Bulk extract ── */
+function handleBulkExtract(e) { if (e.target.files.length) processBulkExtract(e.target.files); }
+
+async function processBulkExtract(files) {
+  if (files.length > 25) { alert('Maximum 25 files.'); return; }
+  setBar('loadingBarBulkE', true);
+  document.getElementById('bulkExtractStatus').textContent = `Analyzing ${files.length} file(s)…`;
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData();
+    Array.from(files).forEach(f => fd.append('files', f));
+    const r = await fetch(`${PROXY}/metadata-bulk-extract`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+    lastResult = { kind:'bulk-extract', ...data };
+    renderBulkExtractResult(lastResult);
+    document.getElementById('bulkExtractStatus').textContent = `Complete · ${data.count} file(s) analyzed`;
+  } catch(e) {
+    showError('Bulk extract failed: ' + e.message);
+  } finally {
+    setBar('loadingBarBulkE', false);
+  }
+}
+
+/* ── Bulk scrub ── */
+function handleBulkScrub(e) { if (e.target.files.length) processBulkScrub(e.target.files); }
+
+async function processBulkScrub(files) {
+  if (files.length > 25) { alert('Maximum 25 files.'); return; }
+  setBar('loadingBarBulkS', true);
+  document.getElementById('bulkScrubStatus').textContent = `Scrubbing ${files.length} file(s)…`;
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData();
+    Array.from(files).forEach(f => fd.append('files', f));
+    const r = await fetch(`${PROXY}/metadata-bulk-scrub`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+    lastResult = { kind:'bulk-scrub', ...data };
+    renderBulkScrubResult(lastResult);
+    document.getElementById('bulkScrubStatus').textContent = `Complete · ${(data.summary||[]).filter(s=>s.ok).length} file(s) cleaned`;
+  } catch(e) {
+    showError('Bulk scrub failed: ' + e.message);
+  } finally {
+    setBar('loadingBarBulkS', false);
+  }
+}
+
+/* ── Compare ── */
+function handleCmp(e, slot) {
+  if (e.target.files[0]) setCmpFile(slot, e.target.files[0]);
+}
+function setCmpFile(slot, file) {
+  if (slot === 1) { cmpFile1 = file; document.getElementById('cmpName1').textContent = file.name; }
+  else            { cmpFile2 = file; document.getElementById('cmpName2').textContent = file.name; }
+  document.getElementById('btnCompare').disabled = !(cmpFile1 && cmpFile2);
+}
+function resetCompare() {
+  cmpFile1 = cmpFile2 = null;
+  document.getElementById('cmpInput1').value = '';
+  document.getElementById('cmpInput2').value = '';
+  document.getElementById('cmpName1').textContent = 'File 1';
+  document.getElementById('cmpName2').textContent = 'File 2';
+  document.getElementById('btnCompare').disabled = true;
+  document.getElementById('resultsWrap').classList.remove('visible');
+}
+
+async function runCompare() {
+  if (!cmpFile1 || !cmpFile2) return;
+  setBar('loadingBarCmp', true);
+  document.getElementById('cmpStatus').textContent = 'Comparing…';
+  document.getElementById('resultsWrap').classList.remove('visible');
+  try {
+    const fd = new FormData();
+    fd.append('file1', cmpFile1);
+    fd.append('file2', cmpFile2);
+    const r = await fetch(`${PROXY}/metadata-compare`, { method:'POST', body:fd });
+    const data = await r.json();
+    if (data.error) { showError(data.error); return; }
+    lastResult = { kind:'compare', ...data };
+    renderCompareResult(lastResult);
+    document.getElementById('cmpStatus').textContent = 'Comparison complete';
+  } catch(e) {
+    showError('Compare failed: ' + e.message);
+  } finally {
+    setBar('loadingBarCmp', false);
+  }
+}
+
+/* ── RENDERERS ── */
+function showError(msg) {
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('verdictBanner').className = 'verdict-banner severe';
+  document.getElementById('verdictIcon').textContent = '⚠';
+  document.getElementById('verdictLabel').textContent = 'Operation failed';
+  document.getElementById('verdictScore').textContent = '—';
+  document.getElementById('verdictSub').textContent = msg;
+  document.getElementById('cardsContainer').innerHTML = '';
+}
+
+function renderVerdictBanner(leakiness, contextLabel) {
+  const b = document.getElementById('verdictBanner');
+  const lbl = (leakiness?.label || 'Unknown').toLowerCase();
+  b.className = 'verdict-banner ' + (lbl === 'severe' ? 'severe' : lbl === 'moderate' ? 'moderate' : lbl === 'minor' ? 'minor' : lbl === 'clean' ? 'clean' : 'unknown');
+  const icons = { clean:'✓', minor:'·', moderate:'⚠', severe:'⊗', unknown:'⊙' };
+  document.getElementById('verdictIcon').textContent = icons[lbl] || '⊙';
+  document.getElementById('verdictLabel').textContent = contextLabel || (leakiness?.label || 'Unknown') + ' leakiness';
+  const scoreEl = document.getElementById('verdictScore');
+  scoreEl.textContent = leakiness?.score ?? '—';
+  scoreEl.className = 'verdict-score ' + (leakiness?.score >= 70 ? 'red' : leakiness?.score >= 40 ? 'warn' : 'green');
+  document.getElementById('verdictSub').textContent = leakiness?.summary || '';
+}
+
+function renderExtractResult(r) {
+  renderVerdictBanner(r.leakiness, `${r.leakiness?.label || 'Unknown'} leakiness`);
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  // Reasons / flags
+  if (r.leakiness?.flags?.length) {
+    html += renderCard('cardFlags', `⚑ Why this score`, r.leakiness.flags.length, true,
+      `<div class="flag-list">${r.leakiness.flags.map(f =>
+        `<div class="flag-row ${esc(f.severity||'low')}"><span class="sym">${esc(f.sym||'·')}</span><span>${esc(f.text)}</span></div>`).join('')}</div>`);
+  }
+
+  // File basics
+  html += renderCard('cardBasics', '◈ File Basics', '', true, renderBasicsBody(r));
+
+  // ExifTool metadata
+  if (r.exiftool) {
+    const groups = groupMetadata(r.exiftool);
+    Object.keys(groups).forEach(g => {
+      const rows = Object.entries(groups[g]).map(([k,v]) =>
+        `<div class="kv-row"><div class="kv-key">${esc(k)}</div><div class="kv-val">${esc(String(v).slice(0,400))}</div></div>`).join('');
+      html += renderCard(`cardExif${g.replace(/[^a-z0-9]/gi,'')}`, `▤ ${g}`, Object.keys(groups[g]).length, false,
+        `<div class="kv-list">${rows}</div>`);
+    });
+  } else if (r.exiftool_unavailable) {
+    html += renderCard('cardExif', '▤ Metadata', '', true,
+      `<div class="empty">ExifTool is not installed on the server. Format-specific analysis (below) is still available.</div>`);
+  }
+
+  // Ghost data
+  if (r.ghost_data?.length) {
+    html += renderCard('cardGhost', '⚠ Ghost Data — hidden content', r.ghost_data.length, true, renderGhostBody(r.ghost_data));
+  }
+
+  // Format-specific analysis cards
+  if (r.docx_analysis) html += renderCard('cardDocx', '📄 Word Document Analysis', '', false, renderDocxBody(r.docx_analysis));
+  if (r.xlsx_analysis) html += renderCard('cardXlsx', '📊 Excel Analysis', '', false, renderXlsxBody(r.xlsx_analysis));
+  if (r.pptx_analysis) html += renderCard('cardPptx', '📽 PowerPoint Analysis', '', false, renderPptxBody(r.pptx_analysis));
+  if (r.pdf_analysis)  html += renderCard('cardPdf',  '▦ PDF Revision History', '', false, renderPdfBody(r.pdf_analysis));
+
+  // Action: scrub this file (cross-mode action)
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">↗ Next Steps</div></div>
+    <div class="card-body always-on">
+      <div class="action-row">
+        <button class="btn-primary" onclick="goScrubMode()">◌ Clean This File →</button>
+        <button class="btn-secondary" onclick="exportJSON()">⇣ Export Report (JSON)</button>
+      </div>
+    </div>
+  </div>`;
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function goScrubMode() {
+  selectMode('scrub');
+  alert('Switched to Scrub mode. Drop the same file here to clean it.');
+}
+
+function renderCard(id, title, count, expanded, bodyHtml) {
+  return `<div class="card${expanded?' expanded':''}" id="${id}">
+    <div class="card-head" onclick="document.getElementById('${id}').classList.toggle('expanded')">
+      <div class="card-title">${title}${count!==''?` <span class="card-count">${count}</span>`:''}</div>
+      <div class="card-toggle">+</div>
+    </div>
+    <div class="card-body">${bodyHtml}</div>
+  </div>`;
+}
+
+function renderBasicsBody(r) {
+  const ft = r.file_type || {};
+  const h = r.hashes || {};
+  return `<div class="kv-list">
+    <div class="kv-row"><div class="kv-key">Filename</div><div class="kv-val accent">${esc(r.filename||'')}</div></div>
+    <div class="kv-row"><div class="kv-key">File Size</div><div class="kv-val">${formatSize(h.size||0)}</div></div>
+    <div class="kv-row"><div class="kv-key">MIME Type</div><div class="kv-val">${esc(ft.mime||'')}</div></div>
+    <div class="kv-row"><div class="kv-key">Description</div><div class="kv-val">${esc(ft.description||'')}</div></div>
+    <div class="kv-row"><div class="kv-key">SHA-256</div><div class="kv-val mono-hash">${esc(h.sha256||'')}</div></div>
+    <div class="kv-row"><div class="kv-key">SHA-1</div><div class="kv-val mono-hash">${esc(h.sha1||'')}</div></div>
+    <div class="kv-row"><div class="kv-key">MD5</div><div class="kv-val mono-hash">${esc(h.md5||'')}</div></div>
+  </div>`;
+}
+
+function renderGhostBody(ghosts) {
+  return ghosts.map(g => {
+    let detailsHtml = '';
+    if (g.details) {
+      if (Array.isArray(g.details)) {
+        detailsHtml = `<div class="ghost-details"><pre style="margin:0;white-space:pre-wrap;font-family:var(--mono);font-size:10.5px;">${esc(JSON.stringify(g.details, null, 2))}</pre></div>`;
+      } else if (typeof g.details === 'object') {
+        detailsHtml = `<div class="ghost-details"><pre style="margin:0;white-space:pre-wrap;font-family:var(--mono);font-size:10.5px;">${esc(JSON.stringify(g.details, null, 2))}</pre></div>`;
+      }
+    }
+    return `<div class="ghost-card severity-${esc(g.severity||'low')}">
+      <div class="ghost-head">
+        <span class="ghost-kind">${esc(g.kind||'').replace(/_/g,' ')}</span>
+        <span class="ghost-sev ${esc(g.severity||'low')}">${esc(g.severity||'')}</span>
+      </div>
+      <div class="ghost-desc">${esc(g.description||'')}</div>
+      ${detailsHtml}
+    </div>`;
+  }).join('');
+}
+
+function renderDocxBody(d) {
+  let html = '<div class="kv-list">';
+  if (d.revision_count != null) html += kvRow('Revision Count', d.revision_count);
+  if (d.total_edit_time_min != null) html += kvRow('Total Edit Time', d.total_edit_time_min + ' min');
+  if (d.tracked_changes?.length) html += kvRow('Tracked Changes', d.tracked_changes.length, 'warn');
+  if (d.comments?.length) html += kvRow('Comments', d.comments.length, 'warn');
+  if (d.hidden_text_count) html += kvRow('Hidden Text Spans', d.hidden_text_count, 'warn');
+  if (Object.keys(d.custom_properties||{}).length) {
+    html += kvRow('Custom Properties', Object.entries(d.custom_properties).map(([k,v])=>`${esc(k)}: ${esc(v)}`).join('<br>'));
+  }
+  html += '</div>';
+
+  // Detail sections
+  if (d.tracked_changes?.length) {
+    html += '<div style="padding:14px 24px;border-top:1px solid var(--border);"><strong style="font-family:var(--mono);font-size:10px;color:#e8d5a3;text-transform:uppercase;letter-spacing:0.12em;">Tracked Changes Detail</strong>';
+    html += '<div class="ghost-details">' + esc(JSON.stringify(d.tracked_changes.slice(0,20), null, 2)) + '</div></div>';
+  }
+  if (d.comments?.length) {
+    html += '<div style="padding:14px 24px;border-top:1px solid var(--border);"><strong style="font-family:var(--mono);font-size:10px;color:#e8d5a3;text-transform:uppercase;letter-spacing:0.12em;">Comments Detail</strong>';
+    html += '<div class="ghost-details">' + esc(JSON.stringify(d.comments.slice(0,20), null, 2)) + '</div></div>';
+  }
+  return html;
+}
+
+function renderXlsxBody(d) {
+  let html = '<div class="kv-list">';
+  if (d.hidden_sheets?.length) {
+    html += kvRow('Hidden Sheets', d.hidden_sheets.map(s => `${esc(s.name)} (${esc(s.state)})`).join('<br>'), 'warn');
+  } else {
+    html += kvRow('Hidden Sheets', 'None', 'green');
+  }
+  if (d.hidden_named_ranges?.length) {
+    html += kvRow('Hidden Named Ranges', d.hidden_named_ranges.map(esc).join(', '), 'warn');
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderPptxBody(d) {
+  let html = '<div class="kv-list">';
+  html += kvRow('Total Slides', d.total_slides);
+  if (d.hidden_slides?.length) {
+    html += kvRow('Hidden Slides', `Slide(s) ${d.hidden_slides.join(', ')}`, 'warn');
+  } else {
+    html += kvRow('Hidden Slides', 'None', 'green');
+  }
+  if (d.slide_notes?.length) {
+    html += kvRow('Slide Notes', d.slide_notes.length + ' slides have speaker notes');
+  }
+  html += '</div>';
+  if (d.slide_notes?.length) {
+    html += '<div style="padding:14px 24px;border-top:1px solid var(--border);"><strong style="font-family:var(--mono);font-size:10px;color:#e8d5a3;text-transform:uppercase;letter-spacing:0.12em;">Speaker Notes</strong>';
+    d.slide_notes.slice(0,10).forEach(n => {
+      html += `<div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.70);margin-top:8px;line-height:1.7;"><strong style="color:#c8a96e">Slide ${n.slide}:</strong> ${esc(n.text)}</div>`;
+    });
+    html += '</div>';
+  }
+  return html;
+}
+
+function renderPdfBody(d) {
+  let html = '<div class="kv-list">';
+  if (d.page_count) html += kvRow('Page Count', d.page_count);
+  if (d.revision_count > 1) {
+    html += kvRow('Incremental Revisions', d.revision_count + ' (older versions of content may be recoverable)', 'red');
+  } else {
+    html += kvRow('Incremental Revisions', '1 (clean)', 'green');
+  }
+  html += kvRow('Annotations', d.annotations || 0);
+  html += kvRow('Form Fields', d.form_fields || 0);
+  html += kvRow('Embedded Files', d.embedded_files || 0, d.embedded_files > 0 ? 'warn' : 'dim');
+  if (d.pdf_info_dict) {
+    Object.entries(d.pdf_info_dict).forEach(([k,v]) => {
+      html += kvRow('PDF/' + k, esc(v), 'accent');
+    });
+  }
+  html += '</div>';
+  return html;
+}
+
+function kvRow(k, v, cls) {
+  return `<div class="kv-row"><div class="kv-key">${esc(k)}</div><div class="kv-val ${cls||''}">${v}</div></div>`;
+}
+
+function groupMetadata(meta) {
+  const groups = {};
+  Object.entries(meta).forEach(([k,v]) => {
+    const colonIdx = k.indexOf(':');
+    let group, name;
+    if (colonIdx > 0) {
+      group = k.slice(0, colonIdx);
+      name = k.slice(colonIdx+1);
+    } else {
+      group = 'Other';
+      name = k;
+    }
+    if (!groups[group]) groups[group] = {};
+    groups[group][name] = v;
+  });
+  return groups;
+}
+
+function renderScrubResult(r) {
+  const pre = r.pre_leakiness || {};
+  const post = r.post_leakiness || {};
+  renderVerdictBanner(post, `Cleaned · ${pre.score} → ${post.score}`);
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  // Action: download cleaned file
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">⇣ Cleaned File</div></div>
+    <div class="card-body always-on">
+      <div class="kv-list">
+        <div class="kv-row"><div class="kv-key">Filename</div><div class="kv-val accent">${esc(r.filename||'')}</div></div>
+        <div class="kv-row"><div class="kv-key">Original Size</div><div class="kv-val">${formatSize(r.original_size||0)}</div></div>
+        <div class="kv-row"><div class="kv-key">Cleaned Size</div><div class="kv-val">${formatSize(r.cleaned_size||0)}</div></div>
+        <div class="kv-row"><div class="kv-key">Fields Removed</div><div class="kv-val warn">${r.removed_count||0}</div></div>
+        <div class="kv-row"><div class="kv-key">Leakiness</div><div class="kv-val">
+          <span style="color:${pre.score >= 70 ? '#c0392b' : pre.score >= 40 ? '#e87b4a' : '#4ec994'}">${pre.score} (${pre.label})</span>
+          → 
+          <span style="color:${post.score >= 70 ? '#c0392b' : post.score >= 40 ? '#e87b4a' : '#4ec994'}">${post.score} (${post.label})</span>
+        </div></div>
+      </div>
+      <div class="action-row">
+        <button class="btn-primary" onclick="downloadCleaned()">⇣ Download Cleaned File</button>
+        <button class="btn-secondary" onclick="exportJSON()">⇣ Export Scrub Report</button>
+      </div>
+    </div>
+  </div>`;
+
+  // Removed fields
+  if (r.fields_removed?.length) {
+    html += renderCard('cardRemoved', `⌫ Fields Removed`, r.fields_removed.length, true,
+      `<div class="kv-list">${r.fields_removed.slice(0,200).map(f =>
+        `<div class="kv-row"><div class="kv-key">${esc(f.field||'')}</div><div class="kv-val warn">${esc(f.old_value||'')}</div></div>`).join('')}</div>`);
+  }
+
+  // Ghost data still present after scrub (warn user)
+  if (r.ghosts_post?.length) {
+    html += renderCard('cardGhostsAfter', `⚠ Ghosts Still Present`, r.ghosts_post.length, true,
+      `<div style="padding:14px 24px;font-family:var(--mono);font-size:11px;color:#e87b4a;line-height:1.7;">
+        Some hidden content remains in the cleaned file (tracked changes, hidden slides, etc. cannot always be safely removed without altering the document content).
+      </div>` + renderGhostBody(r.ghosts_post));
+  }
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function downloadCleaned() {
+  if (!lastResult || lastResult.kind !== 'scrub' || !lastResult.cleaned_b64) return;
+  const bin = atob(lastResult.cleaned_b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  const blob = new Blob([arr]);
+  const ext = lastResult.filename ? lastResult.filename.split('.').pop() : '';
+  const base = lastResult.filename ? lastResult.filename.replace(/\.[^.]+$/,'') : 'cleaned';
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `${base}-clean.${ext}`;
+  a.click();
+}
+
+function renderBulkExtractResult(r) {
+  const results = r.results || [];
+  const total = results.length;
+  const severe = results.filter(x => x.leakiness?.label === 'Severe').length;
+  const moderate = results.filter(x => x.leakiness?.label === 'Moderate').length;
+  const minor = results.filter(x => x.leakiness?.label === 'Minor' || x.leakiness?.label === 'Clean').length;
+  const errors = results.filter(x => x.error).length;
+
+  // Use verdict banner for summary
+  const overallScore = total ? Math.round(results.reduce((s, x) => s + (x.leakiness?.score || 0), 0) / total) : 0;
+  const overallLabel = severe > 0 ? 'severe' : moderate > 0 ? 'moderate' : minor > 0 ? 'minor' : 'unknown';
+  const summary = `${total} file(s) analyzed. ${severe} severe · ${moderate} moderate · ${minor} minor/clean${errors > 0 ? ' · ' + errors + ' errors' : ''}.`;
+  renderVerdictBanner({ score: overallScore, label: overallLabel.charAt(0).toUpperCase()+overallLabel.slice(1), summary }, `Bulk Extract · ${total} file(s)`);
+
+  const c = document.getElementById('cardsContainer');
+  let html = `
+    <div class="bulk-summary">
+      <div class="bulk-stats">
+        <div class="bulk-stat"><span class="bulk-stat-label">Total</span><span class="bulk-stat-value accent">${total}</span></div>
+        <div class="bulk-stat"><span class="bulk-stat-label">Severe</span><span class="bulk-stat-value red">${severe}</span></div>
+        <div class="bulk-stat"><span class="bulk-stat-label">Moderate</span><span class="bulk-stat-value warn">${moderate}</span></div>
+        <div class="bulk-stat"><span class="bulk-stat-label">Minor / Clean</span><span class="bulk-stat-value green">${minor}</span></div>
+        ${errors > 0 ? `<div class="bulk-stat"><span class="bulk-stat-label">Errors</span><span class="bulk-stat-value">${errors}</span></div>` : ''}
+      </div>
+      <button class="btn-secondary" onclick="exportBulkCSV()">⇣ Export CSV</button>
+    </div>
+    <div class="bulk-table">
+      <div class="bulk-head">
+        <div>#</div><div>Filename</div><div>Size</div><div>Score</div><div>Authors</div><div>Verdict</div>
+      </div>
+      ${results.map((it,i) => {
+        const lk = it.leakiness || {};
+        const cls = lk.label ? lk.label.toLowerCase() : (it.error ? 'error' : 'unknown');
+        const authors = (it.key_authors||[]).slice(0,2).join(', ') || '—';
+        return `<div class="bulk-row">
+          <div class="bulk-cell-num">${i+1}</div>
+          <div class="bulk-cell-name" title="${esc(it.filename||'')}">${esc(it.filename||'')}${it.ghost_count ? ` <span style="color:#e87b4a">⚠</span>` : ''}</div>
+          <div class="bulk-cell-size">${formatSize(it.size||0)}</div>
+          <div class="bulk-cell-size" style="color:${(lk.score||0)>=70?'#c0392b':(lk.score||0)>=40?'#e87b4a':'#4ec994'}">${it.error ? '—' : (lk.score ?? '—')}/100</div>
+          <div class="bulk-cell-author" title="${esc(authors)}">${esc(authors)}</div>
+          <div class="bulk-verdict ${cls}">${it.error ? 'error' : (lk.label || 'unknown')}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exportBulkCSV() {
+  if (!lastResult || lastResult.kind !== 'bulk-extract') return;
+  const rows = [['#','Filename','Size','MIME','Leakiness Score','Label','Ghost Count','Authors','SHA256']];
+  (lastResult.results||[]).forEach((it,i) => {
+    const lk = it.leakiness || {};
+    rows.push([i+1, it.filename, it.size, it.mime||'', lk.score||'', lk.label||'', it.ghost_count||0, (it.key_authors||[]).join('|'), it.sha256||'']);
+  });
+  const csv = rows.map(r => r.map(c => {
+    const s = String(c==null?'':c);
+    return s.includes(',')||s.includes('"')||s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\n');
+  const blob = new Blob([csv],{type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `metadata-bulk-${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+}
+
+function renderBulkScrubResult(r) {
+  const summary = r.summary || [];
+  const ok = summary.filter(s => s.ok).length;
+  const errs = summary.filter(s => s.error).length;
+  renderVerdictBanner({score:0, label:'Cleaned', summary:`${ok} file(s) cleaned${errs > 0 ? ', ' + errs + ' error(s)' : ''}`}, `Bulk Scrub Complete`);
+
+  const c = document.getElementById('cardsContainer');
+  let html = `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">⇣ Cleaned Archive</div></div>
+    <div class="card-body always-on">
+      <div class="action-row">
+        <button class="btn-primary" onclick="downloadBulkZip()">⇣ Download Cleaned ZIP</button>
+      </div>
+    </div>
+  </div>`;
+  html += renderCard('cardBulkSummary', '◈ Per-File Summary', summary.length, true,
+    `<div class="kv-list">${summary.map(s =>
+      `<div class="kv-row">
+        <div class="kv-key">${esc(s.filename || '')}</div>
+        <div class="kv-val ${s.error ? 'red' : 'green'}">${s.error ? '✗ ' + esc(s.error) : `✓ ${formatSize(s.size_pre||0)} → ${formatSize(s.size_post||0)} · score ${s.leakiness_pre} → ${s.leakiness_post}`}</div>
+      </div>`).join('')}</div>`);
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function downloadBulkZip() {
+  if (!lastResult || lastResult.kind !== 'bulk-scrub' || !lastResult.zip_b64) return;
+  const bin = atob(lastResult.zip_b64);
+  const arr = new Uint8Array(bin.length);
+  for (let i=0;i<bin.length;i++) arr[i] = bin.charCodeAt(i);
+  const blob = new Blob([arr],{type:'application/zip'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = lastResult.filename || 'metadata-scrubbed.zip';
+  a.click();
+}
+
+function renderCompareResult(r) {
+  const sameContent = r.same_content;
+  renderVerdictBanner(
+    {score:0, label:'Compared', summary: sameContent ? 'Files have IDENTICAL content (same SHA256). Metadata differences only.' : 'Files have DIFFERENT content.'},
+    `Compare · ${esc(r.file1?.filename||'')} vs ${esc(r.file2?.filename||'')}`
+  );
+  const c = document.getElementById('cardsContainer');
+  let html = '';
+
+  // File summary
+  html += `<div class="card expanded">
+    <div class="card-head" style="cursor:default;"><div class="card-title">◈ File Summary</div></div>
+    <div class="card-body always-on">
+      <div class="kv-list">
+        <div class="kv-row"><div class="kv-key">File 1</div><div class="kv-val accent">${esc(r.file1?.filename||'')}</div></div>
+        <div class="kv-row"><div class="kv-key">File 1 SHA-256</div><div class="kv-val mono-hash">${esc(r.file1?.hashes?.sha256||'')}</div></div>
+        <div class="kv-row"><div class="kv-key">File 1 Leakiness</div><div class="kv-val">${r.file1?.leakiness?.score} (${esc(r.file1?.leakiness?.label||'')})</div></div>
+        <div class="kv-row"><div class="kv-key">File 2</div><div class="kv-val accent">${esc(r.file2?.filename||'')}</div></div>
+        <div class="kv-row"><div class="kv-key">File 2 SHA-256</div><div class="kv-val mono-hash">${esc(r.file2?.hashes?.sha256||'')}</div></div>
+        <div class="kv-row"><div class="kv-key">File 2 Leakiness</div><div class="kv-val">${r.file2?.leakiness?.score} (${esc(r.file2?.leakiness?.label||'')})</div></div>
+        <div class="kv-row"><div class="kv-key">Content Identical?</div><div class="kv-val ${sameContent?'green':'warn'}">${sameContent ? '✓ Yes — same SHA-256' : '✗ No — content differs'}</div></div>
+      </div>
+    </div>
+  </div>`;
+
+  // Differing
+  if (r.differing?.length) {
+    html += renderCard('cardDiffering', '⇆ Fields That Differ', r.differing.length, true,
+      `<div>${r.differing.map(d =>
+        `<div class="compare-row">
+          <div class="compare-key">${esc(d.field)}</div>
+          <div class="compare-val diff-only-1">${esc(d.value1||'')}</div>
+          <div class="compare-val diff-only-2">${esc(d.value2||'')}</div>
+        </div>`).join('')}</div>`);
+  }
+
+  if (r.only_in_file1?.length) {
+    html += renderCard('cardOnly1', '◐ Only in File 1', r.only_in_file1.length, false,
+      `<div>${r.only_in_file1.map(d =>
+        `<div class="compare-row"><div class="compare-key">${esc(d.field)}</div><div class="compare-val diff-only-1">${esc(d.value||'')}</div><div class="compare-val empty">—</div></div>`).join('')}</div>`);
+  }
+
+  if (r.only_in_file2?.length) {
+    html += renderCard('cardOnly2', '◑ Only in File 2', r.only_in_file2.length, false,
+      `<div>${r.only_in_file2.map(d =>
+        `<div class="compare-row"><div class="compare-key">${esc(d.field)}</div><div class="compare-val empty">—</div><div class="compare-val diff-only-2">${esc(d.value||'')}</div></div>`).join('')}</div>`);
+  }
+
+  c.innerHTML = html;
+  document.getElementById('resultsWrap').classList.add('visible');
+  document.getElementById('resultsWrap').scrollIntoView({behavior:'smooth',block:'start'});
+}
+
+function exportJSON() {
+  if (!lastResult) return;
+  const out = { ...lastResult };
+  if (out.cleaned_b64) delete out.cleaned_b64;  // strip large binary from export
+  if (out.zip_b64) delete out.zip_b64;
+  const blob = new Blob([JSON.stringify(out, null, 2)], {type:'application/json'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `metadata-${lastResult.kind}-${new Date().toISOString().slice(0,10)}.json`;
+  a.click();
+}
+
+function formatSize(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1024*1024) return (n/1024).toFixed(1) + ' KB';
+  if (n < 1024*1024*1024) return (n/1024/1024).toFixed(1) + ' MB';
+  return (n/1024/1024/1024).toFixed(2) + ' GB';
+}
+</script>
+</body>
+</html>
