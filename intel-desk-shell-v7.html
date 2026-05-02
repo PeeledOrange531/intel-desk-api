@@ -1122,6 +1122,22 @@ const CATEGORIES = [
         datasets:0,
         seo:`Free X (Twitter) account forensics tool that operates entirely on public archive sources \u2014 no X API key required. Checks the Wayback Machine CDX API for every archived snapshot of a profile, queries memory.lol for the account\u2019s full handle rename history (catches identity-laundering), and runs a live HTTP probe to detect alive/suspended/deleted/not-found status. Provides a defensible lower-bound date for account age based on archived evidence (not the actual creation date, which is only available via paid X API). Tweet recovery mode finds Wayback snapshots of deleted tweets. Bulk mode processes up to 50 handles in parallel. Fingerprint comparison analyzes two handles for sock-puppet patterns. Suspicious-pattern detection flags accounts with no archive history, frequent renames, and dormancy followed by reactivation. Used by journalists tracking sources, OSINT researchers, investigators recovering deleted public statements, and analysts monitoring coordinated inauthentic behavior.`,
       },
+      {
+        id:'username-permutator', icon:'⊕', live:true,
+        name:'Username Permutator + Availability',
+        desc:'Generate variants · Check across 30+ platforms · Brand protection',
+        url:`${BASE}/username-permutator.html`,
+        datasets: 30,
+        seo:`Free username permutation generator and cross-platform availability checker. Generates dozens of categorized variations (numeric suffixes, leetspeak, separators, prefix/suffix words, doubled-letter typos, truncations, phonetic swaps, case variants, reversals) of any base username, scored 0-100 by likelihood-of-real-alt-handle heuristic. Quick Check probes 10 high-reliability platforms; Deep Check hits 25+; Brand Protection focuses on impersonation-risk variants on 15 high-traffic platforms with squat-signal detection. Reverse Pattern mode extracts the common base and naming convention from a list of known handles. Honest framing throughout — labels results as Taken / Not Found / Unverifiable, never “Available” — because a 404 doesn’t guarantee a username is registrable. Used by journalists tracking sock-puppet networks, brand and IP protection teams, investigators identifying typo-squat handles, and analysts mapping coordinated inauthentic behavior. No API key, no signup, no logging.`,
+      },
+      {
+        id:'username-correlator', icon:'⇆', live:true,
+        name:'Username Correlation + Sock-Puppet',
+        desc:'Pair score · Cluster · Wayback overlap · memory.lol cross-ref',
+        url:`${BASE}/username-correlator.html`,
+        datasets: 8,
+        seo:`Free cross-platform username correlation tool. Computes a 0-100 same-person likelihood score from four weighted lexical signals: Jaro-Winkler similarity (40%, with leet-normalized variant), n-gram overlap (25%, bigram + trigram Jaccard average), shared core (20%, alphanumeric and digit-stripped forms), and substitution detection (15%, leetspeak + separator-stripped equality). Pair Compare mode shows full signal breakdown with weighted contribution bars. Cluster mode handles up to 20 usernames with pairwise matrix and union-find clustering at adjustable threshold, visualized as a D3 force-directed graph. Sock-Puppet mode adds Wayback Machine CDX presence probes on Twitter/X/GitHub/Reddit/Instagram (mutually exclusive activity windows are a strong sock-puppet signal) plus memory.lol queries to detect handles sharing historical X identities (identity-laundering signal). Pattern Extract finds common base, naming convention, and predicts next-likely handles. Honest framing: bands labeled almost certainly same / likely same / possibly related / weak signal / different. Lexical similarity tells you the same brain selected these handles, not that the same person operates them. Used by journalists tracking disinformation networks, OSINT analysts mapping coordinated inauthentic behavior, brand protection teams identifying impersonator clusters.`,
+      },
     ],
   },
   {
