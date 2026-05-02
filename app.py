@@ -5026,6 +5026,1495 @@ def x_fingerprint():
     }))
 
 
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# USERNAME PERMUTATOR & AVAILABILITY CHECKER — paste-in routes for app.py
+#
+# Routes:
+#   POST /username-permutate     — generate permutations server-side (mirrors client)
+#   POST /username-availability  — check usernames across platforms
+#   POST /username-pattern       — extract common pattern from a list of usernames
+#
+# All free, no API keys required. Uses public HTTP probes only.
+#
+# Honest framing: "Not Found" status does NOT mean "Available to register."
+# Many platforms reserve, deactivate, or restrict usernames. The label is
+# intentionally `not_found` — what we actually verified.
+# ══════════════════════════════════════════════════════════════════════════════
+
+import re as _upre
+import json as _upjson
+import logging as _uplog
+import string as _upstring
+from concurrent.futures import ThreadPoolExecutor as _uppool, as_completed as _upas_completed
+
+_uplogger = _uplog.getLogger("username-permutator")
+
+_UP_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                  "(KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+# ── Platform configuration ─────────────────────────────────────────────────
+# Each platform entry:
+#   url:          format string with {u}
+#   method:       'status_404' | 'json_404' | 'string_match' | 'js_unverifiable'
+#   not_found:    string indicating not found (for string_match)
+#   found:        string indicating found (for string_match, optional)
+#   category:     for UI grouping
+#   reliability:  'high' | 'medium' | 'low' (low = JS-rendered or login-walled)
+#   normalize:    optional func: lambda u → cleaned u for this platform's rules
+#
+_UP_PLATFORMS = {
+    # ── HIGH RELIABILITY ──
+    "github": {
+        "url": "https://github.com/{u}",
+        "method": "status_404", "category": "Developer", "reliability": "high",
+    },
+    "reddit": {
+        "url": "https://www.reddit.com/user/{u}/about.json",
+        "method": "json_404", "category": "Social", "reliability": "high",
+    },
+    "soundcloud": {
+        "url": "https://soundcloud.com/{u}",
+        "method": "status_404", "category": "Music", "reliability": "high",
+    },
+    "medium": {
+        "url": "https://medium.com/@{u}",
+        "method": "status_404", "category": "Writing", "reliability": "high",
+    },
+    "devto": {
+        "url": "https://dev.to/{u}",
+        "method": "status_404", "category": "Developer", "reliability": "high",
+    },
+    "pinterest": {
+        "url": "https://www.pinterest.com/{u}/",
+        "method": "status_404", "category": "Social", "reliability": "high",
+    },
+    "tumblr": {
+        "url": "https://{u}.tumblr.com/",
+        "method": "status_404", "category": "Blog", "reliability": "high",
+    },
+    "vimeo": {
+        "url": "https://vimeo.com/{u}",
+        "method": "status_404", "category": "Video", "reliability": "high",
+    },
+    "bandcamp": {
+        "url": "https://{u}.bandcamp.com/",
+        "method": "status_404", "category": "Music", "reliability": "high",
+    },
+    "lastfm": {
+        "url": "https://www.last.fm/user/{u}",
+        "method": "status_404", "category": "Music", "reliability": "high",
+    },
+    "aboutme": {
+        "url": "https://about.me/{u}",
+        "method": "status_404", "category": "Bio", "reliability": "high",
+    },
+    "keybase": {
+        "url": "https://keybase.io/{u}",
+        "method": "status_404", "category": "Identity", "reliability": "high",
+    },
+    "replit": {
+        "url": "https://replit.com/@{u}",
+        "method": "status_404", "category": "Developer", "reliability": "high",
+    },
+    "deviantart": {
+        "url": "https://{u}.deviantart.com/",
+        "method": "status_404", "category": "Art", "reliability": "high",
+    },
+    "behance": {
+        "url": "https://www.behance.net/{u}",
+        "method": "status_404", "category": "Art", "reliability": "high",
+    },
+    "ao3": {
+        "url": "https://archiveofourown.org/users/{u}",
+        "method": "status_404", "category": "Writing", "reliability": "high",
+    },
+    "patreon": {
+        "url": "https://www.patreon.com/{u}",
+        "method": "status_404", "category": "Creator", "reliability": "high",
+    },
+    "mastodon_social": {
+        "url": "https://mastodon.social/@{u}",
+        "method": "status_404", "category": "Social", "reliability": "high",
+    },
+    "itchio": {
+        "url": "https://{u}.itch.io/",
+        "method": "status_404", "category": "Gaming", "reliability": "high",
+    },
+    "codepen": {
+        "url": "https://codepen.io/{u}",
+        "method": "status_404", "category": "Developer", "reliability": "high",
+    },
+    "producthunt": {
+        "url": "https://www.producthunt.com/@{u}",
+        "method": "status_404", "category": "Tech", "reliability": "high",
+    },
+
+    # ── MEDIUM RELIABILITY (string match always returns 200) ──
+    "hackernews": {
+        "url": "https://news.ycombinator.com/user?id={u}",
+        "method": "string_match", "not_found": "No such user.",
+        "category": "Tech", "reliability": "high",
+    },
+    "telegram": {
+        "url": "https://t.me/{u}",
+        "method": "string_match",
+        "not_found": "If you have <strong>Telegram</strong>, you can contact",
+        "found": "tgme_page_title",
+        "category": "Messaging", "reliability": "medium",
+    },
+    "wikipedia_user": {
+        "url": "https://en.wikipedia.org/wiki/User:{u}",
+        "method": "string_match", "not_found": "Wikipedia does not have a user page",
+        "category": "Knowledge", "reliability": "medium",
+    },
+    "pastebin": {
+        "url": "https://pastebin.com/u/{u}",
+        "method": "string_match", "not_found": "Not Found",
+        "category": "Tech", "reliability": "medium",
+    },
+    "steam": {
+        "url": "https://steamcommunity.com/id/{u}",
+        "method": "string_match",
+        "not_found": "The specified profile could not be found",
+        "category": "Gaming", "reliability": "high",
+    },
+    "twitch": {
+        "url": "https://www.twitch.tv/{u}",
+        "method": "status_404", "category": "Stream", "reliability": "medium",
+    },
+
+    # ── LOW RELIABILITY (JS-rendered or login-walled — flagged in UI) ──
+    "twitter_x": {
+        "url": "https://x.com/{u}",
+        "method": "js_unverifiable", "category": "Social", "reliability": "low",
+        "note": "X aggressively blocks unauthenticated probes. Result is often unreliable.",
+    },
+    "instagram": {
+        "url": "https://www.instagram.com/{u}/",
+        "method": "js_unverifiable", "category": "Social", "reliability": "low",
+        "note": "Instagram requires JS rendering; HTTP probe is unreliable.",
+    },
+    "tiktok": {
+        "url": "https://www.tiktok.com/@{u}",
+        "method": "js_unverifiable", "category": "Social", "reliability": "low",
+        "note": "TikTok requires JS rendering; HTTP probe is unreliable.",
+    },
+    "linkedin": {
+        "url": "https://www.linkedin.com/in/{u}",
+        "method": "js_unverifiable", "category": "Social", "reliability": "low",
+        "note": "LinkedIn requires login for most profile data.",
+    },
+    "facebook": {
+        "url": "https://www.facebook.com/{u}",
+        "method": "js_unverifiable", "category": "Social", "reliability": "low",
+        "note": "Facebook requires login for most profile data.",
+    },
+    "youtube": {
+        "url": "https://www.youtube.com/@{u}",
+        "method": "status_404", "category": "Video", "reliability": "medium",
+    },
+    "threads": {
+        "url": "https://www.threads.net/@{u}",
+        "method": "js_unverifiable", "category": "Social", "reliability": "low",
+        "note": "Threads requires JS rendering; HTTP probe is unreliable.",
+    },
+    "snapchat": {
+        "url": "https://www.snapchat.com/add/{u}",
+        "method": "string_match",
+        "not_found": "Couldn't find that user",
+        "category": "Social", "reliability": "low",
+        "note": "Snapchat detection is best-effort.",
+    },
+}
+
+# Curated subsets
+_UP_SUBSET_QUICK = [
+    "github", "reddit", "soundcloud", "medium", "twitch",
+    "tumblr", "behance", "lastfm", "telegram", "youtube",
+]
+_UP_SUBSET_BRAND = [
+    "github", "reddit", "twitter_x", "instagram", "tiktok",
+    "youtube", "facebook", "twitch", "soundcloud", "tumblr",
+    "telegram", "snapchat", "patreon", "medium", "pinterest",
+]
+
+# ── Username normalization ─────────────────────────────────────────────────
+def _up_clean_input(raw):
+    """Strip URL prefixes and @ symbols. Return base username."""
+    if not raw: return None
+    s = str(raw).strip()
+    s = _upre.sub(
+        r"^https?://(?:www\.|m\.|mobile\.)?[a-z0-9.\-]+/(?:user/|users/|@|in/|add/|u/)?",
+        "", s, flags=_upre.IGNORECASE
+    )
+    s = s.lstrip("@/").split("/")[0].split("?")[0].split("#")[0]
+    s = s.strip()
+    if not s or len(s) > 64: return None
+    if not _upre.fullmatch(r"[A-Za-z0-9._\-]+", s): return None
+    return s
+
+# ── Permutation generation ─────────────────────────────────────────────────
+_UP_LEET_MAP = {"o":"0", "e":"3", "a":"4", "i":"1", "s":"5", "t":"7", "b":"8", "l":"1", "g":"9"}
+_UP_NUMERIC_SUFFIXES = ["1", "2", "7", "13", "21", "23", "47", "69", "77", "99", "100", "123", "420", "777", "1234", "2024", "2025", "2026"]
+_UP_WORD_SUFFIXES   = ["real", "official", "hq", "yt", "tv", "ig", "tg", "live", "us", "uk", "eu", "jp", "_real", "_official", "_hq"]
+_UP_WORD_PREFIXES   = ["real", "the", "official", "mr", "ms", "dr", "real_", "the_"]
+_UP_SEPARATORS      = ["_", ".", "-"]
+
+def _up_strip_alnum(s):
+    """Lowercase + alphanumeric only."""
+    return _upre.sub(r"[^a-z0-9]", "", s.lower())
+
+def _up_leet_swap(s, max_subs=3):
+    """Generate leet variants by swapping up to max_subs characters."""
+    out = []
+    s_lower = s.lower()
+    # Single substitutions
+    for i, ch in enumerate(s_lower):
+        if ch in _UP_LEET_MAP:
+            v = list(s_lower)
+            v[i] = _UP_LEET_MAP[ch]
+            out.append("".join(v))
+    # Full substitution (every applicable char)
+    full = "".join(_UP_LEET_MAP.get(c, c) for c in s_lower)
+    if full != s_lower:
+        out.append(full)
+    return out
+
+def _up_doubled_letter_typos(s):
+    """Typo-squatting: double a letter."""
+    out = []
+    for i, ch in enumerate(s):
+        if ch.isalnum() and (i == 0 or s[i-1] != ch):
+            out.append(s[:i] + ch + ch + s[i:])
+    return out
+
+def _up_truncate(s):
+    """Drop trailing chars."""
+    out = []
+    if len(s) > 4:
+        out.append(s[:-1])
+    if len(s) > 5:
+        out.append(s[:-2])
+    # Drop trailing vowels
+    no_v = _upre.sub(r"[aeiouy]+$", "", s.lower())
+    if no_v and no_v != s.lower():
+        out.append(no_v)
+    return out
+
+def _up_separator_inserts(s):
+    """Insert separators at boundaries (camelCase splits, vowel-consonant)."""
+    out = []
+    # camelCase: insert at lowercase->uppercase boundaries
+    pieces = _upre.findall(r"[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z][a-z]|\b)|[0-9]+", s)
+    if len(pieces) > 1:
+        for sep in _UP_SEPARATORS:
+            out.append(sep.join(p.lower() for p in pieces))
+    # Heuristic word split: insert separator between letters and digits
+    split = _upre.sub(r"([a-zA-Z])([0-9])", r"\1_\2", s)
+    if split != s:
+        out.append(split)
+    return out
+
+def _up_separator_strip(s):
+    """Remove all separators."""
+    stripped = _upre.sub(r"[._\-]", "", s)
+    if stripped != s and stripped:
+        return [stripped]
+    return []
+
+def _up_case_variants(s):
+    """Casing permutations."""
+    return [s.lower(), s.upper(), s.capitalize()]
+
+def _up_reverse(s):
+    """Reverse the string."""
+    return [s[::-1]] if len(s) > 3 else []
+
+def _up_phonetic(s):
+    """Common phonetic swaps."""
+    out = []
+    for src, dst in [("ph", "f"), ("ck", "k"), ("c", "k"), ("k", "c"),
+                     ("y", "i"), ("z", "s"), ("x", "ks")]:
+        if src in s.lower():
+            v = s.lower().replace(src, dst, 1)
+            if v != s.lower():
+                out.append(v)
+    return out
+
+def _up_generate_permutations(base, categories=None, limit=200):
+    """Generate categorized permutations.
+
+    Returns list of dicts: [{"username": ..., "category": ...}, ...]
+    Categories: numeric, leet, separator, prefix_suffix, typo, truncation, case, phonetic, reversal
+    """
+    base_clean = base.strip()
+    if not base_clean: return []
+
+    if categories is None:
+        categories = ["numeric", "leet", "separator", "prefix_suffix",
+                      "typo", "truncation", "case", "phonetic", "reversal"]
+
+    seen = set()
+    out  = []
+    def add(u, cat):
+        u = u.strip()
+        if not u or u == base_clean: return
+        if not _upre.fullmatch(r"[A-Za-z0-9._\-]+", u): return
+        if len(u) > 64: return
+        key = u.lower()
+        if key in seen: return
+        seen.add(key)
+        out.append({"username": u, "category": cat})
+
+    # Numeric suffixes/prefixes
+    if "numeric" in categories:
+        for n in _UP_NUMERIC_SUFFIXES:
+            add(base_clean + n, "numeric")
+            add(base_clean + "_" + n, "numeric")
+            add(base_clean + "." + n, "numeric")
+        for n in _UP_NUMERIC_SUFFIXES[:6]:
+            add(n + base_clean, "numeric")
+
+    # Leetspeak
+    if "leet" in categories:
+        for v in _up_leet_swap(base_clean):
+            add(v, "leet")
+
+    # Separator strip + insert
+    if "separator" in categories:
+        for v in _up_separator_strip(base_clean):
+            add(v, "separator")
+        for v in _up_separator_inserts(base_clean):
+            add(v, "separator")
+
+    # Word prefixes/suffixes
+    if "prefix_suffix" in categories:
+        for w in _UP_WORD_SUFFIXES:
+            add(base_clean + w, "prefix_suffix")
+            add(base_clean + "_" + w.strip("_"), "prefix_suffix")
+        for w in _UP_WORD_PREFIXES:
+            add(w + base_clean, "prefix_suffix")
+            add(w.strip("_") + "_" + base_clean, "prefix_suffix")
+
+    # Doubled-letter typos
+    if "typo" in categories:
+        for v in _up_doubled_letter_typos(base_clean):
+            add(v, "typo")
+
+    # Truncation
+    if "truncation" in categories:
+        for v in _up_truncate(base_clean):
+            add(v, "truncation")
+
+    # Case
+    if "case" in categories:
+        for v in _up_case_variants(base_clean):
+            add(v, "case")
+
+    # Phonetic
+    if "phonetic" in categories:
+        for v in _up_phonetic(base_clean):
+            add(v, "phonetic")
+
+    # Reversal
+    if "reversal" in categories:
+        for v in _up_reverse(base_clean):
+            add(v, "reversal")
+
+    # Score for prioritization (BOOSTER #1)
+    # Higher score = more likely to be a real alt-handle
+    for p in out:
+        p["score"] = _up_score_permutation(p["username"], base_clean, p["category"])
+
+    # Sort by score desc
+    out.sort(key=lambda p: -p["score"])
+    return out[:limit]
+
+def _up_score_permutation(u, base, category):
+    """Heuristic 0-100. Higher = more 'this looks like a real alt-handle.'"""
+    score = 50
+    ub, bb = u.lower(), base.lower()
+    # Length similarity
+    score -= min(20, abs(len(u) - len(base)) * 3)
+    # Common patterns are higher value
+    if category == "numeric":
+        # Year suffixes are very common
+        if _upre.search(r"(202\d|199\d|19\d\d)$", ub): score += 20
+        elif _upre.search(r"\d{1,3}$", ub): score += 12
+    elif category == "prefix_suffix":
+        # _real / official / hq are extremely common
+        if any(w in ub for w in ["real", "official", "hq"]): score += 20
+        elif any(w in ub for w in ["yt", "tv", "live"]): score += 10
+    elif category == "separator":
+        score += 10
+    elif category == "case":
+        score += 5
+    elif category == "typo":
+        score += 8
+    elif category == "leet":
+        # Heavy leet is suspicious; light is normal
+        replaced = sum(1 for a,b in zip(ub, bb) if a != b)
+        if replaced == 1: score += 10
+        elif replaced == 2: score += 6
+        else: score -= 5
+    elif category == "phonetic":
+        score += 6
+    elif category == "reversal":
+        score -= 25
+    elif category == "truncation":
+        score += 4
+    return max(0, min(100, score))
+
+# ── Availability checking ─────────────────────────────────────────────────
+def _up_check_one(platform_key, username, timeout=8):
+    """Check a single platform/username combo. Returns dict."""
+    cfg = _UP_PLATFORMS.get(platform_key)
+    if not cfg:
+        return {"platform": platform_key, "username": username,
+                "status": "error", "reason": "unknown_platform"}
+    url = cfg["url"].format(u=username)
+    out = {
+        "platform":    platform_key,
+        "username":    username,
+        "url":         url,
+        "category":    cfg.get("category"),
+        "reliability": cfg.get("reliability", "medium"),
+    }
+    if cfg.get("note"):
+        out["note"] = cfg["note"]
+
+    try:
+        r = requests.get(
+            url,
+            headers=_UP_HEADERS,
+            timeout=timeout,
+            allow_redirects=True,
+        )
+        method = cfg["method"]
+        if method == "status_404":
+            if r.status_code == 200:
+                out["status"] = "taken"
+            elif r.status_code == 404:
+                out["status"] = "not_found"
+            elif r.status_code in (301, 302, 303, 307, 308):
+                # Followed via allow_redirects=True; should rarely hit here
+                out["status"] = "unverifiable"
+                out["reason"] = f"redirect_{r.status_code}"
+            elif r.status_code in (403, 429):
+                out["status"] = "unverifiable"
+                out["reason"] = f"http_{r.status_code}"
+            else:
+                out["status"] = "unverifiable"
+                out["reason"] = f"http_{r.status_code}"
+        elif method == "json_404":
+            if r.status_code == 200:
+                try:
+                    j = r.json()
+                    # Reddit returns {"kind":"Listing", "data":{"children":[]}} for not found 404s
+                    # /about.json returns user data on success
+                    if isinstance(j, dict) and j.get("kind") == "t2":
+                        out["status"] = "taken"
+                    elif isinstance(j, dict) and j.get("data", {}).get("is_suspended"):
+                        out["status"] = "taken"
+                        out["reason"] = "suspended"
+                    elif isinstance(j, dict) and "data" in j and j["data"]:
+                        out["status"] = "taken"
+                    else:
+                        out["status"] = "not_found"
+                except Exception:
+                    out["status"] = "unverifiable"
+                    out["reason"] = "json_parse"
+            elif r.status_code == 404:
+                out["status"] = "not_found"
+            else:
+                out["status"] = "unverifiable"
+                out["reason"] = f"http_{r.status_code}"
+        elif method == "string_match":
+            if r.status_code != 200:
+                if r.status_code == 404:
+                    out["status"] = "not_found"
+                else:
+                    out["status"] = "unverifiable"
+                    out["reason"] = f"http_{r.status_code}"
+            else:
+                text = r.text or ""
+                nf = cfg.get("not_found")
+                fd = cfg.get("found")
+                if nf and nf in text:
+                    out["status"] = "not_found"
+                elif fd and fd in text:
+                    out["status"] = "taken"
+                elif nf:
+                    out["status"] = "taken"
+                else:
+                    out["status"] = "unverifiable"
+                    out["reason"] = "no_string_match"
+        elif method == "js_unverifiable":
+            # Best-effort probe, but explicitly mark unverifiable
+            out["status"] = "unverifiable"
+            out["reason"] = "js_or_login_required"
+            try:
+                if r.status_code == 404:
+                    out["status"] = "not_found"
+                    out["unverified_hint"] = True
+                elif r.status_code == 200:
+                    # Check for known signed-out content; otherwise still mark unverifiable
+                    text = r.text or ""
+                    if any(s in text for s in ["This account doesn't exist", "User not found",
+                                                "Page not available", "isn't available",
+                                                "Couldn't find this account"]):
+                        out["status"] = "not_found"
+                        out["unverified_hint"] = True
+                    else:
+                        out["taken_hint"] = True
+            except Exception:
+                pass
+        else:
+            out["status"] = "unverifiable"
+            out["reason"] = "unknown_method"
+    except requests.Timeout:
+        out["status"] = "error"
+        out["reason"] = "timeout"
+    except requests.ConnectionError:
+        out["status"] = "error"
+        out["reason"] = "connection"
+    except Exception as e:
+        out["status"] = "error"
+        out["reason"] = "exception"
+        _uplogger.debug(f"check {platform_key}/{username} failed: {e}")
+    return out
+
+def _up_check_batch(checks, max_workers=12, per_timeout=8):
+    """Run a batch of (platform, username) checks in parallel.
+
+    checks: list of (platform_key, username) tuples
+    Returns: list of result dicts in submission order.
+    """
+    results = [None] * len(checks)
+    with _uppool(max_workers=max_workers) as pool:
+        futures = {
+            pool.submit(_up_check_one, p, u, per_timeout): i
+            for i, (p, u) in enumerate(checks)
+        }
+        for fut in _upas_completed(futures):
+            i = futures[fut]
+            try:
+                results[i] = fut.result()
+            except Exception as e:
+                p, u = checks[i]
+                results[i] = {"platform": p, "username": u, "status": "error",
+                              "reason": "future_exception"}
+    return results
+
+# ── Squat detection (BOOSTER #4) ─────────────────────────────────────────
+def _up_squat_signal(platform_key, username, result):
+    """Heuristic: is a TAKEN account showing signs of being a dormant squat?
+    Only runs lightweight checks to keep the batch fast.
+    """
+    if result.get("status") != "taken": return None
+    # Reddit /about.json gives us link_karma + comment_karma + created_utc
+    if platform_key == "reddit":
+        try:
+            r = requests.get(f"https://www.reddit.com/user/{username}/about.json",
+                             headers=_UP_HEADERS, timeout=6)
+            if r.status_code == 200:
+                d = r.json().get("data", {})
+                lk = d.get("link_karma", 0)
+                ck = d.get("comment_karma", 0)
+                if lk + ck < 10:
+                    return {"signal": "low_activity",
+                            "details": f"karma {lk + ck} (link {lk} / comment {ck})"}
+        except Exception:
+            pass
+    # GitHub: check repo + follower count via API
+    if platform_key == "github":
+        try:
+            r = requests.get(f"https://api.github.com/users/{username}",
+                             headers=_UP_HEADERS, timeout=6)
+            if r.status_code == 200:
+                d = r.json()
+                pr = d.get("public_repos", 0)
+                fol = d.get("followers", 0)
+                if pr == 0 and fol < 2:
+                    return {"signal": "empty_profile",
+                            "details": f"{pr} repos / {fol} followers"}
+        except Exception:
+            pass
+    return None
+
+# ── Pattern extraction (used by /username-pattern + Tool 2) ────────────────
+def _up_extract_pattern(usernames):
+    """Given list of usernames, find common base + naming convention."""
+    if not usernames: return {"base": None, "patterns": []}
+    cleaned = [u.strip() for u in usernames if u and u.strip()]
+    if not cleaned: return {"base": None, "patterns": []}
+
+    # Find longest common substring across all (cheap impl: use shortest as candidate)
+    shortest = min(cleaned, key=len)
+    best_core = ""
+    for length in range(len(shortest), 2, -1):
+        for start in range(len(shortest) - length + 1):
+            chunk = shortest[start:start+length].lower()
+            if not _upre.search(r"[a-z]", chunk): continue
+            if all(chunk in u.lower() for u in cleaned):
+                best_core = chunk
+                break
+        if best_core: break
+
+    # Strip noise (numbers/separators) and find shared alphanumeric core
+    alnum_cores = [_up_strip_alnum(u) for u in cleaned]
+    shared_alnum = ""
+    if alnum_cores:
+        s = min(alnum_cores, key=len)
+        for length in range(len(s), 1, -1):
+            for start in range(len(s) - length + 1):
+                chunk = s[start:start+length]
+                if all(chunk in c for c in alnum_cores):
+                    shared_alnum = chunk
+                    break
+            if shared_alnum: break
+
+    # Detect patterns
+    patterns = []
+    # Year suffix?
+    year_count = sum(1 for u in cleaned if _upre.search(r"(?:19|20)\d\d$", u))
+    if year_count >= max(2, len(cleaned) // 2):
+        patterns.append({"kind": "year_suffix", "matches": year_count, "total": len(cleaned)})
+    # Numeric suffix?
+    num_count = sum(1 for u in cleaned if _upre.search(r"\d+$", u))
+    if num_count >= max(2, len(cleaned) // 2):
+        patterns.append({"kind": "numeric_suffix", "matches": num_count, "total": len(cleaned)})
+    # Word suffix detection
+    common_word_suffixes = ["real", "official", "hq", "yt", "tv", "live"]
+    for w in common_word_suffixes:
+        c = sum(1 for u in cleaned if u.lower().rstrip("_").endswith(w))
+        if c >= 2:
+            patterns.append({"kind": "word_suffix", "value": w, "matches": c, "total": len(cleaned)})
+    # Underscore/separator usage
+    sep_count = sum(1 for u in cleaned if _upre.search(r"[._\-]", u))
+    if sep_count == len(cleaned):
+        patterns.append({"kind": "all_have_separators", "matches": sep_count, "total": len(cleaned)})
+    elif sep_count == 0:
+        patterns.append({"kind": "no_separators", "matches": len(cleaned), "total": len(cleaned)})
+    # Casing
+    all_lower = sum(1 for u in cleaned if u == u.lower())
+    if all_lower == len(cleaned):
+        patterns.append({"kind": "all_lowercase", "matches": all_lower, "total": len(cleaned)})
+
+    return {
+        "base":           best_core or None,
+        "shared_alnum":   shared_alnum or None,
+        "common_length":  sum(len(u) for u in cleaned) / len(cleaned),
+        "patterns":       patterns,
+        "input_count":    len(cleaned),
+    }
+
+# ── CORS helpers ──────────────────────────────────────────────────────────
+def _up_resp_options():
+    resp = jsonify({"ok": True})
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return resp
+
+def _up_resp_cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+# ── Routes ─────────────────────────────────────────────────────────────────
+@app.route("/username-permutate", methods=["POST", "OPTIONS"])
+def username_permutate():
+    """Generate permutations server-side."""
+    if request.method == "OPTIONS":
+        return _up_resp_options()
+    body = request.get_json(silent=True) or {}
+    base = _up_clean_input(body.get("base"))
+    if not base:
+        return _up_resp_cors(jsonify({"error": "Invalid base username"})), 400
+    categories  = body.get("categories")
+    if categories and not isinstance(categories, list): categories = None
+    limit       = int(body.get("limit", 200))
+    limit       = max(1, min(500, limit))
+    custom_rules = body.get("custom_rules", []) or []
+
+    perms = _up_generate_permutations(base, categories=categories, limit=limit)
+
+    # Apply custom rules (BOOSTER #5): list of {find, replace}
+    if isinstance(custom_rules, list):
+        seen = {p["username"].lower(): True for p in perms}
+        for rule in custom_rules[:20]:
+            if not isinstance(rule, dict): continue
+            f = str(rule.get("find", ""))[:32]
+            t = str(rule.get("replace", ""))[:32]
+            if not f: continue
+            try:
+                v = base.replace(f, t) if f in base else None
+                if not v: continue
+                if not _upre.fullmatch(r"[A-Za-z0-9._\-]+", v): continue
+                if v.lower() in seen or v == base: continue
+                seen[v.lower()] = True
+                perms.append({
+                    "username": v, "category": "custom",
+                    "score": 70,
+                })
+            except Exception:
+                continue
+
+    # Re-sort
+    perms.sort(key=lambda p: -p["score"])
+    return _up_resp_cors(jsonify({
+        "base":         base,
+        "count":        len(perms),
+        "permutations": perms,
+    }))
+
+@app.route("/username-availability", methods=["POST", "OPTIONS"])
+def username_availability():
+    """Check a list of usernames against a set of platforms."""
+    if request.method == "OPTIONS":
+        return _up_resp_options()
+    body = request.get_json(silent=True) or {}
+    usernames = body.get("usernames") or []
+    if isinstance(usernames, str):
+        usernames = [usernames]
+    if not isinstance(usernames, list) or not usernames:
+        return _up_resp_cors(jsonify({"error": "Provide a non-empty 'usernames' list"})), 400
+    usernames = [str(u).strip() for u in usernames if u]
+    usernames = [u for u in usernames if _upre.fullmatch(r"[A-Za-z0-9._\-]+", u)]
+    usernames = usernames[:60]
+    if not usernames:
+        return _up_resp_cors(jsonify({"error": "No valid usernames after sanitization"})), 400
+
+    mode      = (body.get("mode") or "quick").lower()  # quick | deep | brand | custom
+    platforms = body.get("platforms")
+    do_squat  = bool(body.get("squat_check", False))
+
+    if not platforms or not isinstance(platforms, list):
+        if mode == "deep":
+            platforms = [k for k, v in _UP_PLATFORMS.items() if v.get("reliability") in ("high", "medium")]
+        elif mode == "brand":
+            platforms = list(_UP_SUBSET_BRAND)
+        else:  # quick
+            platforms = list(_UP_SUBSET_QUICK)
+    # Filter to known platforms
+    platforms = [p for p in platforms if p in _UP_PLATFORMS][:40]
+
+    if not platforms:
+        return _up_resp_cors(jsonify({"error": "No valid platforms specified"})), 400
+
+    total = len(usernames) * len(platforms)
+    if total > 1500:
+        # Cap overall
+        usernames = usernames[: max(1, 1500 // max(1, len(platforms)))]
+        total     = len(usernames) * len(platforms)
+
+    checks = [(p, u) for u in usernames for p in platforms]
+    results = _up_check_batch(checks, max_workers=12, per_timeout=8)
+
+    # Optional squat detection on TAKEN results (limited, to keep fast)
+    if do_squat and mode == "brand":
+        squat_targets = [r for r in results if r.get("status") == "taken"
+                         and r.get("platform") in ("reddit", "github")]
+        for r in squat_targets[:20]:  # cap
+            sig = _up_squat_signal(r["platform"], r["username"], r)
+            if sig:
+                r["squat"] = sig
+
+    # Aggregate stats
+    stats = {"taken": 0, "not_found": 0, "unverifiable": 0, "error": 0}
+    for r in results:
+        s = r.get("status", "error")
+        if s in stats: stats[s] += 1
+
+    # Group by username
+    by_username = {}
+    for r in results:
+        by_username.setdefault(r["username"], []).append(r)
+
+    return _up_resp_cors(jsonify({
+        "mode":         mode,
+        "usernames":    usernames,
+        "platforms":    platforms,
+        "platform_meta": {p: {
+            "category": _UP_PLATFORMS[p].get("category"),
+            "reliability": _UP_PLATFORMS[p].get("reliability"),
+            "note": _UP_PLATFORMS[p].get("note"),
+        } for p in platforms},
+        "total_checks": total,
+        "stats":        stats,
+        "results":      results,
+        "by_username":  by_username,
+    }))
+
+@app.route("/username-pattern", methods=["POST", "OPTIONS"])
+def username_pattern():
+    """Extract common pattern from list of usernames."""
+    if request.method == "OPTIONS":
+        return _up_resp_options()
+    body = request.get_json(silent=True) or {}
+    usernames = body.get("usernames") or []
+    if isinstance(usernames, str):
+        usernames = [u.strip() for u in usernames.split(",") if u.strip()]
+    if not isinstance(usernames, list) or len(usernames) < 2:
+        return _up_resp_cors(jsonify({"error": "Provide at least 2 usernames"})), 400
+    usernames = [str(u).strip() for u in usernames if u]
+    usernames = usernames[:50]
+    pattern = _up_extract_pattern(usernames)
+    return _up_resp_cors(jsonify({
+        "input":   usernames,
+        "result":  pattern,
+    }))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# CROSS-PLATFORM USERNAME CORRELATION — paste-in routes for app.py
+#
+# Routes:
+#   POST /username-correlate-pair     — two usernames: full lexical breakdown
+#   POST /username-correlate-cluster  — list of usernames: pairwise matrix + clusters
+#   POST /username-sockpuppet         — handles + Wayback CDX + memory.lol cross-ref
+#   POST /username-correlate-pattern  — extract common pattern (alias of /username-pattern)
+#
+# Confidence is GENUINELY squishy — we report a 0-100 score derived from
+# four lexical signals (Jaro-Winkler, n-gram overlap, shared core, substitution).
+# "Same brain selected these handles" ≠ "Same person operates these accounts."
+# This is reflected in every output band.
+# ══════════════════════════════════════════════════════════════════════════════
+
+import re as _ucre
+import json as _ucjson
+import logging as _uclog
+from difflib import SequenceMatcher as _ucSeqMatch
+from concurrent.futures import ThreadPoolExecutor as _ucpool, as_completed as _ucas_completed
+
+_uclogger = _uclog.getLogger("username-correlator")
+
+_UC_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (compatible; IntelDeskBot/1.0; +https://inteldesk.io)",
+    "Accept-Language": "en-US,en;q=0.9",
+}
+
+# Leet substitution map (BIDIRECTIONAL — we normalize digits → letters when comparing)
+_UC_LEET_NORMALIZE = {"0":"o", "3":"e", "4":"a", "1":"i", "5":"s", "7":"t", "8":"b", "9":"g"}
+
+# ── Username cleaning ─────────────────────────────────────────────────────
+def _uc_clean(raw):
+    """Strip URL prefixes/@. Return lowercase username, or None."""
+    if not raw: return None
+    s = str(raw).strip()
+    s = _ucre.sub(
+        r"^https?://(?:www\.|m\.|mobile\.)?[a-z0-9.\-]+/(?:user/|users/|@|in/|add/|u/)?",
+        "", s, flags=_ucre.IGNORECASE
+    )
+    s = s.lstrip("@/").split("/")[0].split("?")[0].split("#")[0].strip()
+    if not s or len(s) > 64: return None
+    if not _ucre.fullmatch(r"[A-Za-z0-9._\-]+", s): return None
+    return s.lower()
+
+def _uc_normalize_leet(s):
+    """Replace common leet digits with letters."""
+    return "".join(_UC_LEET_NORMALIZE.get(c, c) for c in s.lower())
+
+def _uc_strip_alnum(s):
+    """Lowercase + alphanumeric only."""
+    return _ucre.sub(r"[^a-z0-9]", "", s.lower())
+
+def _uc_strip_to_core(s):
+    """Strip leading/trailing digits + separators to get word core."""
+    return _ucre.sub(r"^[0-9._\-]+|[0-9._\-]+$", "", s.lower())
+
+# ── Lexical similarity functions ──────────────────────────────────────────
+def _uc_jaro(s1, s2):
+    """Jaro similarity 0..1."""
+    if s1 == s2: return 1.0
+    l1, l2 = len(s1), len(s2)
+    if l1 == 0 or l2 == 0: return 0.0
+    match_dist = max(l1, l2) // 2 - 1
+    if match_dist < 0: match_dist = 0
+    s1m = [False] * l1
+    s2m = [False] * l2
+    matches = 0
+    for i, c1 in enumerate(s1):
+        lo = max(0, i - match_dist)
+        hi = min(i + match_dist + 1, l2)
+        for j in range(lo, hi):
+            if s2m[j]: continue
+            if s2[j] != c1: continue
+            s1m[i] = True
+            s2m[j] = True
+            matches += 1
+            break
+    if matches == 0: return 0.0
+    t = 0
+    k = 0
+    for i in range(l1):
+        if not s1m[i]: continue
+        while not s2m[k]: k += 1
+        if s1[i] != s2[k]: t += 1
+        k += 1
+    t //= 2
+    return (matches/l1 + matches/l2 + (matches - t)/matches) / 3.0
+
+def _uc_jaro_winkler(s1, s2, p=0.1):
+    """Jaro-Winkler — boosts matches with shared prefix (max 4 chars)."""
+    j = _uc_jaro(s1, s2)
+    prefix = 0
+    for a, b in zip(s1[:4], s2[:4]):
+        if a == b: prefix += 1
+        else: break
+    return j + prefix * p * (1 - j)
+
+def _uc_ngrams(s, n=2):
+    if len(s) < n: return set()
+    return set(s[i:i+n] for i in range(len(s) - n + 1))
+
+def _uc_ngram_jaccard(s1, s2, n=2):
+    """Jaccard similarity of n-gram sets."""
+    a = _uc_ngrams(s1, n)
+    b = _uc_ngrams(s2, n)
+    if not a and not b: return 1.0
+    if not a or not b: return 0.0
+    return len(a & b) / len(a | b)
+
+def _uc_seq_ratio(s1, s2):
+    """difflib SequenceMatcher ratio (longest common subsequence based)."""
+    return _ucSeqMatch(None, s1, s2).ratio()
+
+# ── Signal computation ────────────────────────────────────────────────────
+def _uc_signal_breakdown(a, b):
+    """Compute all signals between two usernames. Returns dict of signals + score."""
+    sa = _uc_clean(a) or a.lower()
+    sb = _uc_clean(b) or b.lower()
+    al = _uc_normalize_leet(sa)
+    bl = _uc_normalize_leet(sb)
+    a_alnum = _uc_strip_alnum(sa)
+    b_alnum = _uc_strip_alnum(sb)
+    a_core  = _uc_strip_to_core(sa)
+    b_core  = _uc_strip_to_core(sb)
+
+    # 1. Lexical similarity (Jaro-Winkler) — 40% weight
+    jw         = _uc_jaro_winkler(sa, sb)
+    jw_norm    = _uc_jaro_winkler(al, bl)  # leet-normalized
+    seq_ratio  = _uc_seq_ratio(sa, sb)
+    lexical    = max(jw, jw_norm, seq_ratio)
+
+    # 2. N-gram overlap (bigram + trigram avg) — 25% weight
+    bg = _uc_ngram_jaccard(sa, sb, 2)
+    tg = _uc_ngram_jaccard(sa, sb, 3)
+    ngram = (bg + tg) / 2.0
+
+    # 3. Shared core — 20% weight
+    if a_core == b_core and a_core:
+        shared_core = 1.0
+    elif a_alnum == b_alnum:
+        shared_core = 0.95
+    else:
+        # length-weighted: longest common substring of cores
+        sm = _ucSeqMatch(None, a_core, b_core)
+        match = sm.find_longest_match(0, len(a_core), 0, len(b_core))
+        if match.size == 0:
+            shared_core = 0.0
+        else:
+            shared_core = match.size / max(len(a_core), len(b_core), 1)
+
+    # 4. Substitution-based equality — 15% weight
+    sub_score = 0.0
+    if al == bl: sub_score = 1.0       # leet-normalized identical
+    elif sa.replace("_","").replace(".","").replace("-","") == \
+         sb.replace("_","").replace(".","").replace("-",""):
+        sub_score = 0.95               # separator-stripped identical
+    elif a_alnum == b_alnum:
+        sub_score = 0.85
+    else:
+        sub_score = _uc_jaro_winkler(al.replace("_","").replace(".","").replace("-",""),
+                                     bl.replace("_","").replace(".","").replace("-",""))
+
+    # Weighted score
+    score = (lexical * 40 + ngram * 25 + shared_core * 20 + sub_score * 15)
+
+    # Heuristic adjustments
+    if sa == sb: score = 100.0
+    if len(sa) <= 3 or len(sb) <= 3:
+        # Very short handles are inherently low-confidence
+        score = min(score, 60.0)
+
+    score = max(0.0, min(100.0, score))
+
+    return {
+        "a": sa, "b": sb,
+        "score": round(score, 1),
+        "band": _uc_band(score),
+        "signals": {
+            "lexical_similarity": round(lexical, 3),
+            "lexical_jw":         round(jw, 3),
+            "lexical_jw_leet":    round(jw_norm, 3),
+            "lexical_seq":        round(seq_ratio, 3),
+            "ngram_jaccard":      round(ngram, 3),
+            "ngram_bigram":       round(bg, 3),
+            "ngram_trigram":      round(tg, 3),
+            "shared_core":        round(shared_core, 3),
+            "substitution":       round(sub_score, 3),
+        },
+        "weights": {
+            "lexical_similarity": 40,
+            "ngram_jaccard":      25,
+            "shared_core":        20,
+            "substitution":       15,
+        },
+        "contributions": {
+            "lexical_similarity": round(lexical * 40, 1),
+            "ngram_jaccard":      round(ngram * 25, 1),
+            "shared_core":        round(shared_core * 20, 1),
+            "substitution":       round(sub_score * 15, 1),
+        },
+        "normalized_a":   al,
+        "normalized_b":   bl,
+        "alnum_a":        a_alnum,
+        "alnum_b":        b_alnum,
+        "core_a":         a_core,
+        "core_b":         b_core,
+        "exact_match":           sa == sb,
+        "leet_normalized_match": al == bl and sa != sb,
+        "alnum_match":           a_alnum == b_alnum and sa != sb,
+        "core_match":            a_core == b_core and sa != sb and a_core,
+    }
+
+def _uc_band(score):
+    """Map 0-100 score to a confidence band label."""
+    if score >= 90:  return "almost_certainly_same"
+    if score >= 70:  return "likely_same"
+    if score >= 50:  return "possibly_related"
+    if score >= 30:  return "weak_signal"
+    return "different"
+
+# ── Cluster mode ──────────────────────────────────────────────────────────
+def _uc_cluster(usernames, threshold=55):
+    """Build pairwise matrix and form clusters via union-find at given threshold."""
+    n = len(usernames)
+    matrix = [[None]*n for _ in range(n)]
+    pairs  = []
+    for i in range(n):
+        for j in range(i+1, n):
+            sb = _uc_signal_breakdown(usernames[i], usernames[j])
+            matrix[i][j] = sb["score"]
+            matrix[j][i] = sb["score"]
+            pairs.append({
+                "i": i, "j": j,
+                "a": usernames[i], "b": usernames[j],
+                "score": sb["score"], "band": sb["band"],
+                "signals": sb["signals"], "contributions": sb["contributions"],
+            })
+        matrix[i][i] = 100.0
+
+    # Union-find clustering at threshold
+    parent = list(range(n))
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+    def union(a, b):
+        ra, rb = find(a), find(b)
+        if ra != rb: parent[ra] = rb
+
+    for p in pairs:
+        if p["score"] >= threshold:
+            union(p["i"], p["j"])
+
+    clusters = {}
+    for i in range(n):
+        r = find(i)
+        clusters.setdefault(r, []).append(i)
+    cluster_list = []
+    for ix, members in enumerate(clusters.values()):
+        cluster_list.append({
+            "id":      f"cluster_{ix+1}",
+            "members": [usernames[m] for m in members],
+            "size":    len(members),
+        })
+    cluster_list.sort(key=lambda c: -c["size"])
+
+    return {
+        "usernames":  usernames,
+        "matrix":     matrix,
+        "pairs":      sorted(pairs, key=lambda p: -p["score"]),
+        "clusters":   cluster_list,
+        "threshold":  threshold,
+        "edges":      [{"a": p["a"], "b": p["b"], "score": p["score"], "band": p["band"]}
+                       for p in pairs if p["score"] >= 30],
+    }
+
+# ── Sock-puppet mode (Wayback + memory.lol cross-ref) ─────────────────────
+def _uc_wayback_presence(handle):
+    """Quickly probe Wayback for archived snapshots on key platforms.
+
+    Returns dict: {platform: {first_ts, last_ts, count}}.
+    Best-effort — uses Wayback CDX API.
+    """
+    out = {}
+    platforms = [
+        ("twitter", f"twitter.com/{handle}"),
+        ("x",       f"x.com/{handle}"),
+        ("github",  f"github.com/{handle}"),
+        ("reddit",  f"reddit.com/user/{handle}"),
+        ("ig",      f"instagram.com/{handle}"),
+    ]
+    def _probe(label, url_pattern):
+        try:
+            r = requests.get(
+                "https://web.archive.org/cdx/search/cdx",
+                params={
+                    "url":      url_pattern,
+                    "output":   "json",
+                    "limit":    "100",
+                    "fl":       "timestamp",
+                    "filter":   "statuscode:200",
+                    "collapse": "timestamp:6",
+                },
+                headers=_UC_HEADERS,
+                timeout=12,
+            )
+            if r.status_code != 200: return label, None
+            data = r.json() or []
+            if not data or len(data) < 2: return label, None
+            tss = sorted(row[0] for row in data[1:] if row and row[0])
+            if not tss: return label, None
+            return label, {
+                "count":    len(tss),
+                "first_ts": tss[0],
+                "last_ts":  tss[-1],
+            }
+        except Exception:
+            return label, None
+    with _ucpool(max_workers=5) as pool:
+        futs = [pool.submit(_probe, l, u) for l, u in platforms]
+        for f in _ucas_completed(futs):
+            try:
+                label, data = f.result()
+                if data: out[label] = data
+            except Exception:
+                continue
+    return out
+
+def _uc_memory_lol(handle):
+    """Query memory.lol for X handle history."""
+    try:
+        r = requests.get(f"https://api.memory.lol/v1/tw/{handle}",
+                         headers=_UC_HEADERS, timeout=10)
+        if r.status_code != 200: return None
+        data = r.json() or {}
+        accounts = data.get("accounts") or []
+        if not accounts: return None
+        all_handles = []
+        for acct in accounts:
+            for h, periods in (acct.get("screen_names") or {}).items():
+                all_handles.append({
+                    "handle":  h,
+                    "periods": periods,
+                })
+        return all_handles
+    except Exception:
+        return None
+
+def _uc_parse_wayback_ts(ts):
+    """Parse YYYYMMDDhhmmss to (year, month)."""
+    try:
+        return int(ts[:4]), int(ts[4:6])
+    except Exception:
+        return None, None
+
+def _uc_activity_overlap(presence_a, presence_b):
+    """Compare archive activity windows. Mutually-exclusive = sock-puppet signal."""
+    out = {"per_platform": {}, "overall": None}
+    overlap_score = 0.0
+    overlap_count = 0
+    for platform in set(presence_a.keys()) | set(presence_b.keys()):
+        pa = presence_a.get(platform)
+        pb = presence_b.get(platform)
+        if not pa or not pb:
+            out["per_platform"][platform] = {"status": "single", "by": "a" if pa else "b"}
+            continue
+        a_first = pa["first_ts"][:6]
+        a_last  = pa["last_ts"][:6]
+        b_first = pb["first_ts"][:6]
+        b_last  = pb["last_ts"][:6]
+        # Overlap window?
+        ov_start = max(a_first, b_first)
+        ov_end   = min(a_last,  b_last)
+        overlapping = ov_start <= ov_end
+        out["per_platform"][platform] = {
+            "status":          "overlap" if overlapping else "exclusive",
+            "a_first":         a_first, "a_last": a_last, "a_count": pa["count"],
+            "b_first":         b_first, "b_last": b_last, "b_count": pb["count"],
+            "overlap_window":  [ov_start, ov_end] if overlapping else None,
+        }
+        overlap_count += 1
+        if not overlapping:
+            overlap_score += 1.0  # exclusive → strong sock-puppet signal
+    if overlap_count > 0:
+        out["overall"] = {
+            "exclusive_platforms": overlap_score,
+            "total_compared":      overlap_count,
+            "exclusivity_ratio":   overlap_score / overlap_count,
+        }
+    return out
+
+# ── Pattern alias (re-exposes /username-pattern semantics) ────────────────
+def _uc_extract_pattern(usernames):
+    """Local copy of pattern extraction — same logic as Tool 1's _up_extract_pattern."""
+    if not usernames: return {"base": None, "patterns": []}
+    cleaned = [u.strip() for u in usernames if u and u.strip()]
+    if not cleaned: return {"base": None, "patterns": []}
+    shortest = min(cleaned, key=len)
+    best_core = ""
+    for length in range(len(shortest), 2, -1):
+        for start in range(len(shortest) - length + 1):
+            chunk = shortest[start:start+length].lower()
+            if not _ucre.search(r"[a-z]", chunk): continue
+            if all(chunk in u.lower() for u in cleaned):
+                best_core = chunk
+                break
+        if best_core: break
+    alnum_cores = [_uc_strip_alnum(u) for u in cleaned]
+    shared_alnum = ""
+    if alnum_cores:
+        s = min(alnum_cores, key=len)
+        for length in range(len(s), 1, -1):
+            for start in range(len(s) - length + 1):
+                chunk = s[start:start+length]
+                if all(chunk in c for c in alnum_cores):
+                    shared_alnum = chunk
+                    break
+            if shared_alnum: break
+    patterns = []
+    year_count = sum(1 for u in cleaned if _ucre.search(r"(?:19|20)\d\d$", u))
+    if year_count >= max(2, len(cleaned)//2):
+        patterns.append({"kind": "year_suffix", "matches": year_count, "total": len(cleaned)})
+    num_count = sum(1 for u in cleaned if _ucre.search(r"\d+$", u))
+    if num_count >= max(2, len(cleaned)//2):
+        patterns.append({"kind": "numeric_suffix", "matches": num_count, "total": len(cleaned)})
+    for w in ["real", "official", "hq", "yt", "tv", "live"]:
+        c = sum(1 for u in cleaned if u.lower().rstrip("_").endswith(w))
+        if c >= 2:
+            patterns.append({"kind": "word_suffix", "value": w, "matches": c, "total": len(cleaned)})
+    sep_count = sum(1 for u in cleaned if _ucre.search(r"[._\-]", u))
+    if sep_count == len(cleaned):
+        patterns.append({"kind": "all_have_separators", "matches": sep_count, "total": len(cleaned)})
+    elif sep_count == 0:
+        patterns.append({"kind": "no_separators", "matches": len(cleaned), "total": len(cleaned)})
+    all_lower = sum(1 for u in cleaned if u == u.lower())
+    if all_lower == len(cleaned):
+        patterns.append({"kind": "all_lowercase", "matches": all_lower, "total": len(cleaned)})
+    return {
+        "base":           best_core or None,
+        "shared_alnum":   shared_alnum or None,
+        "common_length":  sum(len(u) for u in cleaned) / len(cleaned),
+        "patterns":       patterns,
+        "input_count":    len(cleaned),
+    }
+
+# ── CORS helpers ──────────────────────────────────────────────────────────
+def _uc_resp_options():
+    resp = jsonify({"ok": True})
+    resp.headers["Access-Control-Allow-Origin"]  = "*"
+    resp.headers["Access-Control-Allow-Methods"] = "GET, POST, OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type"
+    return resp
+
+def _uc_resp_cors(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "*"
+    return resp
+
+# ── Routes ─────────────────────────────────────────────────────────────────
+@app.route("/username-correlate-pair", methods=["POST", "OPTIONS"])
+def username_correlate_pair():
+    """Compare two usernames with full signal breakdown."""
+    if request.method == "OPTIONS":
+        return _uc_resp_options()
+    body = request.get_json(silent=True) or {}
+    a = _uc_clean(body.get("a"))
+    b = _uc_clean(body.get("b"))
+    if not a or not b:
+        return _uc_resp_cors(jsonify({"error": "Provide both 'a' and 'b' usernames"})), 400
+    result = _uc_signal_breakdown(a, b)
+    return _uc_resp_cors(jsonify(result))
+
+@app.route("/username-correlate-cluster", methods=["POST", "OPTIONS"])
+def username_correlate_cluster():
+    """Build pairwise matrix and clusters from a list of usernames."""
+    if request.method == "OPTIONS":
+        return _uc_resp_options()
+    body = request.get_json(silent=True) or {}
+    usernames = body.get("usernames") or []
+    if isinstance(usernames, str):
+        usernames = [u.strip() for u in usernames.split("\n") if u.strip()]
+    if not isinstance(usernames, list) or len(usernames) < 2:
+        return _uc_resp_cors(jsonify({"error": "Provide at least 2 usernames"})), 400
+    cleaned = []
+    seen = set()
+    for u in usernames:
+        c = _uc_clean(u)
+        if c and c not in seen:
+            seen.add(c); cleaned.append(c)
+    cleaned = cleaned[:20]
+    if len(cleaned) < 2:
+        return _uc_resp_cors(jsonify({"error": "Need at least 2 valid distinct usernames"})), 400
+    threshold = body.get("threshold", 55)
+    try: threshold = max(0, min(100, int(threshold)))
+    except Exception: threshold = 55
+    out = _uc_cluster(cleaned, threshold=threshold)
+    out["input_count"] = len(cleaned)
+    pattern = _uc_extract_pattern(cleaned)
+    out["pattern"] = pattern
+    return _uc_resp_cors(jsonify(out))
+
+@app.route("/username-sockpuppet", methods=["POST", "OPTIONS"])
+def username_sockpuppet():
+    """Sock-puppet analysis: lexical + Wayback presence overlap + memory.lol."""
+    if request.method == "OPTIONS":
+        return _uc_resp_options()
+    body = request.get_json(silent=True) or {}
+    usernames = body.get("usernames") or []
+    if isinstance(usernames, str):
+        usernames = [u.strip() for u in usernames.split("\n") if u.strip()]
+    if not isinstance(usernames, list) or len(usernames) < 2:
+        return _uc_resp_cors(jsonify({"error": "Provide at least 2 usernames"})), 400
+    cleaned = []
+    seen = set()
+    for u in usernames:
+        c = _uc_clean(u)
+        if c and c not in seen:
+            seen.add(c); cleaned.append(c)
+    cleaned = cleaned[:10]  # tighter cap due to network calls
+    if len(cleaned) < 2:
+        return _uc_resp_cors(jsonify({"error": "Need at least 2 valid distinct usernames"})), 400
+
+    # Step 1: lexical cluster
+    lex = _uc_cluster(cleaned, threshold=55)
+
+    # Step 2: parallel Wayback presence + memory.lol per handle
+    presence  = {}
+    memorylol = {}
+    def _gather(handle):
+        return handle, _uc_wayback_presence(handle), _uc_memory_lol(handle)
+    with _ucpool(max_workers=4) as pool:
+        futs = [pool.submit(_gather, h) for h in cleaned]
+        for f in _ucas_completed(futs):
+            try:
+                h, pres, ml = f.result()
+                presence[h]  = pres or {}
+                memorylol[h] = ml
+            except Exception:
+                continue
+
+    # Step 3: pairwise activity overlap analysis
+    overlaps = []
+    for i in range(len(cleaned)):
+        for j in range(i+1, len(cleaned)):
+            a = cleaned[i]; b = cleaned[j]
+            ov = _uc_activity_overlap(presence.get(a, {}), presence.get(b, {}))
+            overlaps.append({
+                "a": a, "b": b,
+                "overlap": ov,
+            })
+
+    # Step 4: detect shared memory.lol historical handles (X identity-laundering)
+    ml_shared = []
+    seen_pairs = set()
+    for a in cleaned:
+        if not memorylol.get(a): continue
+        a_handles = {x["handle"].lower() for x in memorylol[a] or []}
+        for b in cleaned:
+            if a == b: continue
+            if (a, b) in seen_pairs or (b, a) in seen_pairs: continue
+            seen_pairs.add((a, b))
+            if not memorylol.get(b): continue
+            b_handles = {x["handle"].lower() for x in memorylol[b] or []}
+            shared = (a_handles & b_handles) - {a, b}
+            if shared:
+                ml_shared.append({
+                    "a": a, "b": b,
+                    "shared_historical_handles": sorted(shared),
+                })
+
+    # Composite per-pair sock-puppet score
+    sockpuppet_pairs = []
+    for p in lex["pairs"]:
+        # Find matching activity overlap
+        ov = next((o for o in overlaps if (o["a"] == p["a"] and o["b"] == p["b"]) or
+                   (o["a"] == p["b"] and o["b"] == p["a"])), None)
+        excl_ratio = 0.0
+        ov_summary = None
+        if ov and ov["overlap"]["overall"]:
+            excl_ratio = ov["overlap"]["overall"]["exclusivity_ratio"]
+            ov_summary = ov["overlap"]
+        # Sock-puppet score: high lexical AND mutually exclusive activity = strong signal
+        spuppet = round(p["score"] * 0.6 + excl_ratio * 100 * 0.4, 1)
+        sockpuppet_pairs.append({
+            "a": p["a"], "b": p["b"],
+            "lexical_score":     p["score"],
+            "lexical_band":      p["band"],
+            "exclusivity_ratio": round(excl_ratio, 3),
+            "sockpuppet_score":  spuppet,
+            "activity_overlap":  ov_summary,
+        })
+    sockpuppet_pairs.sort(key=lambda x: -x["sockpuppet_score"])
+
+    return _uc_resp_cors(jsonify({
+        "input":            cleaned,
+        "lexical":          lex,
+        "presence":         presence,
+        "memory_lol":       memorylol,
+        "memory_lol_shared":ml_shared,
+        "sockpuppet_pairs": sockpuppet_pairs,
+    }))
+
+@app.route("/username-correlate-pattern", methods=["POST", "OPTIONS"])
+def username_correlate_pattern():
+    """Pattern extraction (alias of /username-pattern from permutator routes)."""
+    if request.method == "OPTIONS":
+        return _uc_resp_options()
+    body = request.get_json(silent=True) or {}
+    usernames = body.get("usernames") or []
+    if isinstance(usernames, str):
+        usernames = [u.strip() for u in usernames.split("\n") if u.strip()]
+    if not isinstance(usernames, list) or len(usernames) < 2:
+        return _uc_resp_cors(jsonify({"error": "Provide at least 2 usernames"})), 400
+    cleaned = []
+    for u in usernames:
+        c = _uc_clean(u)
+        if c: cleaned.append(c)
+    cleaned = cleaned[:50]
+    pattern = _uc_extract_pattern(cleaned)
+
+    # Also generate predicted next-likely handles based on pattern
+    predicted = []
+    if pattern.get("base"):
+        base = pattern["base"]
+        for p in pattern["patterns"]:
+            if p["kind"] == "year_suffix":
+                predicted.extend([base + str(y) for y in (2024, 2025, 2026, 2027) if base + str(y) not in cleaned])
+            elif p["kind"] == "numeric_suffix":
+                predicted.extend([base + n for n in ("1","2","3","99","123","420","777") if base + n not in cleaned])
+            elif p["kind"] == "word_suffix":
+                w = p["value"]
+                for sep in ("", "_", "."):
+                    cand = base + sep + w
+                    if cand not in cleaned: predicted.append(cand)
+    predicted = list(dict.fromkeys(predicted))[:20]
+
+    return _uc_resp_cors(jsonify({
+        "input":     cleaned,
+        "result":    pattern,
+        "predicted": predicted,
+    }))
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
