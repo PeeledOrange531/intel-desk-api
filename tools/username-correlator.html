@@ -1,0 +1,1127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cross-Platform Username Correlation Tool — Same-Person Probability Across Handles | The Intel Desk</title>
+<meta name="description" content="Compare usernames across platforms to estimate whether the same person operates them. Lexical similarity, n-gram overlap, leetspeak normalization, Wayback activity overlap, memory.lol cross-reference. For sock-puppet investigations and identity attribution.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1280px;margin:0 auto;}
+
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(34px,5.6vw,62px);font-weight:300;line-height:0.98;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:680px;line-height:1.7;}
+
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:740px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);flex-wrap:wrap;max-width:100%;}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 20px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+.search-row{display:flex;gap:0;flex-wrap:wrap;}
+.handle-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.handle-input:focus{border-color:rgba(200,169,110,0.35);}
+.handle-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-go{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-go:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-go:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+.fingerprint-row{display:grid;grid-template-columns:1fr 1fr;gap:2px;}
+.fingerprint-row .handle-input{border-right:1px solid var(--border);}
+.batch-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:16px 20px;outline:none;min-height:160px;resize:vertical;line-height:1.6;}
+.batch-textarea:focus{border-color:rgba(200,169,110,0.35);}
+
+/* Threshold slider */
+.slider-row{margin-top:14px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;}
+.slider-label{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55)!important;text-transform:uppercase;letter-spacing:0.10em;}
+.slider-value{font-family:var(--mono);font-size:14px;color:#e8d5a3!important;min-width:40px;}
+.slider{appearance:none;-webkit-appearance:none;flex:1;min-width:160px;height:2px;background:rgba(200,169,110,0.20);outline:none;}
+.slider::-webkit-slider-thumb{appearance:none;-webkit-appearance:none;width:14px;height:14px;background:var(--accent);border-radius:50%;cursor:pointer;}
+.slider::-moz-range-thumb{width:14px;height:14px;background:var(--accent);border-radius:50%;cursor:pointer;border:none;}
+
+.privacy-notice{margin-top:14px;padding:12px 18px;background:rgba(78,201,148,0.04);border:1px solid rgba(78,201,148,0.20);font-family:var(--mono);font-size:10.5px;color:rgba(78,201,148,0.85)!important;line-height:1.7;}
+.processing-warning{margin-top:14px;padding:12px 18px;background:rgba(232,123,74,0.05);border:1px solid rgba(232,123,74,0.22);font-family:var(--mono);font-size:10.5px;color:rgba(232,123,74,0.85)!important;line-height:1.7;}
+.honesty-notice{margin-top:14px;padding:14px 20px;background:rgba(126,184,228,0.05);border:1px solid rgba(126,184,228,0.22);font-family:var(--mono);font-size:11px;color:rgba(126,184,228,0.85)!important;line-height:1.8;}
+.honesty-notice strong{color:#7eb8e4!important;}
+
+.processing-overlay{display:none;flex-direction:column;gap:16px;padding:36px 32px;background:var(--bg2);border:1px solid var(--border);margin-top:16px;animation:fadeUp 0.3s ease both;}
+.processing-overlay.visible{display:flex;}
+.processing-head{display:flex;align-items:center;gap:14px;}
+.processing-spinner{width:24px;height:24px;border:2px solid rgba(200,169,110,0.20);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.processing-title{font-family:var(--mono);font-size:13px;color:#e8d5a3!important;font-weight:500;letter-spacing:0.04em;flex:1;}
+.processing-time{font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.65)!important;}
+.processing-eta{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;line-height:1.6;}
+.processing-step-list{display:flex;flex-direction:column;gap:6px;}
+.processing-step{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;display:flex;align-items:center;gap:10px;}
+.processing-step.active{color:#e8d5a3!important;}
+.processing-step.done{color:rgba(78,201,148,0.85)!important;}
+.processing-step .step-icon{display:inline-block;width:14px;text-align:center;color:#c8a96e!important;}
+.processing-step.active .step-icon{animation:pulse 1.3s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.processing-bar{height:2px;background:rgba(200,169,110,0.10);overflow:hidden;position:relative;}
+.processing-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* Results */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;background:var(--bg2);border-color:var(--border);}
+.verdict-banner.almost{background:rgba(232,123,74,0.07);border-color:rgba(232,123,74,0.30);}
+.verdict-banner.likely{background:rgba(200,169,110,0.07);border-color:rgba(200,169,110,0.30);}
+.verdict-banner.possibly{background:rgba(126,184,228,0.06);border-color:rgba(126,184,228,0.25);}
+.verdict-banner.weak{background:var(--bg2);border-color:var(--border);}
+.verdict-banner.different{background:rgba(78,201,148,0.05);border-color:rgba(78,201,148,0.20);}
+.verdict-icon{font-size:30px;flex-shrink:0;font-family:var(--serif);color:#e8d5a3!important;}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,26px);font-weight:300;color:#f5f2ec!important;margin-bottom:6px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+.verdict-handle{color:#e8d5a3!important;font-style:italic;}
+.verdict-band{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;padding:5px 12px;border:1px solid;}
+.verdict-band.almost_certainly_same{color:#e87b4a!important;border-color:rgba(232,123,74,0.40);}
+.verdict-band.likely_same{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.verdict-band.possibly_related{color:#7eb8e4!important;border-color:rgba(126,184,228,0.40);}
+.verdict-band.weak_signal{color:rgba(240,236,228,0.50)!important;border-color:var(--border);}
+.verdict-band.different{color:#4ec994!important;border-color:rgba(78,201,148,0.40);}
+.verdict-sub{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+
+/* Score gauge (BOOSTER #1) */
+.score-card{background:var(--bg2);border:1px solid var(--border);padding:28px 32px;display:grid;grid-template-columns:200px 1fr;gap:36px;align-items:center;}
+.score-circle-wrap{position:relative;width:160px;height:160px;}
+.score-circle{transform:rotate(-90deg);}
+.score-circle .bg-arc{fill:none;stroke:rgba(255,255,255,0.06);stroke-width:8;}
+.score-circle .fg-arc{fill:none;stroke:#c8a96e;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 0.8s cubic-bezier(0.4,0,0.2,1);}
+.score-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.score-num-val{font-family:var(--serif);font-size:50px;font-weight:300;color:#f5f2ec!important;line-height:1;}
+.score-num-pct{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;letter-spacing:0.14em;text-transform:uppercase;margin-top:4px;}
+
+/* Signal contribution bars */
+.signals-list{display:flex;flex-direction:column;gap:10px;}
+.signal-row{display:grid;grid-template-columns:140px 1fr 50px;gap:12px;align-items:center;font-family:var(--mono);font-size:11px;}
+.signal-name{color:rgba(240,236,228,0.65)!important;text-transform:uppercase;letter-spacing:0.10em;font-size:10px;}
+.signal-bar-wrap{position:relative;height:10px;background:rgba(255,255,255,0.05);border:1px solid var(--border);}
+.signal-bar{position:absolute;top:0;left:0;bottom:0;background:linear-gradient(90deg,rgba(200,169,110,0.30),rgba(200,169,110,0.65));transition:width 0.6s ease;}
+.signal-bar.lex{background:linear-gradient(90deg,rgba(232,213,163,0.30),rgba(232,213,163,0.65));}
+.signal-bar.ngram{background:linear-gradient(90deg,rgba(126,184,228,0.30),rgba(126,184,228,0.65));}
+.signal-bar.core{background:linear-gradient(90deg,rgba(200,169,110,0.30),rgba(200,169,110,0.65));}
+.signal-bar.sub{background:linear-gradient(90deg,rgba(78,201,148,0.30),rgba(78,201,148,0.65));}
+.signal-num{color:#e8d5a3!important;text-align:right;}
+
+/* Flag pills */
+.flags-row{display:flex;flex-wrap:wrap;gap:6px;margin-top:14px;}
+.flag-pill{font-family:var(--mono);font-size:9.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:5px 10px;border:1px solid;color:#c8a96e!important;border-color:rgba(200,169,110,0.30);}
+.flag-pill.exact{color:#e87b4a!important;border-color:rgba(232,123,74,0.40);}
+.flag-pill.leet{color:#e8d5a3!important;}
+.flag-pill.alnum{color:#7eb8e4!important;border-color:rgba(126,184,228,0.30);}
+.flag-pill.core{color:#4ec994!important;border-color:rgba(78,201,148,0.30);}
+
+/* Section card */
+.card{background:var(--bg2);border:1px solid var(--border);}
+.card-head{display:flex;align-items:center;justify-content:space-between;padding:13px 24px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.card-head:hover{background:rgba(255,255,255,0.02);}
+.card-title{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.16em;color:rgba(240,236,228,0.55)!important;display:flex;align-items:center;gap:10px;}
+.card-count{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;}
+.card-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.card.expanded .card-toggle{transform:rotate(45deg);}
+.card-body{display:none;}
+.card.expanded .card-body{display:block;animation:fadeUp 0.2s ease;}
+.card-body.always-on{display:block!important;}
+
+/* KV list */
+.kv-list{padding:0;}
+.kv-row{display:flex;gap:14px;padding:10px 24px;border-bottom:1px solid var(--border);align-items:flex-start;}
+.kv-row:last-child{border-bottom:none;}
+.kv-key{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;color:rgba(240,236,228,0.40)!important;width:200px;flex-shrink:0;padding-top:1px;}
+.kv-val{font-family:var(--mono);font-size:12px;color:rgba(240,236,228,0.80)!important;flex:1;line-height:1.6;word-break:break-word;}
+.kv-val.accent{color:#e8d5a3!important;}
+
+/* Force-graph (BOOSTER #2) */
+.graph-wrap{background:var(--bg2);border:1px solid var(--border);}
+.graph-head{display:flex;justify-content:space-between;align-items:center;padding:14px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;flex-wrap:wrap;gap:10px;}
+.graph-head .legend{display:flex;gap:14px;font-size:10px;color:rgba(240,236,228,0.55)!important;flex-wrap:wrap;}
+.graph-svg{display:block;width:100%;height:480px;background:var(--bg);}
+.graph-svg .link{stroke:rgba(200,169,110,0.35);stroke-width:0.8;}
+.graph-svg .link.hl{stroke:rgba(232,123,74,0.65);stroke-width:1.6;}
+.graph-svg .node circle{fill:rgba(200,169,110,0.25);stroke:#c8a96e;stroke-width:1.2;cursor:grab;}
+.graph-svg .node circle.hl{fill:rgba(232,123,74,0.35);stroke:#e87b4a;}
+.graph-svg .node text{font-family:var(--mono);font-size:11px;fill:#e8d5a3;pointer-events:none;}
+
+/* Pairs table */
+.pairs-table{display:flex;flex-direction:column;}
+.pairs-head{display:grid;grid-template-columns:1fr 1fr 80px 130px;gap:10px;padding:10px 22px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;align-items:center;}
+.pairs-row{display:grid;grid-template-columns:1fr 1fr 80px 130px;gap:10px;padding:11px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;cursor:pointer;}
+.pairs-row:hover{background:rgba(255,255,255,0.02);}
+.pairs-row:last-child{border-bottom:none;}
+.pairs-row .h{color:#e8d5a3!important;}
+.pairs-row .score{color:#c8a96e!important;text-align:right;font-weight:500;}
+.pairs-row .band{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:4px 8px;border:1px solid;text-align:center;}
+.pairs-row .band.almost_certainly_same{color:#e87b4a!important;border-color:rgba(232,123,74,0.40);}
+.pairs-row .band.likely_same{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.pairs-row .band.possibly_related{color:#7eb8e4!important;border-color:rgba(126,184,228,0.30);}
+.pairs-row .band.weak_signal{color:rgba(240,236,228,0.50)!important;border-color:var(--border);}
+.pairs-row .band.different{color:#4ec994!important;border-color:rgba(78,201,148,0.40);}
+
+/* Cluster cards */
+.cluster-card{padding:12px 22px;border-bottom:1px solid var(--border);}
+.cluster-card:last-child{border-bottom:none;}
+.cluster-head{font-family:var(--mono);font-size:10px;color:rgba(200,169,110,0.65)!important;text-transform:uppercase;letter-spacing:0.14em;margin-bottom:8px;}
+.cluster-members{display:flex;flex-wrap:wrap;gap:6px;}
+.cluster-handle{font-family:var(--mono);font-size:11.5px;color:#e8d5a3!important;padding:5px 10px;border:1px solid var(--border);background:rgba(200,169,110,0.04);}
+.cluster-card.singleton .cluster-handle{color:rgba(240,236,228,0.45)!important;background:transparent;}
+
+/* Wayback timeline (BOOSTER #3) */
+.timeline-handle-row{display:grid;grid-template-columns:140px 1fr;gap:14px;padding:12px 22px;border-bottom:1px solid var(--border);align-items:center;}
+.timeline-handle-row:last-child{border-bottom:none;}
+.timeline-handle-name{font-family:var(--mono);font-size:11.5px;color:#e8d5a3!important;}
+.timeline-empty{font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.30)!important;}
+.timeline-track{position:relative;height:40px;background:rgba(255,255,255,0.02);border:1px solid var(--border);}
+.timeline-bar{position:absolute;height:14px;top:13px;background:rgba(200,169,110,0.35);border:1px solid rgba(200,169,110,0.55);font-family:var(--mono);font-size:8px;color:#f5f2ec;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.timeline-bar.tw{background:rgba(126,184,228,0.30);border-color:rgba(126,184,228,0.55);}
+.timeline-bar.gh{background:rgba(78,201,148,0.30);border-color:rgba(78,201,148,0.55);}
+.timeline-bar.rd{background:rgba(232,123,74,0.30);border-color:rgba(232,123,74,0.55);}
+.timeline-bar.ig{background:rgba(232,213,163,0.30);border-color:rgba(232,213,163,0.55);}
+.timeline-axis{position:relative;height:18px;display:flex;justify-content:space-between;font-family:var(--mono);font-size:9px;color:rgba(240,236,228,0.40)!important;padding:0 4px;margin-top:2px;}
+
+/* memory.lol shared handles */
+.ml-shared-row{padding:12px 22px;border-bottom:1px solid var(--border);}
+.ml-shared-row:last-child{border-bottom:none;}
+.ml-shared-pair{font-family:var(--mono);font-size:11px;color:#e8d5a3!important;margin-bottom:6px;}
+.ml-shared-pair strong{color:#e87b4a!important;}
+.ml-shared-handles{display:flex;flex-wrap:wrap;gap:6px;}
+.ml-shared-handle{font-family:var(--mono);font-size:10.5px;color:#c8a96e!important;padding:4px 8px;border:1px solid rgba(200,169,110,0.30);background:rgba(200,169,110,0.05);}
+
+/* Sock-puppet pairs */
+.sp-pairs-head{display:grid;grid-template-columns:1fr 1fr 80px 100px 100px;gap:10px;padding:10px 22px;background:var(--bg3);border-bottom:1px solid var(--border);font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;align-items:center;}
+.sp-pairs-row{display:grid;grid-template-columns:1fr 1fr 80px 100px 100px;gap:10px;padding:11px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;}
+.sp-pairs-row:last-child{border-bottom:none;}
+.sp-pairs-row .h{color:#e8d5a3!important;}
+.sp-pairs-row .num{color:rgba(240,236,228,0.65)!important;text-align:right;}
+.sp-pairs-row .num.hi{color:#e87b4a!important;font-weight:500;}
+.sp-pairs-row .num.med{color:#c8a96e!important;font-weight:500;}
+
+/* Pattern card */
+.pattern-card{background:var(--bg2);border:1px solid var(--border);padding:24px 28px;}
+.pattern-base-row{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+.pattern-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;}
+.pattern-value{font-family:var(--serif);font-size:32px;font-style:italic;font-weight:400;color:#e8d5a3!important;}
+.pattern-value.mono{font-family:var(--mono);font-size:18px;font-style:normal;}
+.pattern-list{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
+.pattern-item{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.75)!important;padding:10px 14px;border:1px solid var(--border);border-left:3px solid var(--accent);background:rgba(200,169,110,0.04);}
+.pattern-item strong{color:#e8d5a3!important;}
+.pred-list{display:flex;flex-wrap:wrap;gap:6px;}
+.pred-chip{font-family:var(--mono);font-size:11.5px;color:#e8d5a3!important;padding:7px 12px;border:1px solid var(--border);background:var(--bg2);cursor:copy;transition:all 0.15s;}
+.pred-chip:hover{border-color:rgba(200,169,110,0.30);color:#c8a96e!important;background:rgba(200,169,110,0.04);}
+
+/* Action row */
+.toolbar-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);padding:12px 18px;}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:8px 14px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+.export-row{display:flex;gap:6px;}
+
+.empty{padding:24px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+/* Caveat callout */
+.caveat-card{background:rgba(126,184,228,0.04);border:1px solid rgba(126,184,228,0.22);padding:18px 22px;font-family:var(--mono);font-size:11px;line-height:1.8;color:rgba(126,184,228,0.85)!important;}
+.caveat-card strong{color:#7eb8e4!important;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:540px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:900px){
+  .fingerprint-row{grid-template-columns:1fr;}
+  .fingerprint-row .handle-input{border-right:1px solid var(--border);}
+  .score-card{grid-template-columns:1fr;justify-items:center;text-align:center;}
+  .score-card .signal-row{grid-template-columns:120px 1fr 50px;}
+  .pairs-head, .pairs-row{grid-template-columns:1fr 1fr 60px 100px;}
+  .sp-pairs-head, .sp-pairs-row{grid-template-columns:1fr 1fr 70px 80px;}
+  .sp-pairs-head > div:nth-child(5), .sp-pairs-row > div:nth-child(5){display:none;}
+  .timeline-handle-row{grid-template-columns:1fr;}
+}
+@media(max-width:768px){
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;}
+  .mode-pill{flex:1 0 50%;justify-content:center;font-size:10px;padding:10px 12px;}
+  .handle-input{border-right:1px solid var(--border);min-width:100%;}
+  .btn-go{width:100%;margin-top:2px;}
+  .kv-row{flex-direction:column;gap:4px;}
+  .kv-key{width:auto;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Identity & Attribution</span></div>
+    <h1>Cross-Platform Username <em>Correlation</em></h1>
+    <p class="hero-sub">Compare usernames to estimate whether they're operated by the same person. Lexical similarity, leetspeak normalization, n-gram overlap, shared core, plus Wayback activity-window analysis and memory.lol cross-reference for sock-puppet investigations.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does (and What It Cannot Do)</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Free <strong>cross-platform username correlation tool</strong> for OSINT investigators tracking sock-puppet networks, identity-laundering campaigns, and coordinated inauthentic behavior. Computes a <strong>0–100 same-person likelihood score</strong> from four weighted lexical signals: <strong>Jaro-Winkler similarity</strong> (40% — heavy on shared prefixes, robust for short strings), <strong>n-gram overlap</strong> (25% — bigram + trigram Jaccard average), <strong>shared core</strong> (20% — what remains after stripping leading/trailing digits and separators), and <strong>substitution detection</strong> (15% — leetspeak normalization plus separator-stripped equality). The scoring is also computed against the leet-normalized forms (so <em>j0hnsmith</em> and <em>johnsmith</em> match cleanly) and the alphanumeric-only forms (so <em>john_smith</em> and <em>johnsmith</em> match). <strong>Pair Compare</strong> mode shows a full signal breakdown with weighted contribution bars so you can see exactly why two handles scored as they did. <strong>Cluster</strong> mode takes up to 20 handles, builds the full pairwise matrix, and groups them via union-find at an adjustable threshold — visualized as a <strong>D3 force-directed graph</strong> with weighted edges. <strong>Sock-Puppet</strong> mode adds <strong>Wayback Machine CDX presence probes</strong> on Twitter/X/GitHub/Reddit/Instagram (mutually exclusive activity windows are a strong sock-puppet signal — one account goes dormant exactly when another lights up), plus <strong>memory.lol</strong> queries to detect handles that share historical X identities (identity-laundering signal). <strong>Pattern Extract</strong> mode finds the common base, naming convention (year suffixes, separators, casing), and predicts next-likely handles. <strong>Honest framing throughout:</strong> the bands are labeled <em>almost certainly same / likely same / possibly related / weak signal / different</em> — never "match" or "confirmed." Lexical similarity tells you the same brain selected these handles, not that the same person operates them. Short handles (≤3 chars) are capped at 60 points because shared 3-letter prefixes are statistically meaningless. All data sources are public — no API keys, no signup. Used by <strong>journalists tracking disinformation networks</strong>, <strong>OSINT analysts mapping coordinated inauthentic behavior</strong>, <strong>brand protection teams identifying impersonator clusters</strong>, and <strong>investigators correlating accounts across forums and social platforms</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Username Correlation</span><span class="seo-tag">Sock Puppet Detection</span>
+        <span class="seo-tag">Identity Attribution</span><span class="seo-tag">Jaro-Winkler</span>
+        <span class="seo-tag">Leetspeak Normalization</span><span class="seo-tag">Wayback Cross-Reference</span>
+        <span class="seo-tag">memory.lol</span><span class="seo-tag">Identity Laundering</span>
+        <span class="seo-tag">Force-Directed Cluster</span><span class="seo-tag">OSINT</span>
+        <span class="seo-tag">Free Tool</span><span class="seo-tag">No API Key</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="tool-panel">
+    <div class="section-label">Username Correlation Suite</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="pair" onclick="selectMode('pair')" role="tab">
+        <span class="mode-pill-icon">⇆</span> Pair Compare
+      </button>
+      <button class="mode-pill" data-mode="cluster" onclick="selectMode('cluster')" role="tab">
+        <span class="mode-pill-icon">≣</span> Cluster
+      </button>
+      <button class="mode-pill" data-mode="sockpuppet" onclick="selectMode('sockpuppet')" role="tab">
+        <span class="mode-pill-icon">⌖</span> Sock-Puppet
+      </button>
+      <button class="mode-pill" data-mode="pattern" onclick="selectMode('pattern')" role="tab">
+        <span class="mode-pill-icon">↻</span> Pattern Extract
+      </button>
+    </div>
+
+    <!-- PAIR MODE -->
+    <div class="mode-content active" id="modePair">
+      <div class="fingerprint-row">
+        <input type="text" class="handle-input" id="pairA" placeholder="Username A (e.g. johnsmith2024)"
+          autocomplete="off" spellcheck="false">
+        <input type="text" class="handle-input" id="pairB" placeholder="Username B (e.g. j0hnsmith_real)"
+          autocomplete="off" spellcheck="false">
+      </div>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn-go" id="btnPair" onclick="doPair()">Compare →</button>
+      </div>
+      <div class="input-hint">Full signal breakdown with weighted contribution bars. Instant — no network call beyond the API.</div>
+      <div class="honesty-notice">
+        <strong>Honest framing:</strong> A high score means the same brain selected these handles — not that the same person operates the accounts. Lexical similarity is necessary but not sufficient evidence for identity attribution.
+      </div>
+    </div>
+
+    <!-- CLUSTER MODE -->
+    <div class="mode-content" id="modeCluster">
+      <textarea class="batch-textarea" id="clusterInput"
+        placeholder="One username per line — up to 20.&#10;&#10;Example:&#10;johnsmith&#10;j0hnsmith&#10;john_smith&#10;alicedoe&#10;alice_d&#10;j0hn5m1th"></textarea>
+      <div class="slider-row">
+        <span class="slider-label">Cluster threshold</span>
+        <input type="range" class="slider" id="clusterThreshold" min="30" max="90" value="55" oninput="document.getElementById('thresholdVal').textContent=this.value">
+        <span class="slider-value" id="thresholdVal">55</span>
+        <button class="btn-go" id="btnCluster" onclick="doCluster()">Cluster →</button>
+      </div>
+      <div class="input-hint">Lower threshold = looser clusters. 55 is the default; raise to 70 for tighter groupings.</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> ~1 second.
+      </div>
+    </div>
+
+    <!-- SOCKPUPPET MODE -->
+    <div class="mode-content" id="modeSockpuppet">
+      <textarea class="batch-textarea" id="sockpuppetInput"
+        placeholder="One username per line — 2 to 10 handles.&#10;&#10;Example:&#10;johnsmith&#10;j0hnsmith&#10;john_smith_real"></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn-go" id="btnSockpuppet" onclick="doSockpuppet()">Analyze →</button>
+      </div>
+      <div class="input-hint">Lexical analysis + Wayback CDX presence on Twitter/X/GitHub/Reddit/Instagram + memory.lol historical handle lookup.</div>
+      <div class="honesty-notice">
+        <strong>Sock-puppet score</strong> = lexical similarity × 0.6 + activity-exclusivity × 0.4. Mutually exclusive Wayback windows (one handle dormant when another is active) are a strong signal but not proof.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 15–60 seconds depending on handle count and archive depth.
+      </div>
+    </div>
+
+    <!-- PATTERN MODE -->
+    <div class="mode-content" id="modePattern">
+      <textarea class="batch-textarea" id="patternInput"
+        placeholder="One username per line — 2 or more.&#10;&#10;Example:&#10;jane2024&#10;jane2025&#10;jane_2026&#10;janev2"></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px;">
+        <button class="btn-go" id="btnPattern" onclick="doPattern()">Extract →</button>
+      </div>
+      <div class="input-hint">Identifies common base + naming convention. Predicts next-likely handles based on detected pattern.</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> Instant.
+      </div>
+    </div>
+
+    <!-- Dynamic processing overlay -->
+    <div class="processing-overlay" id="processingOverlay">
+      <div class="processing-head">
+        <div class="processing-spinner"></div>
+        <div class="processing-title" id="processingTitle">Processing…</div>
+        <div class="processing-time" id="processingTime">0s</div>
+      </div>
+      <div class="processing-eta" id="processingETA">—</div>
+      <div class="processing-step-list" id="processingSteps"></div>
+      <div class="processing-bar"><div class="processing-bar-inner"></div></div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap" id="resultsWrap"></div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Lexical correlation engine · Wayback CDX cross-reference · memory.lol identity-laundering detection · Honest confidence bands.</div>
+  </footer>
+
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+
+let lastResult = null;
+let processingTimer = null;
+let processingStartTime = 0;
+let forceSim = null;
+
+function esc(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleSEO(){
+  const b = document.getElementById('seoBlockBody');
+  const btn = document.getElementById('seoToggleBtn');
+  const e = b.classList.toggle('expanded');
+  btn.textContent = e ? 'Show Less' : 'Read More';
+}
+
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  document.getElementById('resultsWrap').classList.remove('visible');
+  if (forceSim){ try{forceSim.stop();}catch(e){} forceSim = null; }
+}
+
+function showProcessing(title, eta, steps){
+  document.getElementById('processingTitle').textContent = title;
+  document.getElementById('processingETA').textContent = eta;
+  const stepsEl = document.getElementById('processingSteps');
+  stepsEl.innerHTML = steps.map((s,i)=>`<div class="processing-step ${i===0?'active':''}"><span class="step-icon">${i===0?'◌':'·'}</span>${esc(s)}</div>`).join('');
+  document.getElementById('processingOverlay').classList.add('visible');
+  processingStartTime = Date.now();
+  if (processingTimer) clearInterval(processingTimer);
+  processingTimer = setInterval(()=>{
+    const sec = Math.floor((Date.now()-processingStartTime)/1000);
+    document.getElementById('processingTime').textContent = sec+'s';
+    const stepEls = stepsEl.querySelectorAll('.processing-step');
+    const totalSteps = stepEls.length;
+    const targetStep = Math.min(totalSteps-1, Math.floor(sec/Math.max(3, Math.floor(20/totalSteps))));
+    stepEls.forEach((el,i)=>{
+      el.classList.remove('active','done');
+      const icon = el.querySelector('.step-icon');
+      if (i < targetStep) { el.classList.add('done'); icon.textContent='✓'; }
+      else if (i === targetStep) { el.classList.add('active'); icon.textContent='◌'; }
+      else { icon.textContent='·'; }
+    });
+  }, 250);
+}
+function hideProcessing(){
+  if (processingTimer){ clearInterval(processingTimer); processingTimer=null; }
+  document.getElementById('processingOverlay').classList.remove('visible');
+}
+function markAllStepsDone(){
+  document.querySelectorAll('.processing-step').forEach(el=>{
+    el.classList.remove('active'); el.classList.add('done');
+    el.querySelector('.step-icon').textContent='✓';
+  });
+}
+function showError(msg){
+  const w = document.getElementById('resultsWrap');
+  w.innerHTML = `
+    <div class="verdict-banner" style="background:rgba(192,57,43,0.05);border-color:rgba(192,57,43,0.30);">
+      <div class="verdict-icon" style="color:#c0392b;">!</div>
+      <div class="verdict-text">
+        <div class="verdict-title">Error</div>
+        <div class="verdict-sub">${esc(msg)}</div>
+      </div>
+    </div>`;
+  w.classList.add('visible');
+}
+
+function cleanInput(raw){
+  if (!raw) return null;
+  let s = String(raw).trim();
+  s = s.replace(/^https?:\/\/[^\/]+\/(?:user\/|users\/|@|in\/|add\/|u\/)?/i, '');
+  s = s.replace(/^@/, '').split('/')[0].split('?')[0].split('#')[0].trim();
+  if (!s || s.length > 64) return null;
+  if (!/^[A-Za-z0-9._\-]+$/.test(s)) return null;
+  return s.toLowerCase();
+}
+
+function bandLabel(b){
+  return ({
+    'almost_certainly_same':'Almost Certainly Same',
+    'likely_same':'Likely Same',
+    'possibly_related':'Possibly Related',
+    'weak_signal':'Weak Signal',
+    'different':'Different'
+  })[b] || b;
+}
+function bandClass(b){
+  return ({
+    'almost_certainly_same':'almost',
+    'likely_same':'likely',
+    'possibly_related':'possibly',
+    'weak_signal':'weak',
+    'different':'different'
+  })[b] || 'weak';
+}
+
+/* ── PAIR MODE ── */
+async function doPair(){
+  const a = cleanInput(document.getElementById('pairA').value);
+  const b = cleanInput(document.getElementById('pairB').value);
+  if (!a || !b){ alert('Enter two valid usernames.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing('Computing pair correlation…', 'Expected: <1s.', [
+    'Computing Jaro-Winkler & sequence ratio',
+    'Building n-gram bigram + trigram sets',
+    'Normalizing leet + separator forms',
+    'Aggregating weighted score',
+  ]);
+  try {
+    const r = await fetch(`${PROXY}/username-correlate-pair`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({a, b})
+    });
+    const data = await r.json();
+    if (data.error){ hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'pair', ...data };
+    markAllStepsDone();
+    setTimeout(()=>{ hideProcessing(); renderPairResult(lastResult); }, 250);
+  } catch(e){
+    hideProcessing();
+    showError('Comparison failed: ' + e.message);
+  }
+}
+
+function renderPairResult(d){
+  const w = document.getElementById('resultsWrap');
+  const score = d.score;
+  // Circle gauge math
+  const C = 2 * Math.PI * 70; // r=70
+  const dashOffset = C * (1 - score/100);
+  const sigs = d.signals;
+  const contrib = d.contributions;
+  const flags = [];
+  if (d.exact_match) flags.push({label:'EXACT MATCH', cls:'exact'});
+  if (d.leet_normalized_match) flags.push({label:'LEET-NORMALIZED MATCH', cls:'leet'});
+  if (d.alnum_match && !d.leet_normalized_match) flags.push({label:'ALPHANUMERIC MATCH', cls:'alnum'});
+  if (d.core_match) flags.push({label:'SHARED CORE', cls:'core'});
+
+  const html = `
+    <div class="verdict-banner ${bandClass(d.band)}">
+      <div class="verdict-icon">⇆</div>
+      <div class="verdict-text">
+        <div class="verdict-title">
+          <span class="verdict-handle">${esc(d.a)}</span> ↔ <span class="verdict-handle">${esc(d.b)}</span>
+          <span class="verdict-band ${d.band}">${bandLabel(d.band)}</span>
+        </div>
+        <div class="verdict-sub">Score ${score} / 100 · ${d.exact_match?'Exact handle match':d.leet_normalized_match?'Identical after leet normalization':'Composite of 4 weighted signals'}</div>
+      </div>
+    </div>
+
+    <div class="score-card">
+      <div class="score-circle-wrap">
+        <svg class="score-circle" width="160" height="160" viewBox="0 0 160 160">
+          <circle class="bg-arc" cx="80" cy="80" r="70"></circle>
+          <circle class="fg-arc" cx="80" cy="80" r="70"
+            stroke-dasharray="${C}" stroke-dashoffset="${dashOffset}"></circle>
+        </svg>
+        <div class="score-num">
+          <div class="score-num-val">${score}</div>
+          <div class="score-num-pct">${bandLabel(d.band)}</div>
+        </div>
+      </div>
+      <div>
+        <div style="font-family:var(--mono);font-size:10px;color:rgba(240,236,228,0.50);letter-spacing:0.14em;text-transform:uppercase;margin-bottom:14px;">Signal Contributions (weighted)</div>
+        <div class="signals-list">
+          <div class="signal-row">
+            <div class="signal-name">Lexical (40%)</div>
+            <div class="signal-bar-wrap"><div class="signal-bar lex" style="width:${(contrib.lexical_similarity/40)*100}%"></div></div>
+            <div class="signal-num">${contrib.lexical_similarity}</div>
+          </div>
+          <div class="signal-row">
+            <div class="signal-name">N-gram (25%)</div>
+            <div class="signal-bar-wrap"><div class="signal-bar ngram" style="width:${(contrib.ngram_jaccard/25)*100}%"></div></div>
+            <div class="signal-num">${contrib.ngram_jaccard}</div>
+          </div>
+          <div class="signal-row">
+            <div class="signal-name">Shared Core (20%)</div>
+            <div class="signal-bar-wrap"><div class="signal-bar core" style="width:${(contrib.shared_core/20)*100}%"></div></div>
+            <div class="signal-num">${contrib.shared_core}</div>
+          </div>
+          <div class="signal-row">
+            <div class="signal-name">Substitution (15%)</div>
+            <div class="signal-bar-wrap"><div class="signal-bar sub" style="width:${(contrib.substitution/15)*100}%"></div></div>
+            <div class="signal-num">${contrib.substitution}</div>
+          </div>
+        </div>
+        ${flags.length?`<div class="flags-row">${flags.map(f=>`<span class="flag-pill ${f.cls}">${f.label}</span>`).join('')}</div>`:''}
+      </div>
+    </div>
+
+    <div class="card expanded">
+      <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="card-title">Raw signals</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body">
+        <div class="kv-list">
+          <div class="kv-row"><div class="kv-key">Jaro-Winkler</div><div class="kv-val accent">${sigs.lexical_jw}</div></div>
+          <div class="kv-row"><div class="kv-key">Jaro-Winkler (leet-normalized)</div><div class="kv-val accent">${sigs.lexical_jw_leet}</div></div>
+          <div class="kv-row"><div class="kv-key">SequenceMatcher ratio</div><div class="kv-val">${sigs.lexical_seq}</div></div>
+          <div class="kv-row"><div class="kv-key">Bigram Jaccard</div><div class="kv-val">${sigs.ngram_bigram}</div></div>
+          <div class="kv-row"><div class="kv-key">Trigram Jaccard</div><div class="kv-val">${sigs.ngram_trigram}</div></div>
+          <div class="kv-row"><div class="kv-key">Shared core ratio</div><div class="kv-val accent">${sigs.shared_core}</div></div>
+          <div class="kv-row"><div class="kv-key">Substitution score</div><div class="kv-val accent">${sigs.substitution}</div></div>
+          <div class="kv-row"><div class="kv-key">Normalized A</div><div class="kv-val">${esc(d.normalized_a)}</div></div>
+          <div class="kv-row"><div class="kv-key">Normalized B</div><div class="kv-val">${esc(d.normalized_b)}</div></div>
+          <div class="kv-row"><div class="kv-key">Alphanumeric A</div><div class="kv-val">${esc(d.alnum_a)}</div></div>
+          <div class="kv-row"><div class="kv-key">Alphanumeric B</div><div class="kv-val">${esc(d.alnum_b)}</div></div>
+          <div class="kv-row"><div class="kv-key">Core A</div><div class="kv-val">${esc(d.core_a)}</div></div>
+          <div class="kv-row"><div class="kv-key">Core B</div><div class="kv-val">${esc(d.core_b)}</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="caveat-card">
+      <strong>What this score means:</strong> The same brain probably picked these two handles. <strong>What it doesn't mean:</strong> the same person operates both accounts. Two siblings, two co-workers using the same convention, or one person and their impersonator can all produce a 90+ score. Use this as one piece of evidence among many.
+    </div>
+
+    <div class="toolbar-row">
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55);">Score: ${score}/100 · Band: ${bandLabel(d.band)}</div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="exportPair('json')">Export JSON</button>
+      </div>
+    </div>`;
+  w.innerHTML = html;
+  w.classList.add('visible');
+}
+
+function exportPair(fmt){
+  if (!lastResult || lastResult.kind !== 'pair') return;
+  download(`pair_${lastResult.a}_vs_${lastResult.b}.json`, JSON.stringify(lastResult, null, 2), 'application/json');
+}
+
+/* ── CLUSTER MODE ── */
+async function doCluster(){
+  const raw = document.getElementById('clusterInput').value || '';
+  const usernames = raw.split(/[\n,]/).map(s=>s.trim()).filter(s=>s && /^[A-Za-z0-9._\-]+$/.test(s));
+  if (usernames.length < 2){ alert('Enter at least 2 valid usernames.'); return; }
+  if (usernames.length > 20){ alert('Max 20 usernames per cluster.'); return; }
+  const threshold = parseInt(document.getElementById('clusterThreshold').value, 10);
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(`Clustering ${usernames.length} usernames…`, 'Expected: ~1s.',
+    ['Computing pairwise signal scores', 'Building union-find clusters', 'Generating force graph']);
+  try {
+    const r = await fetch(`${PROXY}/username-correlate-cluster`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({usernames, threshold})
+    });
+    const data = await r.json();
+    if (data.error){ hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'cluster', threshold, ...data };
+    markAllStepsDone();
+    setTimeout(()=>{ hideProcessing(); renderClusterResult(lastResult); }, 250);
+  } catch(e){
+    hideProcessing();
+    showError('Cluster failed: ' + e.message);
+  }
+}
+
+function renderClusterResult(d){
+  const w = document.getElementById('resultsWrap');
+  const totalPairs = d.pairs.length;
+  const strongPairs = d.pairs.filter(p=>p.score >= d.threshold).length;
+  const html = `
+    <div class="verdict-banner likely">
+      <div class="verdict-icon">≣</div>
+      <div class="verdict-text">
+        <div class="verdict-title">
+          ${d.usernames.length} handles · ${d.clusters.length} cluster${d.clusters.length===1?'':'s'} at threshold ${d.threshold}
+        </div>
+        <div class="verdict-sub">${strongPairs} of ${totalPairs} pairs scored ≥${d.threshold} · drag nodes to rearrange · click a pair row for details</div>
+      </div>
+    </div>
+
+    <div class="graph-wrap">
+      <div class="graph-head">
+        <div class="card-title">Force-directed graph</div>
+        <div class="legend">
+          <span style="color:#c8a96e;">— edge ≥ ${d.threshold}</span>
+          <span style="color:rgba(200,169,110,0.55);">— edge 30–${d.threshold-1}</span>
+          <span style="color:rgba(240,236,228,0.45);">drag to rearrange</span>
+        </div>
+      </div>
+      <svg class="graph-svg" id="forceGraph" viewBox="0 0 800 480"></svg>
+    </div>
+
+    <div class="card expanded">
+      <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="card-title">Clusters <span class="card-count">${d.clusters.length}</span></div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body">
+        ${d.clusters.map((c,i)=>`
+          <div class="cluster-card ${c.size===1?'singleton':''}">
+            <div class="cluster-head">${esc(c.id)} · ${c.size} member${c.size===1?'':'s'}</div>
+            <div class="cluster-members">${c.members.map(m=>`<span class="cluster-handle">${esc(m)}</span>`).join('')}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card expanded">
+      <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="card-title">All pairs <span class="card-count">${totalPairs}</span></div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body">
+        <div class="pairs-table">
+          <div class="pairs-head"><div>Username A</div><div>Username B</div><div style="text-align:right;">Score</div><div style="text-align:center;">Band</div></div>
+          ${d.pairs.map(p=>`
+            <div class="pairs-row" onclick='showPairDetail(${JSON.stringify(p).replace(/'/g,"&#39;")})'>
+              <div class="h">${esc(p.a)}</div>
+              <div class="h">${esc(p.b)}</div>
+              <div class="score">${p.score}</div>
+              <div class="band ${p.band}">${bandLabel(p.band)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${d.pattern && d.pattern.patterns.length ? renderPatternBlock(d.pattern, null, 'Detected naming pattern in this cluster') : ''}
+
+    <div class="caveat-card">
+      <strong>How to read this:</strong> Edges connect handles whose lexical similarity score is at least ${d.threshold}. Same cluster = handles that match the threshold via at least one transitive chain. <strong>Lexical clustering tells you who picks similar handles, not who is the same person</strong> — gather behavioral evidence (timing, content, language, mutual contacts) before drawing conclusions.
+    </div>
+
+    <div class="toolbar-row">
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55);">${d.usernames.length} handles · ${d.clusters.length} clusters · ${strongPairs}/${totalPairs} strong pairs</div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="exportCluster('csv-matrix')">Export Matrix CSV</button>
+        <button class="btn-secondary" onclick="exportCluster('csv-pairs')">Export Pairs CSV</button>
+        <button class="btn-secondary" onclick="exportCluster('json')">Export JSON</button>
+      </div>
+    </div>`;
+  w.innerHTML = html;
+  w.classList.add('visible');
+  setTimeout(()=>renderForceGraph(d), 50);
+}
+
+function renderForceGraph(d){
+  const svg = d3.select('#forceGraph');
+  svg.selectAll('*').remove();
+  const W = 800, H = 480;
+  const nodes = d.usernames.map(u => ({id: u}));
+  const links = d.edges.map(e => ({source: e.a, target: e.b, score: e.score, band: e.band}));
+
+  if (forceSim){ try{forceSim.stop();}catch(e){} }
+  forceSim = d3.forceSimulation(nodes)
+    .force('link', d3.forceLink(links).id(n=>n.id).distance(l=>180 - (l.score - 30)))
+    .force('charge', d3.forceManyBody().strength(-280))
+    .force('center', d3.forceCenter(W/2, H/2))
+    .force('collide', d3.forceCollide().radius(36));
+
+  const link = svg.append('g').selectAll('line').data(links).enter()
+    .append('line').attr('class', l => 'link' + (l.score >= d.threshold ? ' hl' : ''))
+    .style('stroke-opacity', l => 0.30 + (l.score-30)/100 * 0.7)
+    .style('stroke-width', l => 0.5 + (l.score-30)/100 * 2.0);
+
+  const node = svg.append('g').selectAll('g').data(nodes).enter()
+    .append('g').attr('class', 'node')
+    .call(d3.drag()
+      .on('start', (e,n)=>{ if(!e.active) forceSim.alphaTarget(0.3).restart(); n.fx=n.x; n.fy=n.y; })
+      .on('drag', (e,n)=>{ n.fx=e.x; n.fy=e.y; })
+      .on('end', (e,n)=>{ if(!e.active) forceSim.alphaTarget(0); n.fx=null; n.fy=null; }));
+  node.append('circle').attr('r', 8);
+  node.append('text').attr('dy', -12).attr('text-anchor', 'middle').text(n=>n.id);
+
+  forceSim.on('tick', ()=>{
+    link.attr('x1', l=>l.source.x).attr('y1', l=>l.source.y)
+        .attr('x2', l=>l.target.x).attr('y2', l=>l.target.y);
+    node.attr('transform', n=>`translate(${n.x},${n.y})`);
+  });
+}
+
+function showPairDetail(p){
+  selectMode('pair');
+  document.getElementById('pairA').value = p.a;
+  document.getElementById('pairB').value = p.b;
+  doPair();
+}
+
+function exportCluster(fmt){
+  if (!lastResult || lastResult.kind !== 'cluster') return;
+  const r = lastResult;
+  if (fmt === 'json'){
+    download(`cluster_${r.usernames.length}.json`, JSON.stringify(r, null, 2), 'application/json');
+  } else if (fmt === 'csv-matrix'){
+    const rows = [[''].concat(r.usernames)];
+    for (let i=0; i<r.usernames.length; i++){
+      rows.push([r.usernames[i]].concat(r.matrix[i].map(v=>v===null?'':v)));
+    }
+    const csv = rows.map(rr=>rr.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    download(`matrix_${r.usernames.length}.csv`, csv, 'text/csv');
+  } else if (fmt === 'csv-pairs'){
+    const rows = [['a','b','score','band','lexical','ngram','shared_core','substitution']];
+    for (const p of r.pairs){
+      rows.push([p.a, p.b, p.score, p.band, p.contributions.lexical_similarity,
+                 p.contributions.ngram_jaccard, p.contributions.shared_core, p.contributions.substitution]);
+    }
+    const csv = rows.map(rr=>rr.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    download(`pairs_${r.usernames.length}.csv`, csv, 'text/csv');
+  }
+}
+
+/* ── SOCKPUPPET MODE ── */
+async function doSockpuppet(){
+  const raw = document.getElementById('sockpuppetInput').value || '';
+  const usernames = raw.split(/[\n,]/).map(s=>s.trim()).filter(s=>s && /^[A-Za-z0-9._\-]+$/.test(s));
+  if (usernames.length < 2){ alert('Enter at least 2 valid usernames.'); return; }
+  if (usernames.length > 10){ alert('Max 10 usernames for sock-puppet analysis.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(`Sock-puppet analysis on ${usernames.length} handles…`,
+    `Expected: 15–60s. ${usernames.length} × 5 Wayback CDX + ${usernames.length} memory.lol queries in parallel.`,
+    [
+      'Computing lexical pairwise scores',
+      'Querying Wayback CDX (twitter / x / github / reddit / instagram)',
+      'Querying memory.lol for X handle history',
+      'Computing activity-window overlaps',
+      'Aggregating sock-puppet scores',
+    ]);
+  try {
+    const r = await fetch(`${PROXY}/username-sockpuppet`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({usernames})
+    });
+    const data = await r.json();
+    if (data.error){ hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'sockpuppet', ...data };
+    markAllStepsDone();
+    setTimeout(()=>{ hideProcessing(); renderSockpuppetResult(lastResult); }, 350);
+  } catch(e){
+    hideProcessing();
+    showError('Analysis failed: ' + e.message);
+  }
+}
+
+function renderSockpuppetResult(d){
+  const w = document.getElementById('resultsWrap');
+  // Determine timeline range
+  let allTs = [];
+  for (const h of Object.keys(d.presence||{})){
+    for (const pk of Object.keys(d.presence[h])){
+      const pres = d.presence[h][pk];
+      if (pres.first_ts) allTs.push(pres.first_ts.slice(0,6));
+      if (pres.last_ts) allTs.push(pres.last_ts.slice(0,6));
+    }
+  }
+  let minTs = '200801', maxTs = '202612';
+  if (allTs.length){
+    minTs = allTs.reduce((a,b)=>a<b?a:b);
+    maxTs = allTs.reduce((a,b)=>a>b?a:b);
+  }
+  const minYr = parseInt(minTs.slice(0,4),10), maxYr = parseInt(maxTs.slice(0,4),10);
+
+  const top = d.sockpuppet_pairs[0];
+  const topScore = top ? top.sockpuppet_score : 0;
+
+  const html = `
+    <div class="verdict-banner ${topScore >= 70 ? 'almost' : topScore >= 50 ? 'likely' : 'possibly'}">
+      <div class="verdict-icon">⌖</div>
+      <div class="verdict-text">
+        <div class="verdict-title">
+          Sock-puppet analysis · ${d.input.length} handles · ${d.sockpuppet_pairs.length} pair${d.sockpuppet_pairs.length===1?'':'s'}
+        </div>
+        <div class="verdict-sub">Top pair: ${top ? `<strong style="color:#e8d5a3;">${esc(top.a)} ↔ ${esc(top.b)}</strong> · score ${topScore}` : '—'} · ${d.memory_lol_shared.length} memory.lol cross-references · ${Object.keys(d.presence).length} handles with archive presence</div>
+      </div>
+    </div>
+
+    <div class="card expanded">
+      <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="card-title">Sock-puppet pair scores</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body">
+        <div class="sp-pairs-head">
+          <div>A</div><div>B</div>
+          <div style="text-align:right;">Lexical</div>
+          <div style="text-align:right;">Excl.</div>
+          <div style="text-align:right;">Sockpuppet</div>
+        </div>
+        ${d.sockpuppet_pairs.map(p=>`
+          <div class="sp-pairs-row">
+            <div class="h">${esc(p.a)}</div>
+            <div class="h">${esc(p.b)}</div>
+            <div class="num">${p.lexical_score}</div>
+            <div class="num ${p.exclusivity_ratio>=0.6?'hi':p.exclusivity_ratio>=0.3?'med':''}">${(p.exclusivity_ratio*100).toFixed(0)}%</div>
+            <div class="num ${p.sockpuppet_score>=70?'hi':p.sockpuppet_score>=50?'med':''}">${p.sockpuppet_score}</div>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card expanded">
+      <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="card-title">Wayback presence timeline</div>
+        <div class="card-count">${minYr}–${maxYr}</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body">
+        ${d.input.map(h => renderTimelineRow(h, d.presence[h] || {}, minYr, maxYr)).join('')}
+        <div class="timeline-axis" style="padding:8px 22px;border-top:1px solid var(--border);">
+          ${Array.from({length: maxYr-minYr+1}, (_,i)=>`<span>${minYr+i}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+
+    ${d.memory_lol_shared.length ? `
+      <div class="card expanded">
+        <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+          <div class="card-title">memory.lol shared historical X handles</div>
+          <div class="card-count">${d.memory_lol_shared.length}</div>
+          <div class="card-toggle">+</div>
+        </div>
+        <div class="card-body">
+          ${d.memory_lol_shared.map(s=>`
+            <div class="ml-shared-row">
+              <div class="ml-shared-pair"><strong>${esc(s.a)}</strong> ↔ <strong>${esc(s.b)}</strong></div>
+              <div class="ml-shared-handles">${s.shared_historical_handles.map(h=>`<span class="ml-shared-handle">@${esc(h)}</span>`).join('')}</div>
+            </div>`).join('')}
+        </div>
+      </div>` : ''}
+
+    <div class="caveat-card">
+      <strong>What "sock-puppet score" actually means:</strong> 60% lexical similarity + 40% activity-window exclusivity. <strong>Exclusivity</strong> = on platforms where both handles have archive presence, how often was one dormant while the other was active. <strong>This is a heuristic, not proof.</strong> Two unrelated people on a hiatus, an account migration, or a platform-specific account turnover all produce false positives. <strong>memory.lol coverage is X-only</strong> and depends on whether the handle was scraped during a relevant rename.
+    </div>
+
+    <div class="toolbar-row">
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55);">Top score: ${topScore}</div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="exportSockpuppet('json')">Export JSON</button>
+      </div>
+    </div>`;
+  w.innerHTML = html;
+  w.classList.add('visible');
+}
+
+function renderTimelineRow(handle, presence, minYr, maxYr){
+  const yrSpan = (maxYr - minYr) + 1;
+  const platforms = Object.keys(presence);
+  if (platforms.length === 0){
+    return `<div class="timeline-handle-row">
+      <div class="timeline-handle-name">${esc(handle)}</div>
+      <div class="timeline-empty">No archive presence found across probed platforms.</div>
+    </div>`;
+  }
+  // Build absolute-positioned bars per platform
+  const bars = platforms.map((p, idx) => {
+    const pres = presence[p];
+    const f = pres.first_ts.slice(0,6); // YYYYMM
+    const l = pres.last_ts.slice(0,6);
+    const fY = parseInt(f.slice(0,4),10), fM = parseInt(f.slice(4,6),10) || 1;
+    const lY = parseInt(l.slice(0,4),10), lM = parseInt(l.slice(4,6),10) || 12;
+    const startFrac = ((fY - minYr) * 12 + (fM-1)) / (yrSpan * 12);
+    const endFrac   = ((lY - minYr) * 12 + lM) / (yrSpan * 12);
+    const left = (startFrac * 100).toFixed(2);
+    const width = Math.max(0.6, ((endFrac - startFrac) * 100)).toFixed(2);
+    const top = 4 + idx * 8;
+    const cls = p.includes('twitter')||p==='x'?'tw':p==='github'?'gh':p==='reddit'?'rd':p==='ig'?'ig':'';
+    return `<div class="timeline-bar ${cls}" style="left:${left}%;width:${width}%;top:${top}px;height:6px;" title="${esc(p)}: ${pres.count} snapshots, ${f}–${l}">${pres.count>5?p:''}</div>`;
+  }).join('');
+  // Adjust track height to fit all platform bars
+  const trackHeight = 14 + platforms.length * 8;
+  return `<div class="timeline-handle-row">
+    <div class="timeline-handle-name">${esc(handle)}</div>
+    <div class="timeline-track" style="height:${trackHeight}px;">${bars}</div>
+  </div>`;
+}
+
+function exportSockpuppet(fmt){
+  if (!lastResult || lastResult.kind !== 'sockpuppet') return;
+  download(`sockpuppet_${lastResult.input.length}.json`, JSON.stringify(lastResult, null, 2), 'application/json');
+}
+
+/* ── PATTERN MODE ── */
+async function doPattern(){
+  const raw = document.getElementById('patternInput').value || '';
+  const usernames = raw.split(/[\n,]/).map(s=>s.trim()).filter(s=>s && /^[A-Za-z0-9._\-]+$/.test(s));
+  if (usernames.length < 2){ alert('Enter at least 2 valid usernames.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(`Extracting pattern from ${usernames.length} handles…`, 'Expected: instant.',
+    ['Finding longest common substring','Detecting numeric/word/separator patterns','Predicting next-likely handles']);
+  try {
+    const r = await fetch(`${PROXY}/username-correlate-pattern`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({usernames})
+    });
+    const data = await r.json();
+    if (data.error){ hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'pattern', ...data };
+    markAllStepsDone();
+    setTimeout(()=>{ hideProcessing(); renderPatternResultFull(lastResult); }, 200);
+  } catch(e){
+    hideProcessing();
+    showError('Pattern extraction failed: ' + e.message);
+  }
+}
+
+function renderPatternBlock(r, predicted, title){
+  const labels = {
+    year_suffix: u=>`<strong>Year suffix</strong> — ${u.matches}/${u.total} handles end with a year (19xx or 20xx).`,
+    numeric_suffix: u=>`<strong>Numeric suffix</strong> — ${u.matches}/${u.total} handles end with digits.`,
+    word_suffix: u=>`<strong>Word suffix</strong> — ${u.matches}/${u.total} handles end with "${esc(u.value)}".`,
+    all_have_separators: u=>`<strong>All separated</strong> — every handle (${u.matches}/${u.total}) contains <code>_ . -</code>.`,
+    no_separators: u=>`<strong>No separators</strong> — none of ${u.total} handles contain <code>_ . -</code>.`,
+    all_lowercase: u=>`<strong>All lowercase</strong> — ${u.matches}/${u.total} handles are entirely lowercase.`,
+  };
+  return `
+    <div class="card expanded">
+      <div class="card-head" onclick="this.parentElement.classList.toggle('expanded')">
+        <div class="card-title">${esc(title || 'Pattern extracted')}</div>
+        <div class="card-toggle">+</div>
+      </div>
+      <div class="card-body">
+        <div class="pattern-card" style="border:none;">
+          <div class="pattern-base-row">
+            <span class="pattern-label">Common base</span>
+            <span class="pattern-value">${r.base ? esc(r.base) : '—'}</span>
+          </div>
+          <div class="pattern-base-row">
+            <span class="pattern-label">Shared core (alphanumeric only)</span>
+            <span class="pattern-value mono">${r.shared_alnum ? esc(r.shared_alnum) : '—'}</span>
+          </div>
+          <div class="pattern-base-row">
+            <span class="pattern-label">Avg length</span>
+            <span class="pattern-value mono">${r.common_length.toFixed(1)}</span>
+          </div>
+          <div class="pattern-list">
+            ${r.patterns.length === 0 ? '<div class="empty">No strong conventions detected — handles vary too much.</div>' :
+              r.patterns.map(p=>`<div class="pattern-item">${labels[p.kind] ? labels[p.kind](p) : esc(JSON.stringify(p))}</div>`).join('')}
+          </div>
+          ${predicted && predicted.length ? `
+            <div style="margin-top:18px;">
+              <div class="pattern-label" style="margin-bottom:10px;">Predicted next-likely handles</div>
+              <div class="pred-list">${predicted.map(h=>`<span class="pred-chip" onclick="copyChip(this,'${esc(h)}')">${esc(h)}</span>`).join('')}</div>
+            </div>` : ''}
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderPatternResultFull(d){
+  const w = document.getElementById('resultsWrap');
+  const r = d.result;
+  const html = `
+    <div class="verdict-banner likely">
+      <div class="verdict-icon">↻</div>
+      <div class="verdict-text">
+        <div class="verdict-title">Pattern Extracted · <span class="verdict-handle">${r.base ? esc(r.base) : '—'}</span></div>
+        <div class="verdict-sub">${d.input.length} handles · ${r.patterns.length} convention(s) · ${d.predicted.length} predicted next-likely handle(s)</div>
+      </div>
+    </div>
+
+    ${renderPatternBlock(r, d.predicted, 'Naming convention')}
+
+    <div class="caveat-card">
+      <strong>Predicted handles are guesses, not validated availability.</strong> Use the Username Permutator + Availability Checker tool to verify whether predicted handles are actually registered. A predicted handle existing on a platform doesn't mean it belongs to your target — it may belong to someone else with the same naming style.
+    </div>
+
+    <div class="toolbar-row">
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55);">${d.input.length} handles analyzed</div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="exportPattern('json')">Export JSON</button>
+      </div>
+    </div>`;
+  w.innerHTML = html;
+  w.classList.add('visible');
+}
+
+function copyChip(el, text){
+  navigator.clipboard.writeText(text).catch(()=>{});
+  const orig = el.innerHTML;
+  el.innerHTML = `copied · ${esc(text)}`;
+  setTimeout(()=>{ el.innerHTML = orig; }, 900);
+}
+
+function exportPattern(fmt){
+  if (!lastResult || lastResult.kind !== 'pattern') return;
+  download(`pattern_${lastResult.input.length}.json`, JSON.stringify(lastResult, null, 2), 'application/json');
+}
+
+/* ── Download helper ── */
+function download(filename, content, mime){
+  const blob = new Blob([content], {type: mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+}
+</script>
+</body>
+</html>

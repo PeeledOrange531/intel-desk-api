@@ -1,0 +1,1115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Username Permutation Generator + Cross-Platform Availability Checker | The Intel Desk</title>
+<meta name="description" content="Generate variations of any username and check which ones are taken or unclaimed across 30+ platforms. For brand protection, sock-puppet hunting, or finding alt-account naming patterns. No API key required.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#050505;--bg2:#0a0a0a;--bg3:#111111;
+  --border:rgba(255,255,255,0.07);--border-hover:rgba(255,255,255,0.18);
+  --text:#f5f2ec;--accent:#c8a96e;--accent2:#e8d5a3;--accent-dim:rgba(200,169,110,0.15);
+  --green:#4ec994;--orange:#e87b4a;--blue:#7eb8e4;--red:#c0392b;
+  --mono:'DM Mono',monospace;--serif:'Cormorant Garamond',Georgia,serif;--sans:'Syne',sans-serif;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+body{background:#050505!important;color:#f5f2ec!important;font-family:var(--sans);min-height:100vh;overflow-x:hidden;}
+body *{color:inherit;}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.45;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.08'/%3E%3C/svg%3E");
+  background-repeat:repeat;background-size:256px;}
+
+.page-wrap{position:relative;z-index:1;padding:0 clamp(16px,4vw,48px);max-width:1280px;margin:0 auto;}
+
+/* HERO */
+.hero{padding:clamp(40px,8vw,80px) 0 clamp(32px,5vw,60px);border-bottom:1px solid var(--border);animation:fadeUp 0.6s ease both;}
+.eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:28px;}
+.eyebrow::before{content:'';display:block;width:32px;height:1px;background:var(--accent);flex-shrink:0;}
+.eyebrow span{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.20em;color:#c8a96e!important;}
+.hero h1{font-family:var(--serif);font-size:clamp(34px,5.6vw,62px);font-weight:300;line-height:0.98;color:#f5f2ec!important;}
+.hero h1 em{font-style:italic;color:#e8d5a3!important;}
+.hero-sub{font-family:var(--mono);font-size:13px;color:rgba(240,236,228,0.55)!important;margin-top:18px;max-width:680px;line-height:1.7;}
+
+/* SEO */
+.seo-block{background:var(--bg2);border:1px solid var(--border);border-top:none;}
+.seo-block-header{display:flex;align-items:center;justify-content:space-between;padding:10px 32px;cursor:pointer;user-select:none;gap:16px;}
+.seo-block-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:#c8a96e!important;display:flex;align-items:center;gap:10px;flex:1;}
+.seo-block-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.seo-toggle-btn{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.55)!important;background:transparent;border:1px solid rgba(200,169,110,0.22);padding:4px 14px;cursor:pointer;flex-shrink:0;}
+.seo-block-body{max-height:72px;overflow:hidden;transition:max-height 0.4s cubic-bezier(0.4,0,0.2,1);padding:0 32px 14px;position:relative;}
+.seo-block-body::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(transparent,var(--bg2));pointer-events:none;transition:opacity 0.3s;}
+.seo-block-body.expanded{max-height:740px;}.seo-block-body.expanded::after{opacity:0;}
+.seo-block p{font-family:var(--mono);font-size:13px;line-height:1.9;color:rgba(240,236,228,0.75)!important;}
+.seo-block p strong{color:#e8d5a3!important;}
+.seo-tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px;padding-top:16px;border-top:1px solid var(--border);}
+.seo-tag{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;color:rgba(240,236,228,0.50)!important;border:1px solid var(--border);padding:4px 10px;}
+
+.section-label{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.18em;color:rgba(240,236,228,0.50)!important;display:flex;align-items:center;gap:16px;margin-bottom:16px;}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+
+.tool-panel{padding:clamp(28px,4vw,40px) 0 0;animation:fadeUp 0.4s ease both;}
+
+/* Mode pills */
+.mode-pills{display:flex;gap:0;border:1px solid var(--border);width:fit-content;margin-bottom:24px;background:var(--bg2);flex-wrap:wrap;max-width:100%;}
+.mode-pill{font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:12px 20px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;transition:all 0.15s;border-right:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+.mode-pill:last-child{border-right:none;}
+.mode-pill:hover{color:#e8d5a3!important;background:rgba(255,255,255,0.02);}
+.mode-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.mode-pill-icon{font-family:var(--serif);font-size:14px;font-weight:400;}
+.mode-content{display:none;}
+.mode-content.active{display:block;animation:fadeUp 0.3s ease both;}
+
+/* Search row */
+.search-row{display:flex;gap:0;flex-wrap:wrap;}
+.handle-input{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--border);border-right:none;color:#f5f2ec!important;font-family:var(--mono);font-size:13px;padding:16px 20px;outline:none;transition:border-color 0.2s;}
+.handle-input:focus{border-color:rgba(200,169,110,0.35);}
+.handle-input::placeholder{color:rgba(240,236,228,0.25)!important;}
+.btn-go{background:var(--accent-dim);border:1px solid rgba(200,169,110,0.3);color:#c8a96e!important;font-family:var(--mono);font-size:11px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;padding:16px 36px;cursor:pointer;transition:all 0.2s;white-space:nowrap;min-height:52px;}
+.btn-go:hover:not(:disabled){background:rgba(200,169,110,0.25);color:#e8d5a3!important;}
+.btn-go:disabled{opacity:0.5;cursor:not-allowed;}
+.input-hint{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;margin-top:10px;}
+
+.batch-textarea{width:100%;background:var(--bg2);border:1px solid var(--border);color:#f5f2ec!important;font-family:var(--mono);font-size:12px;padding:16px 20px;outline:none;min-height:140px;resize:vertical;line-height:1.6;}
+.batch-textarea:focus{border-color:rgba(200,169,110,0.35);}
+
+/* Category toggles (BOOSTER #6) */
+.cat-toggle-row{margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;}
+.cat-toggle{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:7px 12px;border:1px solid var(--border);background:transparent;color:rgba(240,236,228,0.45)!important;cursor:pointer;transition:all 0.15s;}
+.cat-toggle:hover{border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+.cat-toggle.on{color:#c8a96e!important;border-color:rgba(200,169,110,0.35);background:rgba(200,169,110,0.06);}
+
+/* Custom rules input (BOOSTER #5) */
+.custom-rules{margin-top:14px;display:none;flex-direction:column;gap:8px;}
+.custom-rules.visible{display:flex;}
+.rule-row{display:grid;grid-template-columns:1fr 12px 1fr 36px;gap:6px;align-items:center;}
+.rule-row .handle-input{padding:10px 14px;font-size:11.5px;border-right:1px solid var(--border);}
+.rule-row .arrow{font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.55)!important;text-align:center;}
+.rule-x{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.45)!important;font-family:var(--mono);font-size:14px;cursor:pointer;height:36px;}
+.rule-x:hover{color:#e87b4a!important;border-color:rgba(232,123,74,0.30);}
+.btn-link{background:transparent;border:none;color:#c8a96e!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.12em;cursor:pointer;padding:6px 0;text-align:left;}
+.btn-link:hover{color:#e8d5a3!important;}
+
+/* Privacy + processing notices */
+.privacy-notice{margin-top:14px;padding:12px 18px;background:rgba(78,201,148,0.04);border:1px solid rgba(78,201,148,0.20);font-family:var(--mono);font-size:10.5px;color:rgba(78,201,148,0.85)!important;line-height:1.7;}
+.processing-warning{margin-top:14px;padding:12px 18px;background:rgba(232,123,74,0.05);border:1px solid rgba(232,123,74,0.22);font-family:var(--mono);font-size:10.5px;color:rgba(232,123,74,0.85)!important;line-height:1.7;}
+.honesty-notice{margin-top:14px;padding:14px 20px;background:rgba(126,184,228,0.05);border:1px solid rgba(126,184,228,0.22);font-family:var(--mono);font-size:11px;color:rgba(126,184,228,0.85)!important;line-height:1.8;}
+.honesty-notice strong{color:#7eb8e4!important;}
+
+/* Dynamic processing overlay */
+.processing-overlay{display:none;flex-direction:column;gap:16px;padding:36px 32px;background:var(--bg2);border:1px solid var(--border);margin-top:16px;animation:fadeUp 0.3s ease both;}
+.processing-overlay.visible{display:flex;}
+.processing-head{display:flex;align-items:center;gap:14px;}
+.processing-spinner{width:24px;height:24px;border:2px solid rgba(200,169,110,0.20);border-top-color:var(--accent);border-radius:50%;animation:spin 0.9s linear infinite;flex-shrink:0;}
+@keyframes spin{to{transform:rotate(360deg);}}
+.processing-title{font-family:var(--mono);font-size:13px;color:#e8d5a3!important;font-weight:500;letter-spacing:0.04em;flex:1;}
+.processing-time{font-family:var(--mono);font-size:11px;color:rgba(200,169,110,0.65)!important;}
+.processing-eta{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.45)!important;line-height:1.6;}
+.processing-step-list{display:flex;flex-direction:column;gap:6px;}
+.processing-step{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.40)!important;display:flex;align-items:center;gap:10px;}
+.processing-step.active{color:#e8d5a3!important;}
+.processing-step.done{color:rgba(78,201,148,0.85)!important;}
+.processing-step .step-icon{display:inline-block;width:14px;text-align:center;color:#c8a96e!important;}
+.processing-step.active .step-icon{animation:pulse 1.3s ease-in-out infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:0.4;}}
+.processing-bar{height:2px;background:rgba(200,169,110,0.10);overflow:hidden;position:relative;}
+.processing-bar-inner{height:100%;background:linear-gradient(90deg,transparent,#c8a96e,transparent);animation:loadSlide 1.4s ease-in-out infinite;}
+@keyframes loadSlide{0%{transform:translateX(-100%);}100%{transform:translateX(300%);}}
+
+/* Results */
+.results-wrap{display:none;flex-direction:column;gap:2px;margin-top:clamp(28px,4vw,40px);animation:fadeUp 0.4s ease both;}
+.results-wrap.visible{display:flex;}
+
+.verdict-banner{padding:22px 26px;display:flex;align-items:center;gap:18px;border:1px solid;flex-wrap:wrap;background:var(--bg2);border-color:var(--border);}
+.verdict-banner.info{background:rgba(126,184,228,0.05);border-color:rgba(126,184,228,0.22);}
+.verdict-icon{font-size:30px;flex-shrink:0;font-family:var(--serif);color:#e8d5a3!important;}
+.verdict-text{flex:1;min-width:200px;}
+.verdict-title{font-family:var(--serif);font-size:clamp(20px,3vw,26px);font-weight:300;color:#f5f2ec!important;margin-bottom:6px;display:flex;align-items:baseline;gap:14px;flex-wrap:wrap;}
+.verdict-handle{color:#e8d5a3!important;font-style:italic;}
+.verdict-sub{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.65)!important;line-height:1.7;}
+
+/* Stats summary */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:0;background:var(--bg2);border:1px solid var(--border);}
+.stat{padding:18px 22px;border-right:1px solid var(--border);}
+.stat:last-child{border-right:none;}
+.stat-label{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.45)!important;margin-bottom:6px;}
+.stat-value{font-family:var(--serif);font-size:28px;font-weight:300;line-height:1;color:#e8d5a3!important;}
+.stat-value.green{color:#4ec994!important;}
+.stat-value.warn{color:#e87b4a!important;}
+.stat-value.red{color:#c0392b!important;}
+.stat-value.dim{color:rgba(240,236,228,0.40)!important;}
+
+/* Filter & view-toggle row */
+.toolbar-row{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;background:var(--bg3);border:1px solid var(--border);padding:12px 18px;}
+.filter-pills{display:flex;gap:0;border:1px solid var(--border);background:var(--bg2);}
+.filter-pill{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:8px 14px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;border-right:1px solid var(--border);transition:all 0.15s;}
+.filter-pill:last-child{border-right:none;}
+.filter-pill:hover{color:#e8d5a3!important;}
+.filter-pill.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.view-toggle{display:flex;gap:0;border:1px solid var(--border);background:var(--bg2);}
+.view-toggle button{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:8px 14px;cursor:pointer;border:none;background:transparent;color:rgba(240,236,228,0.45)!important;border-right:1px solid var(--border);}
+.view-toggle button:last-child{border-right:none;}
+.view-toggle button.active{color:#c8a96e!important;background:rgba(200,169,110,0.10);}
+.export-row{display:flex;gap:6px;}
+.btn-secondary{background:transparent;border:1px solid var(--border);color:rgba(240,236,228,0.55)!important;font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:8px 14px;cursor:pointer;transition:all 0.15s;}
+.btn-secondary:hover:not(:disabled){border-color:rgba(200,169,110,0.30);color:#e8d5a3!important;}
+
+/* Heatmap (BOOSTER #2) */
+.heatmap-wrap{background:var(--bg2);border:1px solid var(--border);overflow-x:auto;}
+.heatmap-wrap.hidden{display:none;}
+.heatmap-table{border-collapse:collapse;font-family:var(--mono);font-size:10px;min-width:100%;}
+.heatmap-table th{text-align:left;padding:10px 8px;color:rgba(240,236,228,0.50)!important;font-weight:500;text-transform:uppercase;letter-spacing:0.08em;font-size:9px;border-bottom:1px solid var(--border);background:var(--bg3);position:sticky;top:0;white-space:nowrap;}
+.heatmap-table th.platform-col{transform:rotate(-45deg);transform-origin:left bottom;height:90px;width:32px;padding:0;font-size:9px;color:rgba(240,236,228,0.55)!important;text-align:left;}
+.heatmap-table th.platform-col-wrap{height:120px;padding:0;}
+.heatmap-table th.platform-col-wrap > div{transform:rotate(-45deg);transform-origin:left center;width:100px;text-align:left;padding:6px 0;color:rgba(240,236,228,0.55)!important;}
+.heatmap-table th.platform-col-wrap.low-rel > div{color:rgba(232,123,74,0.65)!important;}
+.heatmap-table th.username-col{padding:10px 14px;font-family:var(--mono);font-size:10px;color:#e8d5a3!important;text-transform:none;letter-spacing:0;font-weight:400;background:var(--bg3);border-bottom:1px solid var(--border);position:sticky;left:0;z-index:2;}
+.heatmap-table td.username-cell{padding:6px 14px;font-family:var(--mono);font-size:11px;color:#e8d5a3!important;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;left:0;z-index:1;white-space:nowrap;}
+.heatmap-table td.username-cell .perm-cat{font-size:8.5px;color:rgba(200,169,110,0.55)!important;display:block;margin-top:2px;letter-spacing:0.06em;text-transform:uppercase;}
+.heatmap-table td.heat-cell{padding:0;border-bottom:1px solid var(--border);text-align:center;width:32px;height:32px;cursor:pointer;}
+.heat-dot{display:inline-block;width:14px;height:14px;border-radius:50%;border:1px solid;}
+.heat-dot.taken{background:rgba(200,169,110,0.35);border-color:rgba(200,169,110,0.65);}
+.heat-dot.not_found{background:rgba(78,201,148,0.30);border-color:rgba(78,201,148,0.65);}
+.heat-dot.unverifiable{background:rgba(126,184,228,0.20);border-color:rgba(126,184,228,0.45);}
+.heat-dot.error{background:rgba(192,57,43,0.20);border-color:rgba(192,57,43,0.45);}
+.heatmap-table td.heat-cell:hover .heat-dot{transform:scale(1.4);box-shadow:0 0 0 2px rgba(200,169,110,0.15);}
+
+/* Per-username detail (LIST view) */
+.list-wrap{display:flex;flex-direction:column;gap:2px;}
+.list-wrap.hidden{display:none;}
+.uname-card{background:var(--bg2);border:1px solid var(--border);}
+.uname-head{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;gap:12px;}
+.uname-head:hover{background:rgba(255,255,255,0.02);}
+.uname-name{font-family:var(--mono);font-size:13px;color:#e8d5a3!important;font-weight:500;}
+.uname-cat-tag{font-family:var(--mono);font-size:9px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:3px 8px;border:1px solid rgba(200,169,110,0.30);color:#c8a96e!important;}
+.uname-summary{display:flex;gap:14px;font-family:var(--mono);font-size:10.5px;flex-wrap:wrap;}
+.uname-summary span{display:flex;align-items:center;gap:4px;}
+.uname-summary span.t-taken{color:rgba(200,169,110,0.85)!important;}
+.uname-summary span.t-nf{color:rgba(78,201,148,0.85)!important;}
+.uname-summary span.t-uv{color:rgba(126,184,228,0.85)!important;}
+.uname-summary span.t-er{color:rgba(192,57,43,0.85)!important;}
+.uname-toggle{font-family:var(--mono);font-size:14px;color:rgba(240,236,228,0.30)!important;transition:transform 0.2s;}
+.uname-card.expanded .uname-toggle{transform:rotate(45deg);}
+.uname-body{display:none;}
+.uname-card.expanded .uname-body{display:block;animation:fadeUp 0.2s ease;}
+
+.platform-row{display:grid;grid-template-columns:160px 110px 1fr 80px;gap:14px;padding:10px 22px;border-bottom:1px solid var(--border);font-family:var(--mono);font-size:11px;align-items:center;}
+.platform-row:last-child{border-bottom:none;}
+.platform-row.low-rel{background:rgba(232,123,74,0.025);}
+.platform-name{color:#e8d5a3!important;}
+.platform-name .rel-badge{display:inline-block;margin-left:6px;font-size:8.5px;color:rgba(232,123,74,0.65)!important;letter-spacing:0.06em;}
+.platform-status{font-family:var(--mono);font-size:9.5px;font-weight:500;text-transform:uppercase;letter-spacing:0.10em;padding:3px 8px;border:1px solid;text-align:center;width:fit-content;}
+.platform-status.taken{color:#c8a96e!important;border-color:rgba(200,169,110,0.40);}
+.platform-status.not_found{color:#4ec994!important;border-color:rgba(78,201,148,0.40);}
+.platform-status.unverifiable{color:#7eb8e4!important;border-color:rgba(126,184,228,0.40);}
+.platform-status.error{color:#c0392b!important;border-color:rgba(192,57,43,0.40);}
+.platform-url{color:rgba(240,236,228,0.50)!important;font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.platform-url a{color:rgba(200,169,110,0.65)!important;text-decoration:none;}
+.platform-url a:hover{color:#e8d5a3!important;text-decoration:underline;}
+.platform-action{text-align:right;}
+.platform-action a{color:rgba(200,169,110,0.55)!important;font-size:9px;text-decoration:none;letter-spacing:0.10em;text-transform:uppercase;}
+.platform-action a:hover{color:#e8d5a3!important;}
+.squat-row{padding:8px 22px 12px 192px;font-family:var(--mono);font-size:10px;color:rgba(232,123,74,0.85)!important;border-bottom:1px solid var(--border);background:rgba(232,123,74,0.04);}
+.unverif-note{padding:0 22px 10px 192px;font-family:var(--mono);font-size:9.5px;color:rgba(126,184,228,0.65)!important;line-height:1.6;}
+
+/* Pattern card (Reverse mode) */
+.pattern-card{background:var(--bg2);border:1px solid var(--border);padding:24px 28px;}
+.pattern-base-row{display:flex;align-items:baseline;gap:14px;margin-bottom:14px;flex-wrap:wrap;}
+.pattern-label{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(240,236,228,0.50)!important;}
+.pattern-value{font-family:var(--serif);font-size:32px;font-style:italic;font-weight:400;color:#e8d5a3!important;}
+.pattern-value.mono{font-family:var(--mono);font-size:18px;font-style:normal;}
+.pattern-list{margin-top:16px;display:flex;flex-direction:column;gap:8px;}
+.pattern-item{font-family:var(--mono);font-size:11.5px;color:rgba(240,236,228,0.75)!important;padding:10px 14px;border:1px solid var(--border);border-left:3px solid var(--accent);background:rgba(200,169,110,0.04);}
+.pattern-item strong{color:#e8d5a3!important;}
+
+/* Generate-only category headers */
+.gen-cat{margin-top:18px;}
+.gen-cat-head{font-family:var(--mono);font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:0.14em;color:rgba(200,169,110,0.65)!important;display:flex;align-items:center;gap:14px;margin-bottom:10px;padding-top:14px;}
+.gen-cat-head::after{content:'';flex:1;height:1px;background:var(--border);}
+.gen-cat-count{font-family:var(--mono);font-size:9.5px;color:rgba(240,236,228,0.40)!important;}
+.gen-list{display:flex;flex-wrap:wrap;gap:6px;}
+.gen-chip{font-family:var(--mono);font-size:11.5px;color:#e8d5a3!important;padding:7px 12px;border:1px solid var(--border);background:var(--bg2);cursor:copy;transition:all 0.15s;}
+.gen-chip:hover{border-color:rgba(200,169,110,0.30);color:#c8a96e!important;background:rgba(200,169,110,0.04);}
+.gen-chip .chip-score{font-size:9px;color:rgba(200,169,110,0.55)!important;margin-left:6px;}
+
+/* Empty */
+.empty{padding:24px 24px;font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.30)!important;text-align:center;}
+
+/* Footer */
+.footer{margin-top:clamp(48px,8vw,80px);padding:28px 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.footer-left{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.50)!important;}
+.footer-left strong{color:#c8a96e!important;}
+.footer-right{font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.35)!important;max-width:540px;text-align:right;line-height:1.6;}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:translateY(0);}}
+
+@media(max-width:900px){
+  .heatmap-table th.platform-col-wrap{height:100px;}
+  .heatmap-table th.platform-col-wrap > div{width:80px;}
+  .platform-row{grid-template-columns:1fr 90px 60px;gap:8px;}
+  .platform-row .platform-url{display:none;}
+  .squat-row{padding:8px 18px 12px 18px;}
+  .unverif-note{padding:0 18px 10px 18px;}
+}
+@media(max-width:768px){
+  .seo-block-header{padding:10px 16px;}
+  .seo-block-body{padding:0 16px 14px;}
+  .footer-right{text-align:left;max-width:100%;}
+  .mode-pills{width:100%;}
+  .mode-pill{flex:1 0 50%;justify-content:center;font-size:10px;padding:10px 12px;}
+  .handle-input{border-right:1px solid var(--border);min-width:100%;}
+  .btn-go{width:100%;margin-top:2px;}
+  .toolbar-row{flex-direction:column;align-items:stretch;}
+  .filter-pills,.view-toggle,.export-row{justify-content:center;}
+}
+</style>
+</head>
+<body>
+<div class="page-wrap">
+
+  <section class="hero">
+    <div class="eyebrow"><span>Identity & Attribution</span></div>
+    <h1>Username <em>Permutator</em> &amp; Availability Checker</h1>
+    <p class="hero-sub">Generate variations of any username — leetspeak, separators, year suffixes, prefix/suffix words, typos, phonetic swaps — and check which ones are taken or unclaimed across 30+ platforms. Built for brand protection, sock-puppet hunting, and finding alt-account naming patterns.</p>
+  </section>
+
+  <div class="seo-block">
+    <div class="seo-block-header" onclick="toggleSEO()">
+      <div class="seo-block-label">What This Tool Does (and What It Cannot Do)</div>
+      <button class="seo-toggle-btn" id="seoToggleBtn">Read More</button>
+    </div>
+    <div class="seo-block-body" id="seoBlockBody">
+      <p>Free <strong>username permutation generator</strong> and <strong>cross-platform availability checker</strong> for OSINT investigators, brand protection teams, and security researchers. Paste any base username and the tool generates dozens of categorized variations — <strong>numeric suffixes</strong> (jane2024, jane99), <strong>leetspeak substitutions</strong> (j4ne, jan3), <strong>separator inserts and strips</strong> (jane_doe, janedoe), <strong>prefix/suffix words</strong> (real_jane, jane_official, jane_hq), <strong>doubled-letter typos</strong> (jaane, jannie), <strong>truncations</strong> (jan, janed), <strong>phonetic swaps</strong>, <strong>case variants</strong>, and <strong>reversals</strong>. Each permutation is scored 0–100 by a heuristic that ranks how likely the variation is to be a real alt-handle (year suffixes and "real/official/hq" suffixes rank highest). The <strong>Quick Check</strong> mode probes ~10 high-reliability platforms; <strong>Deep Check</strong> hits 25+ platforms; <strong>Brand Protection</strong> mode focuses on impersonation-risk variants and runs a "squat signal" check on the highest-value platforms (low Reddit karma, empty GitHub profiles). The <strong>Reverse Pattern</strong> mode takes a list of known handles and extracts the common base + naming convention so you can predict the next likely handle. <strong>Honest framing throughout:</strong> we label results as <em>Taken / Not Found / Unverifiable</em> — never "Available" — because a 404 doesn't guarantee a username is registrable (it may be reserved, deactivated, banned, or simply protected). Platforms that require JavaScript or login (Instagram, TikTok, LinkedIn, X, Threads, Facebook) are flagged as <strong>low reliability</strong> with explicit notes — we attempt the probe but the result is best-effort. All data sources are public HTTP probes; no API keys, no signup, no logging of inputs. Used by <strong>journalists tracking sock-puppet networks</strong>, <strong>brand and IP protection teams</strong>, <strong>investigators identifying typo-squat domains and handles</strong>, and <strong>analysts mapping coordinated inauthentic behavior</strong>.</p>
+      <div class="seo-tags">
+        <span class="seo-tag">Username Permutation</span><span class="seo-tag">Availability Checker</span>
+        <span class="seo-tag">Brand Protection</span><span class="seo-tag">Sock Puppet Hunting</span>
+        <span class="seo-tag">Typo Squatting</span><span class="seo-tag">Leetspeak Detection</span>
+        <span class="seo-tag">Cross-Platform OSINT</span><span class="seo-tag">Identity Attribution</span>
+        <span class="seo-tag">Handle Variations</span><span class="seo-tag">Pattern Extraction</span>
+        <span class="seo-tag">Free Tool</span><span class="seo-tag">No API Key</span>
+      </div>
+    </div>
+  </div>
+
+  <section class="tool-panel">
+    <div class="section-label">Username Permutator &amp; Availability</div>
+
+    <div class="mode-pills" role="tablist">
+      <button class="mode-pill active" data-mode="generate" onclick="selectMode('generate')" role="tab">
+        <span class="mode-pill-icon">⊕</span> Generate
+      </button>
+      <button class="mode-pill" data-mode="quick" onclick="selectMode('quick')" role="tab">
+        <span class="mode-pill-icon">◐</span> Quick Check
+      </button>
+      <button class="mode-pill" data-mode="deep" onclick="selectMode('deep')" role="tab">
+        <span class="mode-pill-icon">◑</span> Deep Check
+      </button>
+      <button class="mode-pill" data-mode="brand" onclick="selectMode('brand')" role="tab">
+        <span class="mode-pill-icon">⌖</span> Brand Protection
+      </button>
+      <button class="mode-pill" data-mode="reverse" onclick="selectMode('reverse')" role="tab">
+        <span class="mode-pill-icon">↻</span> Reverse Pattern
+      </button>
+    </div>
+
+    <!-- GENERATE MODE -->
+    <div class="mode-content active" id="modeGenerate">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="genInput" placeholder="Base username (e.g. johnsmith)"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doGenerate()">
+        <button class="btn-go" id="btnGen" onclick="doGenerate()">Generate →</button>
+      </div>
+      <div class="input-hint">Instant — runs entirely in your browser. No network call.</div>
+      <div class="cat-toggle-row" id="genCats">
+        <button class="cat-toggle on" data-cat="numeric" onclick="toggleCat(this)">Numeric</button>
+        <button class="cat-toggle on" data-cat="leet" onclick="toggleCat(this)">Leetspeak</button>
+        <button class="cat-toggle on" data-cat="separator" onclick="toggleCat(this)">Separator</button>
+        <button class="cat-toggle on" data-cat="prefix_suffix" onclick="toggleCat(this)">Prefix/Suffix</button>
+        <button class="cat-toggle on" data-cat="typo" onclick="toggleCat(this)">Typo</button>
+        <button class="cat-toggle on" data-cat="truncation" onclick="toggleCat(this)">Truncation</button>
+        <button class="cat-toggle on" data-cat="case" onclick="toggleCat(this)">Case</button>
+        <button class="cat-toggle on" data-cat="phonetic" onclick="toggleCat(this)">Phonetic</button>
+        <button class="cat-toggle" data-cat="reversal" onclick="toggleCat(this)">Reversal</button>
+      </div>
+      <button class="btn-link" onclick="toggleCustomRules()">+ Custom substitution rules</button>
+      <div class="custom-rules" id="customRules">
+        <div class="rule-row">
+          <input type="text" class="handle-input" placeholder="find" data-rule-find>
+          <span class="arrow">→</span>
+          <input type="text" class="handle-input" placeholder="replace" data-rule-rep>
+          <button class="rule-x" onclick="this.parentElement.remove()">×</button>
+        </div>
+        <button class="btn-link" onclick="addRuleRow()">+ add another rule</button>
+      </div>
+      <div class="privacy-notice">
+        🔒 <strong>Privacy:</strong> Generation runs in your browser — your input never reaches our server in this mode.
+      </div>
+    </div>
+
+    <!-- QUICK CHECK MODE -->
+    <div class="mode-content" id="modeQuick">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="quickInput" placeholder="Base username (e.g. johnsmith)"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doCheck('quick')">
+        <button class="btn-go" id="btnQuick" onclick="doCheck('quick')">Check →</button>
+      </div>
+      <div class="input-hint">~30 prioritized permutations checked across 10 high-reliability platforms.</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 15–40 seconds. Runs ~300 HTTP probes in parallel batches.
+      </div>
+    </div>
+
+    <!-- DEEP CHECK MODE -->
+    <div class="mode-content" id="modeDeep">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="deepInput" placeholder="Base username"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doCheck('deep')">
+        <button class="btn-go" id="btnDeep" onclick="doCheck('deep')">Deep Check →</button>
+      </div>
+      <div class="input-hint">~30 permutations × 25+ platforms (including JS-rendered ones flagged as Unverifiable).</div>
+      <div class="honesty-notice">
+        <strong>Honesty note:</strong> "Not Found" does not mean "Available to register." Platforms reserve, deactivate, or restrict usernames — we report what we verified, nothing more.
+      </div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 30–90 seconds. Up to 750 HTTP probes.
+      </div>
+    </div>
+
+    <!-- BRAND PROTECTION MODE -->
+    <div class="mode-content" id="modeBrand">
+      <div class="search-row">
+        <input type="text" class="handle-input" id="brandInput" placeholder="Brand name or handle"
+          autocomplete="off" spellcheck="false"
+          onkeydown="if(event.key==='Enter')doCheck('brand')">
+        <button class="btn-go" id="btnBrand" onclick="doCheck('brand')">Scan →</button>
+      </div>
+      <div class="input-hint">Prioritizes impersonation-risk variants (real_, _official, doubled-letter typos) on 15 high-traffic platforms. Includes squat-signal check on Reddit and GitHub.</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> 30–60 seconds.
+      </div>
+    </div>
+
+    <!-- REVERSE PATTERN MODE -->
+    <div class="mode-content" id="modeReverse">
+      <textarea class="batch-textarea" id="reverseInput"
+        placeholder="One username per line — paste 2 or more known handles to extract the naming pattern.&#10;Example:&#10;johnsmith2024&#10;johnsmith_2025&#10;johnsmith.real"></textarea>
+      <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;">
+        <button class="btn-go" id="btnReverse" onclick="doReverse()">Extract Pattern →</button>
+      </div>
+      <div class="input-hint">Identifies the shared base + naming convention (year suffixes, separators, casing, common word suffixes).</div>
+      <div class="processing-warning">
+        ⏱ <strong>Processing time:</strong> Instant.
+      </div>
+    </div>
+
+    <!-- Dynamic processing overlay -->
+    <div class="processing-overlay" id="processingOverlay">
+      <div class="processing-head">
+        <div class="processing-spinner"></div>
+        <div class="processing-title" id="processingTitle">Processing…</div>
+        <div class="processing-time" id="processingTime">0s</div>
+      </div>
+      <div class="processing-eta" id="processingETA">—</div>
+      <div class="processing-step-list" id="processingSteps"></div>
+      <div class="processing-bar"><div class="processing-bar-inner"></div></div>
+    </div>
+
+    <!-- Results -->
+    <div class="results-wrap" id="resultsWrap"></div>
+  </section>
+
+  <footer class="footer">
+    <div class="footer-left">© 2025 <strong>The Intel Desk</strong></div>
+    <div class="footer-right">Public HTTP probes · Reliability-tagged platform list · Heuristic permutation scoring · No account creation, no logging.</div>
+  </footer>
+
+</div>
+
+<script>
+const PROXY = 'https://intel-desk-api.onrender.com';
+
+let lastResult = null;
+let processingTimer = null;
+let processingStartTime = 0;
+let currentFilter = 'all';
+let currentView = 'heatmap';
+
+function esc(s){
+  return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function toggleSEO(){
+  const b = document.getElementById('seoBlockBody');
+  const btn = document.getElementById('seoToggleBtn');
+  const e = b.classList.toggle('expanded');
+  btn.textContent = e ? 'Show Less' : 'Read More';
+}
+
+function selectMode(name){
+  document.querySelectorAll('.mode-pill').forEach(p=>p.classList.toggle('active',p.dataset.mode===name));
+  document.querySelectorAll('.mode-content').forEach(m=>m.classList.remove('active'));
+  document.getElementById('mode'+name.charAt(0).toUpperCase()+name.slice(1)).classList.add('active');
+  document.getElementById('resultsWrap').classList.remove('visible');
+}
+
+function toggleCat(btn){
+  btn.classList.toggle('on');
+}
+function getActiveCats(){
+  return Array.from(document.querySelectorAll('#genCats .cat-toggle.on')).map(b=>b.dataset.cat);
+}
+
+function toggleCustomRules(){
+  document.getElementById('customRules').classList.toggle('visible');
+}
+function addRuleRow(){
+  const cont = document.getElementById('customRules');
+  const link = cont.querySelector('.btn-link');
+  const row = document.createElement('div');
+  row.className = 'rule-row';
+  row.innerHTML = `
+    <input type="text" class="handle-input" placeholder="find" data-rule-find>
+    <span class="arrow">→</span>
+    <input type="text" class="handle-input" placeholder="replace" data-rule-rep>
+    <button class="rule-x" onclick="this.parentElement.remove()">×</button>`;
+  cont.insertBefore(row, link);
+}
+function getCustomRules(){
+  return Array.from(document.querySelectorAll('#customRules .rule-row')).map(row=>{
+    const f = row.querySelector('[data-rule-find]').value.trim();
+    const r = row.querySelector('[data-rule-rep]').value.trim();
+    return f ? {find:f, replace:r} : null;
+  }).filter(Boolean);
+}
+
+function showProcessing(title, eta, steps){
+  document.getElementById('processingTitle').textContent = title;
+  document.getElementById('processingETA').textContent = eta;
+  const stepsEl = document.getElementById('processingSteps');
+  stepsEl.innerHTML = steps.map((s,i)=>`<div class="processing-step ${i===0?'active':''}"><span class="step-icon">${i===0?'◌':'·'}</span>${esc(s)}</div>`).join('');
+  document.getElementById('processingOverlay').classList.add('visible');
+  processingStartTime = Date.now();
+  if (processingTimer) clearInterval(processingTimer);
+  processingTimer = setInterval(()=>{
+    const sec = Math.floor((Date.now()-processingStartTime)/1000);
+    document.getElementById('processingTime').textContent = sec+'s';
+    const stepEls = stepsEl.querySelectorAll('.processing-step');
+    const totalSteps = stepEls.length;
+    const targetStep = Math.min(totalSteps-1, Math.floor(sec/Math.max(3, Math.floor(20/totalSteps))));
+    stepEls.forEach((el,i)=>{
+      el.classList.remove('active','done');
+      const icon = el.querySelector('.step-icon');
+      if (i < targetStep) { el.classList.add('done'); icon.textContent='✓'; }
+      else if (i === targetStep) { el.classList.add('active'); icon.textContent='◌'; }
+      else { icon.textContent='·'; }
+    });
+  }, 250);
+}
+function hideProcessing(){
+  if (processingTimer){ clearInterval(processingTimer); processingTimer=null; }
+  document.getElementById('processingOverlay').classList.remove('visible');
+}
+function markAllStepsDone(){
+  document.querySelectorAll('.processing-step').forEach(el=>{
+    el.classList.remove('active'); el.classList.add('done');
+    el.querySelector('.step-icon').textContent='✓';
+  });
+}
+
+function showError(msg){
+  const w = document.getElementById('resultsWrap');
+  w.innerHTML = `
+    <div class="verdict-banner" style="background:rgba(192,57,43,0.05);border-color:rgba(192,57,43,0.30);">
+      <div class="verdict-icon" style="color:#c0392b;">!</div>
+      <div class="verdict-text">
+        <div class="verdict-title">Error</div>
+        <div class="verdict-sub">${esc(msg)}</div>
+      </div>
+    </div>`;
+  w.classList.add('visible');
+}
+
+function cleanInput(raw){
+  if (!raw) return null;
+  let s = String(raw).trim();
+  s = s.replace(/^https?:\/\/[^\/]+\/(?:user\/|users\/|@|in\/|add\/|u\/)?/i, '');
+  s = s.replace(/^@/, '').split('/')[0].split('?')[0].split('#')[0].trim();
+  if (!s || s.length > 64) return null;
+  if (!/^[A-Za-z0-9._\-]+$/.test(s)) return null;
+  return s;
+}
+
+/* ── Client-side permutation generator (mirrors backend) ── */
+const LEET_MAP = {o:'0', e:'3', a:'4', i:'1', s:'5', t:'7', b:'8', l:'1', g:'9'};
+const NUMERIC_SUFFIXES = ['1','2','7','13','21','23','47','69','77','99','100','123','420','777','1234','2024','2025','2026'];
+const WORD_SUFFIXES   = ['real','official','hq','yt','tv','ig','tg','live','us','uk','eu','jp','_real','_official','_hq'];
+const WORD_PREFIXES   = ['real','the','official','mr','ms','dr','real_','the_'];
+
+function leetSwap(s){
+  const out = [];
+  const sl = s.toLowerCase();
+  for (let i=0; i<sl.length; i++){
+    const c = sl[i];
+    if (LEET_MAP[c]){
+      out.push(sl.slice(0,i) + LEET_MAP[c] + sl.slice(i+1));
+    }
+  }
+  let full = '';
+  for (const c of sl) full += LEET_MAP[c] || c;
+  if (full !== sl) out.push(full);
+  return out;
+}
+function doubledTypos(s){
+  const out = [];
+  for (let i=0; i<s.length; i++){
+    const c = s[i];
+    if (/[a-zA-Z0-9]/.test(c) && (i===0 || s[i-1]!==c)){
+      out.push(s.slice(0,i) + c + c + s.slice(i));
+    }
+  }
+  return out;
+}
+function truncateVariants(s){
+  const out = [];
+  if (s.length > 4) out.push(s.slice(0,-1));
+  if (s.length > 5) out.push(s.slice(0,-2));
+  const noV = s.toLowerCase().replace(/[aeiouy]+$/, '');
+  if (noV && noV !== s.toLowerCase()) out.push(noV);
+  return out;
+}
+function separatorInserts(s){
+  const out = [];
+  const pieces = s.match(/[A-Z]?[a-z0-9]+|[A-Z]+(?=[A-Z][a-z]|\b)|[0-9]+/g) || [];
+  if (pieces.length > 1){
+    for (const sep of ['_','.','-']){
+      out.push(pieces.map(p=>p.toLowerCase()).join(sep));
+    }
+  }
+  const split = s.replace(/([a-zA-Z])([0-9])/, '$1_$2');
+  if (split !== s) out.push(split);
+  return out;
+}
+function separatorStrip(s){
+  const stripped = s.replace(/[._\-]/g, '');
+  return (stripped !== s && stripped) ? [stripped] : [];
+}
+function caseVariants(s){
+  return [s.toLowerCase(), s.toUpperCase(), s.charAt(0).toUpperCase()+s.slice(1).toLowerCase()];
+}
+function phoneticVariants(s){
+  const out = [];
+  const swaps = [['ph','f'],['ck','k'],['c','k'],['k','c'],['y','i'],['z','s'],['x','ks']];
+  for (const [src,dst] of swaps){
+    if (s.toLowerCase().includes(src)){
+      const v = s.toLowerCase().replace(src, dst);
+      if (v !== s.toLowerCase()) out.push(v);
+    }
+  }
+  return out;
+}
+
+function scorePermutation(u, base, category){
+  let score = 50;
+  const ub = u.toLowerCase(), bb = base.toLowerCase();
+  score -= Math.min(20, Math.abs(u.length - base.length) * 3);
+  if (category === 'numeric'){
+    if (/(?:202\d|199\d|19\d\d)$/.test(ub)) score += 20;
+    else if (/\d{1,3}$/.test(ub)) score += 12;
+  } else if (category === 'prefix_suffix'){
+    if (/(real|official|hq)/.test(ub)) score += 20;
+    else if (/(yt|tv|live)/.test(ub)) score += 10;
+  } else if (category === 'separator') score += 10;
+  else if (category === 'case') score += 5;
+  else if (category === 'typo') score += 8;
+  else if (category === 'leet'){
+    let replaced = 0;
+    for (let i=0; i<Math.min(ub.length,bb.length); i++) if (ub[i]!==bb[i]) replaced++;
+    if (replaced === 1) score += 10;
+    else if (replaced === 2) score += 6;
+    else score -= 5;
+  } else if (category === 'phonetic') score += 6;
+  else if (category === 'reversal') score -= 25;
+  else if (category === 'truncation') score += 4;
+  else if (category === 'custom') score = 70;
+  return Math.max(0, Math.min(100, score));
+}
+
+function generatePermutations(base, categories, customRules, limit){
+  const seen = new Set();
+  const out  = [];
+  function add(u, cat){
+    u = u.trim();
+    if (!u || u === base) return;
+    if (!/^[A-Za-z0-9._\-]+$/.test(u)) return;
+    if (u.length > 64) return;
+    const k = u.toLowerCase();
+    if (seen.has(k)) return;
+    seen.add(k);
+    out.push({username: u, category: cat, score: scorePermutation(u, base, cat)});
+  }
+  const cats = new Set(categories);
+  if (cats.has('numeric')){
+    for (const n of NUMERIC_SUFFIXES){
+      add(base+n, 'numeric'); add(base+'_'+n, 'numeric'); add(base+'.'+n, 'numeric');
+    }
+    for (let i=0; i<6; i++) add(NUMERIC_SUFFIXES[i]+base, 'numeric');
+  }
+  if (cats.has('leet'))
+    for (const v of leetSwap(base)) add(v, 'leet');
+  if (cats.has('separator')){
+    for (const v of separatorStrip(base)) add(v, 'separator');
+    for (const v of separatorInserts(base)) add(v, 'separator');
+  }
+  if (cats.has('prefix_suffix')){
+    for (const w of WORD_SUFFIXES){
+      add(base+w, 'prefix_suffix');
+      add(base+'_'+w.replace(/^_+|_+$/g,''), 'prefix_suffix');
+    }
+    for (const w of WORD_PREFIXES){
+      add(w+base, 'prefix_suffix');
+      add(w.replace(/^_+|_+$/g,'')+'_'+base, 'prefix_suffix');
+    }
+  }
+  if (cats.has('typo'))
+    for (const v of doubledTypos(base)) add(v, 'typo');
+  if (cats.has('truncation'))
+    for (const v of truncateVariants(base)) add(v, 'truncation');
+  if (cats.has('case'))
+    for (const v of caseVariants(base)) add(v, 'case');
+  if (cats.has('phonetic'))
+    for (const v of phoneticVariants(base)) add(v, 'phonetic');
+  if (cats.has('reversal') && base.length > 3)
+    add(base.split('').reverse().join(''), 'reversal');
+  // Custom rules
+  for (const rule of (customRules||[])){
+    if (!rule.find) continue;
+    if (base.includes(rule.find)){
+      const v = base.replace(rule.find, rule.replace || '');
+      if (v && v !== base) add(v, 'custom');
+    }
+  }
+  out.sort((a,b)=>b.score - a.score);
+  return out.slice(0, limit||200);
+}
+
+/* ── GENERATE MODE (client-side only) ── */
+function doGenerate(){
+  const base = cleanInput(document.getElementById('genInput').value);
+  if (!base){ alert('Enter a valid base username (letters, numbers, . _ - only).'); return; }
+  const cats = getActiveCats();
+  if (cats.length === 0){ alert('Enable at least one permutation category.'); return; }
+  const customRules = getCustomRules();
+  const perms = generatePermutations(base, cats, customRules, 200);
+  lastResult = { kind:'generate', base, permutations: perms };
+  renderGenerateResult(lastResult);
+}
+
+function renderGenerateResult(data){
+  const w = document.getElementById('resultsWrap');
+  // Group by category
+  const byCat = {};
+  for (const p of data.permutations){
+    (byCat[p.category] = byCat[p.category] || []).push(p);
+  }
+  const catOrder = ['prefix_suffix','numeric','separator','leet','typo','phonetic','case','truncation','reversal','custom'];
+  const catLabels = {
+    prefix_suffix:'Prefix / Suffix Words', numeric:'Numeric Suffixes',
+    separator:'Separator Variants', leet:'Leetspeak Substitutions',
+    typo:'Doubled-Letter Typos', phonetic:'Phonetic Swaps',
+    case:'Case Variants', truncation:'Truncations',
+    reversal:'Reversal', custom:'Custom Rules'
+  };
+  let html = `
+    <div class="verdict-banner info">
+      <div class="verdict-icon">⊕</div>
+      <div class="verdict-text">
+        <div class="verdict-title"><span class="verdict-handle">${esc(data.base)}</span> · <span style="font-family:var(--mono);font-size:14px;color:rgba(200,169,110,0.85);letter-spacing:0.06em;">${data.permutations.length} permutations</span></div>
+        <div class="verdict-sub">Generated client-side · ranked by likelihood-of-real-alt-handle heuristic · click any chip to copy</div>
+      </div>
+    </div>
+    <div class="toolbar-row">
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55);">Click chip to copy · score 0–100 to right of each chip</div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="exportGenerate('csv')">Export CSV</button>
+        <button class="btn-secondary" onclick="exportGenerate('json')">Export JSON</button>
+        <button class="btn-secondary" onclick="checkGenerated()">Check All →</button>
+      </div>
+    </div>`;
+  for (const cat of catOrder){
+    if (!byCat[cat] || !byCat[cat].length) continue;
+    html += `<div class="gen-cat">
+      <div class="gen-cat-head">${catLabels[cat]} <span class="gen-cat-count">${byCat[cat].length}</span></div>
+      <div class="gen-list">
+        ${byCat[cat].map(p=>`<span class="gen-chip" onclick="copyChip(this, '${esc(p.username)}')">${esc(p.username)}<span class="chip-score">${p.score}</span></span>`).join('')}
+      </div>
+    </div>`;
+  }
+  w.innerHTML = html;
+  w.classList.add('visible');
+}
+
+function copyChip(el, text){
+  navigator.clipboard.writeText(text).catch(()=>{});
+  const orig = el.innerHTML;
+  el.innerHTML = `copied · ${esc(text)}`;
+  setTimeout(()=>{ el.innerHTML = orig; }, 900);
+}
+
+function exportGenerate(fmt){
+  if (!lastResult || lastResult.kind !== 'generate') return;
+  if (fmt === 'json'){
+    download(`permutations_${lastResult.base}.json`, JSON.stringify(lastResult, null, 2), 'application/json');
+  } else {
+    const rows = [['username','category','score']];
+    for (const p of lastResult.permutations) rows.push([p.username, p.category, p.score]);
+    const csv = rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    download(`permutations_${lastResult.base}.csv`, csv, 'text/csv');
+  }
+}
+
+function checkGenerated(){
+  if (!lastResult || lastResult.kind !== 'generate') return;
+  if (!confirm(`This will run a Quick Check on the top 30 permutations across 10 platforms (~5 min). Continue?`)) return;
+  selectMode('quick');
+  document.getElementById('quickInput').value = lastResult.base;
+  doCheck('quick');
+}
+
+/* ── CHECK MODES (server-side) ── */
+async function doCheck(mode){
+  const inputId = mode==='quick'?'quickInput':mode==='deep'?'deepInput':'brandInput';
+  const base = cleanInput(document.getElementById(inputId).value);
+  if (!base){ alert('Enter a valid base username.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+
+  // Build permutations client-side (so user sees what's being checked, and we cap to top N)
+  const cats = ['numeric','leet','separator','prefix_suffix','typo','case'];
+  if (mode === 'brand'){
+    // Brand prioritizes prefix_suffix + typo
+    var perms = generatePermutations(base, ['prefix_suffix','typo','separator','numeric'], [], 60);
+    perms = perms.slice(0, 30);
+  } else {
+    var perms = generatePermutations(base, cats, [], 60).slice(0, 30);
+  }
+  // Always include base itself
+  const usernames = [base, ...perms.map(p=>p.username)].slice(0, 32);
+  // Save permutation metadata for rendering
+  const permMeta = {[base]: {category:'base', score:100}};
+  for (const p of perms) permMeta[p.username] = {category:p.category, score:p.score};
+
+  const platformCount = mode==='quick' ? 10 : mode==='deep' ? 28 : 15;
+  const totalChecks = usernames.length * platformCount;
+  const eta = `Expected: ${mode==='quick'?'15–40s':mode==='deep'?'30–90s':'30–60s'}. ~${totalChecks} HTTP probes in parallel.`;
+
+  showProcessing(
+    `${mode==='brand'?'Brand-protection scan':mode==='deep'?'Deep availability check':'Quick availability check'} — ${base}`,
+    eta,
+    [
+      'Generating prioritized permutations',
+      `Probing ${platformCount} platforms in parallel`,
+      mode==='brand'?'Running squat-signal checks':'Aggregating per-username results',
+      'Building heatmap',
+    ]
+  );
+
+  try {
+    const r = await fetch(`${PROXY}/username-availability`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        usernames,
+        mode,
+        squat_check: mode === 'brand',
+      })
+    });
+    const data = await r.json();
+    if (data.error){ hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'check', mode, base, permMeta, ...data };
+    markAllStepsDone();
+    setTimeout(()=>{ hideProcessing(); renderCheckResult(lastResult); }, 350);
+  } catch(e){
+    hideProcessing();
+    showError('Check failed: ' + e.message);
+  }
+}
+
+function renderCheckResult(data){
+  const w = document.getElementById('resultsWrap');
+  currentFilter = 'all';
+  currentView = 'heatmap';
+
+  const stats = data.stats;
+  const total = stats.taken + stats.not_found + stats.unverifiable + stats.error;
+
+  // Platform list and meta
+  const platforms = data.platforms;
+  const meta = data.platform_meta || {};
+
+  // Build heatmap
+  const lookup = {};
+  for (const r of data.results){
+    lookup[r.username + '|' + r.platform] = r;
+  }
+
+  let html = `
+    <div class="verdict-banner info">
+      <div class="verdict-icon">⌖</div>
+      <div class="verdict-text">
+        <div class="verdict-title"><span class="verdict-handle">${esc(data.base)}</span> · <span style="font-family:var(--mono);font-size:14px;color:rgba(200,169,110,0.85);letter-spacing:0.06em;">${data.usernames.length} variants × ${platforms.length} platforms = ${total} probes</span></div>
+        <div class="verdict-sub">Mode: <strong style="color:#e8d5a3;">${data.mode}</strong> · Click any cell or username row for details · "Not Found" ≠ "Available to register"</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat"><div class="stat-label">Taken</div><div class="stat-value">${stats.taken}</div></div>
+      <div class="stat"><div class="stat-label">Not Found</div><div class="stat-value green">${stats.not_found}</div></div>
+      <div class="stat"><div class="stat-label">Unverifiable</div><div class="stat-value warn">${stats.unverifiable}</div></div>
+      <div class="stat"><div class="stat-label">Errors</div><div class="stat-value dim">${stats.error}</div></div>
+    </div>
+    <div class="toolbar-row">
+      <div class="filter-pills">
+        <button class="filter-pill active" onclick="setFilter('all')">All</button>
+        <button class="filter-pill" onclick="setFilter('not_found')">Not Found</button>
+        <button class="filter-pill" onclick="setFilter('taken')">Taken</button>
+        <button class="filter-pill" onclick="setFilter('unverifiable')">Unverifiable</button>
+      </div>
+      <div class="view-toggle">
+        <button class="active" onclick="setView('heatmap')">Heatmap</button>
+        <button onclick="setView('list')">List</button>
+      </div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="exportCheck('csv')">Export CSV</button>
+        <button class="btn-secondary" onclick="exportCheck('json')">Export JSON</button>
+      </div>
+    </div>
+    <div class="heatmap-wrap" id="heatmapWrap">${buildHeatmap(data, lookup, platforms, meta)}</div>
+    <div class="list-wrap hidden" id="listWrap">${buildList(data, lookup, platforms, meta)}</div>`;
+
+  w.innerHTML = html;
+  w.classList.add('visible');
+}
+
+function buildHeatmap(data, lookup, platforms, meta){
+  let head = `<table class="heatmap-table"><thead><tr><th class="username-col">Username</th>`;
+  for (const p of platforms){
+    const m = meta[p] || {};
+    const lowRel = m.reliability === 'low';
+    head += `<th class="platform-col-wrap${lowRel?' low-rel':''}" title="${esc(m.note||'')}"><div>${esc(p)}${lowRel?' ⚠':''}</div></th>`;
+  }
+  head += `</tr></thead><tbody>`;
+  let body = '';
+  for (const u of data.usernames){
+    const meta_u = data.permMeta && data.permMeta[u];
+    const cat = meta_u ? meta_u.category : '';
+    body += `<tr data-username="${esc(u)}"><td class="username-cell">${esc(u)}${cat && cat!=='base' ? `<span class="perm-cat">${esc(cat)}</span>` : (cat==='base'?'<span class="perm-cat" style="color:rgba(200,169,110,0.85);">BASE</span>':'')}</td>`;
+    for (const p of platforms){
+      const r = lookup[u+'|'+p];
+      const status = r ? r.status : 'error';
+      const reason = r ? (r.reason || '') : '';
+      const tooltip = `${u} on ${p}: ${status}${reason?' ('+reason+')':''}`;
+      body += `<td class="heat-cell" title="${esc(tooltip)}" data-status="${status}" onclick="openDetail('${esc(u)}','${esc(p)}')"><span class="heat-dot ${status}"></span></td>`;
+    }
+    body += `</tr>`;
+  }
+  return head + body + '</tbody></table>';
+}
+
+function buildList(data, lookup, platforms, meta){
+  let html = '';
+  for (const u of data.usernames){
+    const meta_u = data.permMeta && data.permMeta[u];
+    const cat = meta_u ? meta_u.category : '';
+    const score = meta_u ? meta_u.score : null;
+    let counts = {taken:0, not_found:0, unverifiable:0, error:0};
+    let rows = '';
+    for (const p of platforms){
+      const r = lookup[u+'|'+p];
+      if (!r) continue;
+      counts[r.status] = (counts[r.status]||0) + 1;
+      const m = meta[p] || {};
+      const lowRel = m.reliability === 'low';
+      rows += `<div class="platform-row${lowRel?' low-rel':''}">
+        <div class="platform-name">${esc(p)}${lowRel?'<span class="rel-badge">⚠ low-rel</span>':''}</div>
+        <div class="platform-status ${r.status}">${r.status.replace('_',' ')}</div>
+        <div class="platform-url"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer nofollow">${esc(r.url)}</a></div>
+        <div class="platform-action"><a href="${esc(r.url)}" target="_blank" rel="noopener noreferrer nofollow">open ↗</a></div>
+      </div>`;
+      if (r.squat){
+        rows += `<div class="squat-row">⚠ Squat signal: ${esc(r.squat.signal)} — ${esc(r.squat.details||'')}</div>`;
+      }
+      if (r.status === 'unverifiable' && m.note){
+        rows += `<div class="unverif-note">${esc(m.note)}</div>`;
+      }
+    }
+    html += `<div class="uname-card" data-username="${esc(u)}"><div class="uname-head" onclick="this.parentElement.classList.toggle('expanded')">
+      <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+        <div class="uname-name">${esc(u)}</div>
+        ${cat==='base'?'<span class="uname-cat-tag">BASE</span>':cat?`<span class="uname-cat-tag">${esc(cat)}${score!==null?' · '+score:''}</span>`:''}
+      </div>
+      <div class="uname-summary">
+        <span class="t-taken">⊕ taken ${counts.taken}</span>
+        <span class="t-nf">○ not found ${counts.not_found}</span>
+        <span class="t-uv">? unverifiable ${counts.unverifiable}</span>
+        ${counts.error?`<span class="t-er">! errors ${counts.error}</span>`:''}
+      </div>
+      <div class="uname-toggle">+</div>
+    </div><div class="uname-body">${rows}</div></div>`;
+  }
+  return html || '<div class="empty">No results.</div>';
+}
+
+function setFilter(f){
+  currentFilter = f;
+  document.querySelectorAll('.filter-pill').forEach(b=>b.classList.toggle('active', b.textContent.toLowerCase().replace(' ','_').includes(f)||(f==='all'&&b.textContent==='All')));
+  applyFilter();
+}
+function setView(v){
+  currentView = v;
+  document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.toggle('active', b.textContent.toLowerCase()===v));
+  document.getElementById('heatmapWrap').classList.toggle('hidden', v!=='heatmap');
+  document.getElementById('listWrap').classList.toggle('hidden', v!=='list');
+}
+function applyFilter(){
+  // For heatmap: dim non-matching cells
+  document.querySelectorAll('.heat-cell').forEach(td=>{
+    const s = td.dataset.status;
+    if (currentFilter === 'all'){
+      td.style.opacity = '1';
+    } else {
+      td.style.opacity = s === currentFilter ? '1' : '0.18';
+    }
+  });
+  // For list: hide rows with no matching results
+  document.querySelectorAll('.uname-card').forEach(card=>{
+    if (currentFilter === 'all'){ card.style.display=''; return; }
+    const has = card.querySelectorAll(`.platform-status.${currentFilter}`).length > 0;
+    card.style.display = has ? '' : 'none';
+  });
+}
+function openDetail(u, p){
+  setView('list');
+  document.querySelectorAll('.view-toggle button').forEach(b=>b.classList.toggle('active', b.textContent.toLowerCase()==='list'));
+  const card = document.querySelector(`.uname-card[data-username="${u}"]`);
+  if (card){
+    card.classList.add('expanded');
+    card.scrollIntoView({behavior:'smooth', block:'center'});
+  }
+}
+
+function exportCheck(fmt){
+  if (!lastResult || lastResult.kind !== 'check') return;
+  const r = lastResult;
+  if (fmt === 'json'){
+    download(`availability_${r.base}_${r.mode}.json`, JSON.stringify(r, null, 2), 'application/json');
+  } else {
+    const rows = [['username','category','score','platform','status','reason','url','reliability']];
+    for (const x of r.results){
+      const m = r.platform_meta[x.platform] || {};
+      const meta_u = r.permMeta[x.username] || {};
+      rows.push([x.username, meta_u.category||'', meta_u.score||'', x.platform, x.status, x.reason||'', x.url||'', m.reliability||'']);
+    }
+    const csv = rows.map(rr=>rr.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    download(`availability_${r.base}_${r.mode}.csv`, csv, 'text/csv');
+  }
+}
+
+/* ── REVERSE PATTERN MODE ── */
+async function doReverse(){
+  const raw = document.getElementById('reverseInput').value || '';
+  const usernames = raw.split(/[\n,]/).map(s=>s.trim()).filter(s=>s && /^[A-Za-z0-9._\-]+$/.test(s));
+  if (usernames.length < 2){ alert('Enter at least 2 valid usernames.'); return; }
+  document.getElementById('resultsWrap').classList.remove('visible');
+  showProcessing(
+    `Extracting pattern from ${usernames.length} usernames…`,
+    'Expected: Instant.',
+    ['Finding longest common substring','Detecting numeric/word suffix patterns','Identifying separator and casing conventions']
+  );
+  try {
+    const r = await fetch(`${PROXY}/username-pattern`, {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({usernames})
+    });
+    const data = await r.json();
+    if (data.error){ hideProcessing(); showError(data.error); return; }
+    lastResult = { kind:'pattern', ...data };
+    markAllStepsDone();
+    setTimeout(()=>{ hideProcessing(); renderPatternResult(lastResult); }, 250);
+  } catch(e){
+    hideProcessing();
+    showError('Pattern extraction failed: ' + e.message);
+  }
+}
+
+function renderPatternResult(data){
+  const w = document.getElementById('resultsWrap');
+  const r = data.result;
+  const labels = {
+    year_suffix: u=>`<strong>Year suffix</strong> — ${u.matches}/${u.total} handles end with a year (19xx or 20xx).`,
+    numeric_suffix: u=>`<strong>Numeric suffix</strong> — ${u.matches}/${u.total} handles end with digits.`,
+    word_suffix: u=>`<strong>Word suffix</strong> — ${u.matches}/${u.total} handles end with "${esc(u.value)}".`,
+    all_have_separators: u=>`<strong>All separated</strong> — every handle (${u.matches}/${u.total}) contains <code>_ . -</code>.`,
+    no_separators: u=>`<strong>No separators</strong> — none of ${u.total} handles contain <code>_ . -</code>.`,
+    all_lowercase: u=>`<strong>All lowercase</strong> — ${u.matches}/${u.total} handles are entirely lowercase.`,
+  };
+  let html = `
+    <div class="verdict-banner info">
+      <div class="verdict-icon">↻</div>
+      <div class="verdict-text">
+        <div class="verdict-title"><span class="verdict-handle">Pattern Extracted</span></div>
+        <div class="verdict-sub">${data.input.length} input handles · ${r.patterns.length} convention(s) detected</div>
+      </div>
+    </div>
+    <div class="pattern-card">
+      <div class="pattern-base-row">
+        <span class="pattern-label">Common base</span>
+        <span class="pattern-value">${r.base ? esc(r.base) : '—'}</span>
+      </div>
+      <div class="pattern-base-row">
+        <span class="pattern-label">Shared core (alphanumeric only)</span>
+        <span class="pattern-value mono">${r.shared_alnum ? esc(r.shared_alnum) : '—'}</span>
+      </div>
+      <div class="pattern-base-row">
+        <span class="pattern-label">Avg length</span>
+        <span class="pattern-value mono">${r.common_length.toFixed(1)}</span>
+      </div>
+      <div class="pattern-list">
+        ${r.patterns.length === 0 ? '<div class="empty">No strong conventions detected — handles vary too much.</div>' :
+          r.patterns.map(p=>`<div class="pattern-item">${labels[p.kind] ? labels[p.kind](p) : esc(JSON.stringify(p))}</div>`).join('')}
+      </div>
+    </div>
+    <div class="toolbar-row">
+      <div style="font-family:var(--mono);font-size:11px;color:rgba(240,236,228,0.55);">${data.input.length} handles analyzed</div>
+      <div class="export-row">
+        <button class="btn-secondary" onclick="patternToGenerate()">Use base as Generate seed →</button>
+      </div>
+    </div>`;
+  w.innerHTML = html;
+  w.classList.add('visible');
+}
+
+function patternToGenerate(){
+  if (!lastResult || lastResult.kind !== 'pattern') return;
+  const seed = lastResult.result.base || lastResult.result.shared_alnum;
+  if (!seed){ alert('No common base detected.'); return; }
+  selectMode('generate');
+  document.getElementById('genInput').value = seed;
+  doGenerate();
+}
+
+/* ── Download helper ── */
+function download(filename, content, mime){
+  const blob = new Blob([content], {type: mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ document.body.removeChild(a); URL.revokeObjectURL(a.href); }, 100);
+}
+</script>
+</body>
+</html>
